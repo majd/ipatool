@@ -11,6 +11,13 @@
 		A9CA48CA2658FB6900BC09D5 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = A9CA48C92658FB6900BC09D5 /* ArgumentParser */; };
 		A9CA48CD2658FBF700BC09D5 /* Download.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48CC2658FBF700BC09D5 /* Download.swift */; };
 		A9CA48CF2658FC7400BC09D5 /* IPATool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48CE2658FC7400BC09D5 /* IPATool.swift */; };
+		A9CA48D2265913B300BC09D5 /* HTTPRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48D1265913B300BC09D5 /* HTTPRequest.swift */; };
+		A9CA48D626591AC200BC09D5 /* HTTPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48D526591AC200BC09D5 /* HTTPClient.swift */; };
+		A9CA48D826591B0400BC09D5 /* URLSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48D726591B0400BC09D5 /* URLSession.swift */; };
+		A9CA48DA26591CE200BC09D5 /* HTTPMethod.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48D926591CE200BC09D5 /* HTTPMethod.swift */; };
+		A9CA48DC26591CF100BC09D5 /* HTTPPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48DB26591CF100BC09D5 /* HTTPPayload.swift */; };
+		A9CA48DE26591D6A00BC09D5 /* HTTPEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48DD26591D6A00BC09D5 /* HTTPEndpoint.swift */; };
+		A9CA48E026591E4000BC09D5 /* HTTPResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48DF26591E4000BC09D5 /* HTTPResponse.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -30,6 +37,13 @@
 		A9CA48C12658F93F00BC09D5 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A9CA48CC2658FBF700BC09D5 /* Download.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Download.swift; sourceTree = "<group>"; };
 		A9CA48CE2658FC7400BC09D5 /* IPATool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPATool.swift; sourceTree = "<group>"; };
+		A9CA48D1265913B300BC09D5 /* HTTPRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRequest.swift; sourceTree = "<group>"; };
+		A9CA48D526591AC200BC09D5 /* HTTPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPClient.swift; sourceTree = "<group>"; };
+		A9CA48D726591B0400BC09D5 /* URLSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = URLSession.swift; sourceTree = "<group>"; };
+		A9CA48D926591CE200BC09D5 /* HTTPMethod.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPMethod.swift; sourceTree = "<group>"; };
+		A9CA48DB26591CF100BC09D5 /* HTTPPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPPayload.swift; sourceTree = "<group>"; };
+		A9CA48DD26591D6A00BC09D5 /* HTTPEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPEndpoint.swift; sourceTree = "<group>"; };
+		A9CA48DF26591E4000BC09D5 /* HTTPResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPResponse.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -64,6 +78,7 @@
 			isa = PBXGroup;
 			children = (
 				A9CA48CB2658FBEB00BC09D5 /* Commands */,
+				A9CA48D02659138600BC09D5 /* Networking */,
 				A9CA48CE2658FC7400BC09D5 /* IPATool.swift */,
 				A9CA48C12658F93F00BC09D5 /* main.swift */,
 			);
@@ -78,12 +93,26 @@
 			path = Commands;
 			sourceTree = "<group>";
 		};
+		A9CA48D02659138600BC09D5 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				A9CA48D526591AC200BC09D5 /* HTTPClient.swift */,
+				A9CA48DD26591D6A00BC09D5 /* HTTPEndpoint.swift */,
+				A9CA48D926591CE200BC09D5 /* HTTPMethod.swift */,
+				A9CA48DB26591CF100BC09D5 /* HTTPPayload.swift */,
+				A9CA48D1265913B300BC09D5 /* HTTPRequest.swift */,
+				A9CA48DF26591E4000BC09D5 /* HTTPResponse.swift */,
+				A9CA48D726591B0400BC09D5 /* URLSession.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		A9CA48BD2658F93F00BC09D5 /* ipatool */ = {
+		A9CA48BD2658F93F00BC09D5 /* IPATool */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = A9CA48C52658F93F00BC09D5 /* Build configuration list for PBXNativeTarget "ipatool" */;
+			buildConfigurationList = A9CA48C52658F93F00BC09D5 /* Build configuration list for PBXNativeTarget "IPATool" */;
 			buildPhases = (
 				A9CA48BA2658F93F00BC09D5 /* Sources */,
 				A9CA48BB2658F93F00BC09D5 /* Frameworks */,
@@ -93,7 +122,7 @@
 			);
 			dependencies = (
 			);
-			name = ipatool;
+			name = IPATool;
 			packageProductDependencies = (
 				A9CA48C92658FB6900BC09D5 /* ArgumentParser */,
 			);
@@ -131,7 +160,7 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				A9CA48BD2658F93F00BC09D5 /* ipatool */,
+				A9CA48BD2658F93F00BC09D5 /* IPATool */,
 			);
 		};
 /* End PBXProject section */
@@ -142,7 +171,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				A9CA48CF2658FC7400BC09D5 /* IPATool.swift in Sources */,
+				A9CA48DE26591D6A00BC09D5 /* HTTPEndpoint.swift in Sources */,
+				A9CA48E026591E4000BC09D5 /* HTTPResponse.swift in Sources */,
+				A9CA48D626591AC200BC09D5 /* HTTPClient.swift in Sources */,
+				A9CA48DA26591CE200BC09D5 /* HTTPMethod.swift in Sources */,
+				A9CA48D826591B0400BC09D5 /* URLSession.swift in Sources */,
+				A9CA48D2265913B300BC09D5 /* HTTPRequest.swift in Sources */,
 				A9CA48C22658F93F00BC09D5 /* main.swift in Sources */,
+				A9CA48DC26591CF100BC09D5 /* HTTPPayload.swift in Sources */,
 				A9CA48CD2658FBF700BC09D5 /* Download.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -270,7 +306,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				MACOSX_DEPLOYMENT_TARGET = 10.10;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = ipatool;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
@@ -280,7 +316,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				MACOSX_DEPLOYMENT_TARGET = 10.10;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = ipatool;
 				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
@@ -297,7 +333,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		A9CA48C52658F93F00BC09D5 /* Build configuration list for PBXNativeTarget "ipatool" */ = {
+		A9CA48C52658F93F00BC09D5 /* Build configuration list for PBXNativeTarget "IPATool" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A9CA48C62658F93F00BC09D5 /* Debug */,
