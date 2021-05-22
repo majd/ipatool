@@ -26,6 +26,8 @@
 		A9CA48EE26592DD800BC09D5 /* StoreEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48ED26592DD800BC09D5 /* StoreEndpoint.swift */; };
 		A9CA48F026592DE100BC09D5 /* StoreRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48EF26592DE100BC09D5 /* StoreRequest.swift */; };
 		A9CA48F22659317E00BC09D5 /* StoreResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48F12659317E00BC09D5 /* StoreResponse.swift */; };
+		A9CA48F52659423C00BC09D5 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = A9CA48F42659423C00BC09D5 /* ZIPFoundation */; };
+		A9CA48F8265942D500BC09D5 /* SignatureClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48F7265942D500BC09D5 /* SignatureClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -60,6 +62,7 @@
 		A9CA48ED26592DD800BC09D5 /* StoreEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreEndpoint.swift; sourceTree = "<group>"; };
 		A9CA48EF26592DE100BC09D5 /* StoreRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreRequest.swift; sourceTree = "<group>"; };
 		A9CA48F12659317E00BC09D5 /* StoreResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreResponse.swift; sourceTree = "<group>"; };
+		A9CA48F7265942D500BC09D5 /* SignatureClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +71,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A9CA48CA2658FB6900BC09D5 /* ArgumentParser in Frameworks */,
+				A9CA48F52659423C00BC09D5 /* ZIPFoundation in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -96,6 +100,7 @@
 				A9CA48CB2658FBEB00BC09D5 /* Commands */,
 				A9CA48E1265926BF00BC09D5 /* iTunes */,
 				A9CA48D02659138600BC09D5 /* Networking */,
+				A9CA48F6265942A600BC09D5 /* Signature */,
 				A9CA48EA265929E000BC09D5 /* Store */,
 				A9CA48CE2658FC7400BC09D5 /* IPATool.swift */,
 				A9CA48C12658F93F00BC09D5 /* main.swift */,
@@ -147,6 +152,14 @@
 			path = Store;
 			sourceTree = "<group>";
 		};
+		A9CA48F6265942A600BC09D5 /* Signature */ = {
+			isa = PBXGroup;
+			children = (
+				A9CA48F7265942D500BC09D5 /* SignatureClient.swift */,
+			);
+			path = Signature;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -165,6 +178,7 @@
 			name = IPATool;
 			packageProductDependencies = (
 				A9CA48C92658FB6900BC09D5 /* ArgumentParser */,
+				A9CA48F42659423C00BC09D5 /* ZIPFoundation */,
 			);
 			productName = ipatool;
 			productReference = A9CA48BE2658F93F00BC09D5 /* ipatool */;
@@ -195,6 +209,7 @@
 			mainGroup = A9CA48B52658F93F00BC09D5;
 			packageReferences = (
 				A9CA48C82658FB6900BC09D5 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
+				A9CA48F32659423C00BC09D5 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 			);
 			productRefGroup = A9CA48BF2658F93F00BC09D5 /* Products */;
 			projectDirPath = "";
@@ -222,6 +237,7 @@
 				A9CA48D2265913B300BC09D5 /* HTTPRequest.swift in Sources */,
 				A9CA48C22658F93F00BC09D5 /* main.swift in Sources */,
 				A9CA48EC26592DD100BC09D5 /* StoreClient.swift in Sources */,
+				A9CA48F8265942D500BC09D5 /* SignatureClient.swift in Sources */,
 				A9CA48E92659281F00BC09D5 /* iTunesResponse.swift in Sources */,
 				A9CA48EE26592DD800BC09D5 /* StoreEndpoint.swift in Sources */,
 				A9CA48DC26591CF100BC09D5 /* HTTPPayload.swift in Sources */,
@@ -353,7 +369,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				PRODUCT_NAME = ipatool;
 				SWIFT_VERSION = 5.0;
 			};
@@ -363,7 +379,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				MACOSX_DEPLOYMENT_TARGET = 10.10;
+				MACOSX_DEPLOYMENT_TARGET = 10.11;
 				PRODUCT_NAME = ipatool;
 				SWIFT_VERSION = 5.0;
 			};
@@ -401,6 +417,14 @@
 				version = 0.4.3;
 			};
 		};
+		A9CA48F32659423C00BC09D5 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.9.12;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -408,6 +432,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = A9CA48C82658FB6900BC09D5 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
 			productName = ArgumentParser;
+		};
+		A9CA48F42659423C00BC09D5 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A9CA48F32659423C00BC09D5 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
