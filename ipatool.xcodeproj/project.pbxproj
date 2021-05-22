@@ -18,6 +18,10 @@
 		A9CA48DC26591CF100BC09D5 /* HTTPPayload.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48DB26591CF100BC09D5 /* HTTPPayload.swift */; };
 		A9CA48DE26591D6A00BC09D5 /* HTTPEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48DD26591D6A00BC09D5 /* HTTPEndpoint.swift */; };
 		A9CA48E026591E4000BC09D5 /* HTTPResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48DF26591E4000BC09D5 /* HTTPResponse.swift */; };
+		A9CA48E3265926D200BC09D5 /* iTunesClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48E2265926D200BC09D5 /* iTunesClient.swift */; };
+		A9CA48E5265926DB00BC09D5 /* iTunesRequest.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48E4265926DB00BC09D5 /* iTunesRequest.swift */; };
+		A9CA48E72659273700BC09D5 /* iTunesEndpoint.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48E62659273700BC09D5 /* iTunesEndpoint.swift */; };
+		A9CA48E92659281F00BC09D5 /* iTunesResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48E82659281F00BC09D5 /* iTunesResponse.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -44,6 +48,10 @@
 		A9CA48DB26591CF100BC09D5 /* HTTPPayload.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPPayload.swift; sourceTree = "<group>"; };
 		A9CA48DD26591D6A00BC09D5 /* HTTPEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPEndpoint.swift; sourceTree = "<group>"; };
 		A9CA48DF26591E4000BC09D5 /* HTTPResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPResponse.swift; sourceTree = "<group>"; };
+		A9CA48E2265926D200BC09D5 /* iTunesClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iTunesClient.swift; sourceTree = "<group>"; };
+		A9CA48E4265926DB00BC09D5 /* iTunesRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iTunesRequest.swift; sourceTree = "<group>"; };
+		A9CA48E62659273700BC09D5 /* iTunesEndpoint.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iTunesEndpoint.swift; sourceTree = "<group>"; };
+		A9CA48E82659281F00BC09D5 /* iTunesResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = iTunesResponse.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -78,6 +86,7 @@
 			isa = PBXGroup;
 			children = (
 				A9CA48CB2658FBEB00BC09D5 /* Commands */,
+				A9CA48E1265926BF00BC09D5 /* iTunes */,
 				A9CA48D02659138600BC09D5 /* Networking */,
 				A9CA48CE2658FC7400BC09D5 /* IPATool.swift */,
 				A9CA48C12658F93F00BC09D5 /* main.swift */,
@@ -105,6 +114,17 @@
 				A9CA48D726591B0400BC09D5 /* URLSession.swift */,
 			);
 			path = Networking;
+			sourceTree = "<group>";
+		};
+		A9CA48E1265926BF00BC09D5 /* iTunes */ = {
+			isa = PBXGroup;
+			children = (
+				A9CA48E2265926D200BC09D5 /* iTunesClient.swift */,
+				A9CA48E62659273700BC09D5 /* iTunesEndpoint.swift */,
+				A9CA48E4265926DB00BC09D5 /* iTunesRequest.swift */,
+				A9CA48E82659281F00BC09D5 /* iTunesResponse.swift */,
+			);
+			path = iTunes;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -175,10 +195,14 @@
 				A9CA48E026591E4000BC09D5 /* HTTPResponse.swift in Sources */,
 				A9CA48D626591AC200BC09D5 /* HTTPClient.swift in Sources */,
 				A9CA48DA26591CE200BC09D5 /* HTTPMethod.swift in Sources */,
+				A9CA48E3265926D200BC09D5 /* iTunesClient.swift in Sources */,
 				A9CA48D826591B0400BC09D5 /* URLSession.swift in Sources */,
+				A9CA48E5265926DB00BC09D5 /* iTunesRequest.swift in Sources */,
 				A9CA48D2265913B300BC09D5 /* HTTPRequest.swift in Sources */,
 				A9CA48C22658F93F00BC09D5 /* main.swift in Sources */,
+				A9CA48E92659281F00BC09D5 /* iTunesResponse.swift in Sources */,
 				A9CA48DC26591CF100BC09D5 /* HTTPPayload.swift in Sources */,
+				A9CA48E72659273700BC09D5 /* iTunesEndpoint.swift in Sources */,
 				A9CA48CD2658FBF700BC09D5 /* Download.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -1,6 +1,6 @@
 //
 //  HTTPMethod.swift
-//  ipatool
+//  IPATool
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
