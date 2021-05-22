@@ -8,6 +8,7 @@
 import Foundation
 
 enum iTunesRequest {
+    case search(term: String, limit: Int)
     case lookup(bundleIdentifier: String)
 }
 
@@ -17,13 +18,20 @@ extension iTunesRequest: HTTPRequest {
     }
 
     var endpoint: HTTPEndpoint {
-        return iTunesEndpoint.lookup        
+        switch self {
+        case .lookup:
+            return iTunesEndpoint.lookup
+        case .search:
+            return iTunesEndpoint.search
+        }
     }
 
     var payload: HTTPPayload? {
         switch self {
         case let .lookup(bundleIdentifier):
             return .urlEncoding(["media": "software", "bundleId": bundleIdentifier, "limit": "1"])
+        case let .search(term, limit):
+            return .urlEncoding(["media": "software", "term": term, "limit": "\(limit)"])
         }
     }
 }

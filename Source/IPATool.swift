@@ -10,9 +10,8 @@ import ArgumentParser
 struct IPATool: ParsableCommand {
     static var configuration: CommandConfiguration {
         return .init(commandName: "ipatool",
-                     abstract: "A cli tool for interacting with Apple ipa files.",
+                     abstract: "A cli tool for interacting with Apple's ipa files.",
                      version: "0.9.0",
-                     subcommands: [Download.self],
-                     defaultSubcommand: Download.self)
+                     subcommands: [Download.self, Search.self])
     }
 }
