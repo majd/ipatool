@@ -28,6 +28,7 @@
 		A9CA48F22659317E00BC09D5 /* StoreResponse.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48F12659317E00BC09D5 /* StoreResponse.swift */; };
 		A9CA48F52659423C00BC09D5 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = A9CA48F42659423C00BC09D5 /* ZIPFoundation */; };
 		A9CA48F8265942D500BC09D5 /* SignatureClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48F7265942D500BC09D5 /* SignatureClient.swift */; };
+		A9CA48FA2659478600BC09D5 /* HTTPDownloadClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48F92659478600BC09D5 /* HTTPDownloadClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -63,6 +64,7 @@
 		A9CA48EF26592DE100BC09D5 /* StoreRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreRequest.swift; sourceTree = "<group>"; };
 		A9CA48F12659317E00BC09D5 /* StoreResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreResponse.swift; sourceTree = "<group>"; };
 		A9CA48F7265942D500BC09D5 /* SignatureClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureClient.swift; sourceTree = "<group>"; };
+		A9CA48F92659478600BC09D5 /* HTTPDownloadClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPDownloadClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -120,6 +122,7 @@
 			isa = PBXGroup;
 			children = (
 				A9CA48D526591AC200BC09D5 /* HTTPClient.swift */,
+				A9CA48F92659478600BC09D5 /* HTTPDownloadClient.swift */,
 				A9CA48DD26591D6A00BC09D5 /* HTTPEndpoint.swift */,
 				A9CA48D926591CE200BC09D5 /* HTTPMethod.swift */,
 				A9CA48DB26591CF100BC09D5 /* HTTPPayload.swift */,
@@ -243,6 +246,7 @@
 				A9CA48DC26591CF100BC09D5 /* HTTPPayload.swift in Sources */,
 				A9CA48E72659273700BC09D5 /* iTunesEndpoint.swift in Sources */,
 				A9CA48F22659317E00BC09D5 /* StoreResponse.swift in Sources */,
+				A9CA48FA2659478600BC09D5 /* HTTPDownloadClient.swift in Sources */,
 				A9CA48CD2658FBF700BC09D5 /* Download.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
