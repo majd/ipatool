@@ -35,6 +35,7 @@ extension StoreResponse {
         case invalidCredentials = -5000
         case invalidAccount = 5001
         case invalidItem = -10000
+        case lockedAccount = -10001
     }
 }
 
@@ -63,6 +64,8 @@ extension StoreResponse: Decodable {
                 self = .failure(error: Error.invalidCredentials)
             case "An Apple ID verification code is required to sign in. Type your password followed by the verification code shown on your other devices.":
                 self = .failure(error: Error.codeRequired)
+            case "This Apple ID has been locked for security reasons. Visit iForgot to reset your account (https://iforgot.apple.com).":
+                self = .failure(error: Error.lockedAccount)
             default:
                 self = .failure(error: Error.unknownError)
             }
