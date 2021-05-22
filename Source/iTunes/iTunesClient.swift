@@ -42,7 +42,9 @@ final class iTunesClient: iTunesClientInterface {
     }
     
     func lookup(bundleIdentifier: String, completion: @escaping (Result<iTunesResponse.Result, Swift.Error>) -> Void) {
-        httpClient.send(iTunesRequest.lookup(bundleIdentifier: bundleIdentifier)) { result in
+        let request = iTunesRequest.lookup(bundleIdentifier: bundleIdentifier)
+        
+        httpClient.send(request) { result in
             switch result {
             case let .success(response):
                 do {

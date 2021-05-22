@@ -20,9 +20,13 @@ extension HTTPResponse {
         
         switch decoder {
         case .json:
-            return try JSONDecoder().decode(type, from: data)
-        case .propertyList:
-            return try PropertyListDecoder().decode(type, from: data)
+            let decoder = JSONDecoder()
+            decoder.userInfo = [.init(rawValue: "data")!: data]
+            return try decoder.decode(type, from: data)
+        case .xml:
+            let decoder = PropertyListDecoder()
+            decoder.userInfo = [.init(rawValue: "data")!: data]
+            return try decoder.decode(type, from: data)
         }
     }
 }
@@ -30,7 +34,7 @@ extension HTTPResponse {
 extension HTTPResponse {
     enum Decoder {
         case json
-        case propertyList
+        case xml
     }
     
     enum Error: Swift.Error {

@@ -8,8 +8,8 @@
 import Foundation
 
 protocol HTTPRequest {
-    var endpoint: HTTPEndpoint { get }
     var method: HTTPMethod { get }
+    var endpoint: HTTPEndpoint { get }
     var headers: [String: String] { get }
     var payload: HTTPPayload? { get }
 }

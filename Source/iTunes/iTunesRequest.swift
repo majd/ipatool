@@ -12,12 +12,12 @@ enum iTunesRequest {
 }
 
 extension iTunesRequest: HTTPRequest {
-    var endpoint: HTTPEndpoint {
-        return iTunesEndpoint.lookup        
-    }
-
     var method: HTTPMethod {
         return .get
+    }
+
+    var endpoint: HTTPEndpoint {
+        return iTunesEndpoint.lookup        
     }
 
     var payload: HTTPPayload? {
