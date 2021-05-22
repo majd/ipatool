@@ -3,11 +3,14 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 50;
+	objectVersion = 52;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		A9CA48C22658F93F00BC09D5 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48C12658F93F00BC09D5 /* main.swift */; };
+		A9CA48CA2658FB6900BC09D5 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = A9CA48C92658FB6900BC09D5 /* ArgumentParser */; };
+		A9CA48CD2658FBF700BC09D5 /* Download.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48CC2658FBF700BC09D5 /* Download.swift */; };
+		A9CA48CF2658FC7400BC09D5 /* IPATool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48CE2658FC7400BC09D5 /* IPATool.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +28,8 @@
 /* Begin PBXFileReference section */
 		A9CA48BE2658F93F00BC09D5 /* ipatool */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ipatool; sourceTree = BUILT_PRODUCTS_DIR; };
 		A9CA48C12658F93F00BC09D5 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A9CA48CC2658FBF700BC09D5 /* Download.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Download.swift; sourceTree = "<group>"; };
+		A9CA48CE2658FC7400BC09D5 /* IPATool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPATool.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +37,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A9CA48CA2658FB6900BC09D5 /* ArgumentParser in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -57,9 +63,19 @@
 		A9CA48C02658F93F00BC09D5 /* Source */ = {
 			isa = PBXGroup;
 			children = (
+				A9CA48CB2658FBEB00BC09D5 /* Commands */,
+				A9CA48CE2658FC7400BC09D5 /* IPATool.swift */,
 				A9CA48C12658F93F00BC09D5 /* main.swift */,
 			);
 			path = Source;
+			sourceTree = "<group>";
+		};
+		A9CA48CB2658FBEB00BC09D5 /* Commands */ = {
+			isa = PBXGroup;
+			children = (
+				A9CA48CC2658FBF700BC09D5 /* Download.swift */,
+			);
+			path = Commands;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -78,6 +94,9 @@
 			dependencies = (
 			);
 			name = ipatool;
+			packageProductDependencies = (
+				A9CA48C92658FB6900BC09D5 /* ArgumentParser */,
+			);
 			productName = ipatool;
 			productReference = A9CA48BE2658F93F00BC09D5 /* ipatool */;
 			productType = "com.apple.product-type.tool";
@@ -105,6 +124,9 @@
 				Base,
 			);
 			mainGroup = A9CA48B52658F93F00BC09D5;
+			packageReferences = (
+				A9CA48C82658FB6900BC09D5 /* XCRemoteSwiftPackageReference "swift-argument-parser" */,
+			);
 			productRefGroup = A9CA48BF2658F93F00BC09D5 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -119,7 +141,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A9CA48CF2658FC7400BC09D5 /* IPATool.swift in Sources */,
 				A9CA48C22658F93F00BC09D5 /* main.swift in Sources */,
+				A9CA48CD2658FBF700BC09D5 /* Download.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -245,7 +269,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
@@ -255,7 +279,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				MACOSX_DEPLOYMENT_TARGET = 10.9;
+				MACOSX_DEPLOYMENT_TARGET = 10.10;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
 			};
@@ -283,6 +307,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A9CA48C82658FB6900BC09D5 /* XCRemoteSwiftPackageReference "swift-argument-parser" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/apple/swift-argument-parser";
+			requirement = {
+				kind = exactVersion;
+				version = 0.4.3;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A9CA48C92658FB6900BC09D5 /* ArgumentParser */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A9CA48C82658FB6900BC09D5 /* XCRemoteSwiftPackageReference "swift-argument-parser" */;
+			productName = ArgumentParser;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A9CA48B62658F93F00BC09D5 /* Project object */;
 }
