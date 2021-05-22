@@ -29,6 +29,9 @@
 		A9CA48F52659423C00BC09D5 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = A9CA48F42659423C00BC09D5 /* ZIPFoundation */; };
 		A9CA48F8265942D500BC09D5 /* SignatureClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48F7265942D500BC09D5 /* SignatureClient.swift */; };
 		A9CA48FA2659478600BC09D5 /* HTTPDownloadClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48F92659478600BC09D5 /* HTTPDownloadClient.swift */; };
+		A9CA48FD26594B5F00BC09D5 /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48FC26594B5F00BC09D5 /* Logging.swift */; };
+		A9CA48FF26594B7A00BC09D5 /* LogLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48FE26594B7A00BC09D5 /* LogLevel.swift */; };
+		A9CA490126594BB000BC09D5 /* ConsoleLogger.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA490026594BB000BC09D5 /* ConsoleLogger.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -65,6 +68,9 @@
 		A9CA48F12659317E00BC09D5 /* StoreResponse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreResponse.swift; sourceTree = "<group>"; };
 		A9CA48F7265942D500BC09D5 /* SignatureClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignatureClient.swift; sourceTree = "<group>"; };
 		A9CA48F92659478600BC09D5 /* HTTPDownloadClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPDownloadClient.swift; sourceTree = "<group>"; };
+		A9CA48FC26594B5F00BC09D5 /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
+		A9CA48FE26594B7A00BC09D5 /* LogLevel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogLevel.swift; sourceTree = "<group>"; };
+		A9CA490026594BB000BC09D5 /* ConsoleLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConsoleLogger.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +107,7 @@
 			children = (
 				A9CA48CB2658FBEB00BC09D5 /* Commands */,
 				A9CA48E1265926BF00BC09D5 /* iTunes */,
+				A9CA48FB26594B5600BC09D5 /* Logger */,
 				A9CA48D02659138600BC09D5 /* Networking */,
 				A9CA48F6265942A600BC09D5 /* Signature */,
 				A9CA48EA265929E000BC09D5 /* Store */,
@@ -161,6 +168,16 @@
 				A9CA48F7265942D500BC09D5 /* SignatureClient.swift */,
 			);
 			path = Signature;
+			sourceTree = "<group>";
+		};
+		A9CA48FB26594B5600BC09D5 /* Logger */ = {
+			isa = PBXGroup;
+			children = (
+				A9CA48FC26594B5F00BC09D5 /* Logging.swift */,
+				A9CA48FE26594B7A00BC09D5 /* LogLevel.swift */,
+				A9CA490026594BB000BC09D5 /* ConsoleLogger.swift */,
+			);
+			path = Logger;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -238,10 +255,13 @@
 				A9CA48D826591B0400BC09D5 /* URLSession.swift in Sources */,
 				A9CA48E5265926DB00BC09D5 /* iTunesRequest.swift in Sources */,
 				A9CA48D2265913B300BC09D5 /* HTTPRequest.swift in Sources */,
+				A9CA48FD26594B5F00BC09D5 /* Logging.swift in Sources */,
 				A9CA48C22658F93F00BC09D5 /* main.swift in Sources */,
 				A9CA48EC26592DD100BC09D5 /* StoreClient.swift in Sources */,
+				A9CA490126594BB000BC09D5 /* ConsoleLogger.swift in Sources */,
 				A9CA48F8265942D500BC09D5 /* SignatureClient.swift in Sources */,
 				A9CA48E92659281F00BC09D5 /* iTunesResponse.swift in Sources */,
+				A9CA48FF26594B7A00BC09D5 /* LogLevel.swift in Sources */,
 				A9CA48EE26592DD800BC09D5 /* StoreEndpoint.swift in Sources */,
 				A9CA48DC26591CF100BC09D5 /* HTTPPayload.swift in Sources */,
 				A9CA48E72659273700BC09D5 /* iTunesEndpoint.swift in Sources */,
