@@ -113,7 +113,6 @@
 				A9CA48D02659138600BC09D5 /* Networking */,
 				A9CA48F6265942A600BC09D5 /* Signature */,
 				A9CA48EA265929E000BC09D5 /* Store */,
-				A9CA48CE2658FC7400BC09D5 /* IPATool.swift */,
 				A9CA48C12658F93F00BC09D5 /* main.swift */,
 			);
 			path = Source;
@@ -124,6 +123,7 @@
 			children = (
 				A9CA48CC2658FBF700BC09D5 /* Download.swift */,
 				A9CA49022659627A00BC09D5 /* Search.swift */,
+				A9CA48CE2658FC7400BC09D5 /* IPATool.swift */,
 			);
 			path = Commands;
 			sourceTree = "<group>";

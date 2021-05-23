@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A9CA48BD2658F93F00BC09D5"
-               BuildableName = "IPATool"
+               BuildableName = "ipatool"
                BlueprintName = "IPATool"
                ReferencedContainer = "container:ipatool.xcodeproj">
             </BuildableReference>
@@ -45,11 +45,29 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A9CA48BD2658F93F00BC09D5"
-            BuildableName = "IPATool"
+            BuildableName = "ipatool"
             BlueprintName = "IPATool"
             ReferencedContainer = "container:ipatool.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
+      <CommandLineArguments>
+         <CommandLineArgument
+            argument = "download --help"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "download com.apple.TestFlight"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "search --help"
+            isEnabled = "YES">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "search TestFlight --limit 2"
+            isEnabled = "NO">
+         </CommandLineArgument>
+      </CommandLineArguments>
    </LaunchAction>
    <ProfileAction
       buildConfiguration = "Release"
@@ -62,7 +80,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A9CA48BD2658F93F00BC09D5"
-            BuildableName = "IPATool"
+            BuildableName = "ipatool"
             BlueprintName = "IPATool"
             ReferencedContainer = "container:ipatool.xcodeproj">
          </BuildableReference>

@@ -14,13 +14,13 @@ struct Search: ParsableCommand {
     }
 
     @Option
-    private var logLevel: LogLevel = .info
-
-    @Option
     private var limit: Int = 5
 
     @Argument(help: "The term to search for.")
     var term: String
+
+    @Option
+    private var logLevel: LogLevel = .info
 }
 
 extension Search {
