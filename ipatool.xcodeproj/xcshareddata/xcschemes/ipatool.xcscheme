@@ -61,11 +61,11 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "search --help"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "search TestFlight --limit 2"
-            isEnabled = "NO">
+            argument = "search TestFlight --limit 1"
+            isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>

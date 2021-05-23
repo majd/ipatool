@@ -42,7 +42,12 @@ extension Search {
                 _exit(1)
             }
             
-            logger.log("Found \(results.count) results:\n\(results.enumerated().map({ "\($0 + 1). \($1.name): \($1.bundleIdentifier) (\($1.version))." }).joined(separator: "\n"))", level: .info)
+            let output = results
+                .enumerated()
+                .map({ "\($0 + 1). \($1.name): \($1.bundleIdentifier) (\($1.version))." })
+                .joined(separator: "\n")
+
+            logger.log("Found \(results.count) \(results.count == 1 ? "result" : "results"):\n\(output)", level: .info)
         } catch {
             logger.log("\(error)", level: .debug)
             logger.log("An unknown error has occurred.", level: .error)
