@@ -18,14 +18,14 @@ To search for apps on the App Store, use the `search` command.
 ```
 OVERVIEW: Search for iOS apps available on the App Store.
 
-USAGE: ipatool search [--log-level <log-level>] [--limit <limit>] <term>
+USAGE: ipatool search [--limit <limit>] <term> [--log-level <log-level>]
 
 ARGUMENTS:
   <term>                  The term to search for. 
 
 OPTIONS:
-  --log-level <log-level> (default: info)
   --limit <limit>         (default: 5)
+  --log-level <log-level> (default: info)
   --version               Show the version.
   -h, --help              Show help information.
 ```
