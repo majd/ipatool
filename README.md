@@ -18,14 +18,14 @@ To search for apps on the App Store, use the `search` command.
 ```
 OVERVIEW: Search for iOS apps available on the App Store.
 
-USAGE: ipatool search [--log-level <log-level>] [--limit <limit>] <term>
+USAGE: ipatool search [--limit <limit>] <term> [--log-level <log-level>]
 
 ARGUMENTS:
   <term>                  The term to search for. 
 
 OPTIONS:
-  --log-level <log-level> (default: info)
   --limit <limit>         (default: 5)
+  --log-level <log-level> (default: info)
   --version               Show the version.
   -h, --help              Show help information.
 ```
@@ -58,11 +58,11 @@ The tool does not store your credentials anywhere and it only communicates with 
 
 **Will my Apple ID get flagged for using this tool?**
 
-Maybe, but probably not. While this tool communicates with iTunes and the App Store directly, mimicking the behavior of iTunes running on macOS, I cannot guarrantee its safety. I recommend using a throwaway Apple ID. **Use this tool your own risk**.
+Maybe, but probably not. While this tool communicates with iTunes and the App Store directly, mimicking the behavior of iTunes running on macOS, I cannot guarantee its safety. I recommend using a throwaway Apple ID. **Use this tool at your own risk**.
 
 **Can I use this tool to download paid apps without paying for them?**
 
-**No**. This is is not a piracy tool; you can only download apps that you have previously install on your iOS device. This limitation applies to free apps as well. Essentially, your account must already have a license for the app you are trying to download.
+**No**. This is is not a piracy tool; you can only download apps that you have previously installed on your iOS device. This limitation applies to free apps as well. Essentially, your account must already have a license for the app you are trying to download.
 
 **Can I use this tool to sideload unuspported iOS apps on Apple Silicon Macs?**
 
