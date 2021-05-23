@@ -1,4 +1,5 @@
 # IPATool
+[![Release](https://img.shields.io/github/release/majd/ipatool.svg)](https://GitHub.com/majd/ipatool/releases/)
 ![Swift](https://img.shields.io/badge/Swift-5.x-green.svg)
 ![macOS](https://img.shields.io/badge/macOS-10.11%2B-green.svg)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/majd/ipatool/blob/main/LICENSE)
