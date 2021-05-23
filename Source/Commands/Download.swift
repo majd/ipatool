@@ -138,7 +138,27 @@ extension Download {
         logger.log("Authenticated as '\(account.firstName) \(account.lastName)'.", level: .info)
 
         logger.log("Requesting a signed copy of '\(app.identifier)' from the App Store...", level: .info)
-        let item = try storeClient.item(identifier: "\(app.identifier)", directoryServicesIdentifier: account.directoryServicesIdentifier)
+        let item: StoreResponse.Item
+
+        do {
+            item = try storeClient.item(identifier: "\(app.identifier)", directoryServicesIdentifier: account.directoryServicesIdentifier)
+        } catch {
+            logger.log("\(error)", level: .debug)
+            
+            switch error {
+            case StoreClient.Error.invalidResponse:
+                logger.log("Received invalid response.", level: .error)
+            case StoreResponse.Error.invalidItem:
+                logger.log("Received invalid store item.", level: .error)
+            case StoreResponse.Error.invalidLicense:
+                logger.log("Your Apple ID does not have a license for this app. Download the app on an iOS device to obtain a license.", level: .error)
+            default:
+                logger.log("An unknown error has occurred.", level: .error)
+            }
+            
+            _exit(1)
+        }
+        
         logger.log("Received a response of the signed copy: \(item.md5).", level: .debug)
         
         logger.log("Creating signature client...", level: .debug)
@@ -158,8 +178,15 @@ extension Download {
         logger.log("Saved app package to \(URL(fileURLWithPath: path).lastPathComponent).", level: .info)
 
         logger.log("Applying patches...", level: .info)
-        try signatureClient.appendMetadata(item: item, email: email)
-        try signatureClient.appendSignature(item: item)
+        
+        do {
+            try signatureClient.appendMetadata(item: item, email: email)
+            try signatureClient.appendSignature(item: item)
+        } catch {
+            logger.log("\(error)", level: .debug)
+            logger.log("Failed to apply patches. The ipa file will be left incomplete.", level: .error)
+            _exit(1)
+        }
         
         logger.log("Done.", level: .info)
     }
