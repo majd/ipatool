@@ -12,6 +12,21 @@
 * macOS 10.11 or later.
 * Apple ID set up to use the App Store.
 
+## Installation
+
+### Manual Install
+
+You can grab the latest version of `ipatool` from [GitHub releases](https://github.com/majd/ipatool/releases).
+
+### Homebrew
+
+You can install `ipatool` using [Homebrew](https://brew.sh).
+
+```
+$ brew tap majd/repo
+$ brew install ipatool
+```
+
 ## Usage
 
 To search for apps on the App Store, use the `search` command.
