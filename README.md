@@ -1,7 +1,7 @@
 # IPATool
 [![Release](https://img.shields.io/github/release/majd/ipatool.svg)](https://GitHub.com/majd/ipatool/releases/)
-![Swift](https://img.shields.io/badge/Swift-5.x-green.svg)
-![macOS](https://img.shields.io/badge/macOS-10.11%2B-green.svg)
+![Swift](https://img.shields.io/badge/Swift-5.4-green.svg)
+![macOS](https://img.shields.io/badge/macOS-10.15%2B-green.svg)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/majd/ipatool/blob/main/LICENSE)
 
 `ipatool` is a command line tool that allows you to search for iOS apps on the [App Store](https://apps.apple.com) and download a copy of the app package, known as an _ipa_ file.
@@ -9,7 +9,7 @@
 ![Demo](./demo.gif)
 
 ## Requirements
-* macOS 10.11 or later.
+* macOS 10.15 or later.
 * Apple ID set up to use the App Store.
 
 ## Installation
