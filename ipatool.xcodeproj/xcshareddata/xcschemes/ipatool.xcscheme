@@ -57,15 +57,15 @@
          </CommandLineArgument>
          <CommandLineArgument
             argument = "download -b com.apple.TestFlight"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "search --help"
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
-            argument = "search TestFlight --limit 1"
-            isEnabled = "NO">
+            argument = "search TestFlight --limit 5"
+            isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>

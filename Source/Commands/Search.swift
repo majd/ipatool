@@ -21,12 +21,12 @@ struct Search: ParsableCommand {
 
     @Option
     private var logLevel: LogLevel = .info
+    
+    lazy var logger = ConsoleLogger(level: logLevel)
 }
 
 extension Search {
-    func run() throws {
-        let logger = ConsoleLogger(level: logLevel)
-        
+    mutating func results(with term: String) -> [iTunesResponse.Result] {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(urlSession: URLSession.shared)
 
@@ -41,17 +41,25 @@ extension Search {
                 logger.log("No results found.", level: .error)
                 _exit(1)
             }
-            
-            let output = results
-                .enumerated()
-                .map({ "\($0 + 1). \($1.name): \($1.bundleIdentifier) (\($1.version))." })
-                .joined(separator: "\n")
 
-            logger.log("Found \(results.count) \(results.count == 1 ? "result" : "results"):\n\(output)", level: .info)
+            return results
         } catch {
             logger.log("\(error)", level: .debug)
             logger.log("An unknown error has occurred.", level: .error)
             _exit(1)
         }
+    }
+    
+    mutating func run() throws {
+        // Search the iTunes store
+        let results = results(with: term)
+
+        // Compile output
+        let output = results
+            .enumerated()
+            .map({ "\($0 + 1). \($1.name): \($1.bundleIdentifier) (\($1.version))." })
+            .joined(separator: "\n")
+
+        logger.log("Found \(results.count) \(results.count == 1 ? "result" : "results"):\n\(output)", level: .info)
     }
 }

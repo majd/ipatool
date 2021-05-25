@@ -16,37 +16,29 @@ struct Download: ParsableCommand {
     @Option(name: [.short, .long], help: "The bundle identifier of the target iOS app.")
     private var bundleIdentifier: String
 
-    @Option(name: [.short, .long], help: "The email address for the Apple ID.")
-    private var email: String?
+    @Option(name: [.short, .customLong("email")], help: "The email address for the Apple ID.")
+    private var emailArgument: String?
 
-    @Option(name: [.short, .long], help: "The password for the Apple ID.")
-    private var password: String?
+    @Option(name: [.short, .customLong("password")], help: "The password for the Apple ID.")
+    private var passwordArgument: String?
 
     @Option
     private var logLevel: LogLevel = .info
+    
+    lazy var logger = ConsoleLogger(level: logLevel)
 }
 
 extension Download {
-    func run() throws {
-        let logger = ConsoleLogger(level: logLevel)
-        
+    mutating func app(with bundleIdentifier: String) -> iTunesResponse.Result {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(urlSession: URLSession.shared)
 
         logger.log("Creating iTunes client...", level: .debug)
         let itunesClient = iTunesClient(httpClient: httpClient)
 
-        logger.log("Creating App Store client...", level: .debug)
-        let storeClient = StoreClient(httpClient: httpClient)
-
-        logger.log("Creating download client...", level: .debug)
-        let downloadClient = HTTPDownloadClient()
-
-        logger.log("Querying the iTunes store for '\(bundleIdentifier)'...", level: .info)
-        let app: iTunesResponse.Result
-        
         do {
-            app = try itunesClient.lookup(bundleIdentifier: bundleIdentifier)
+            logger.log("Querying the iTunes Store for '\(bundleIdentifier)'...", level: .info)
+            return try itunesClient.lookup(bundleIdentifier: bundleIdentifier)
         } catch {
             logger.log("\(error)", level: .debug)
 
@@ -59,45 +51,51 @@ extension Download {
 
             _exit(1)
         }
-        logger.log("Found app: \(app.name) (\(app.version)).", level: .debug)
-        
-        let email: String
-        let password: String
-        
-        if let cliEmail = self.email {
-            email = cliEmail
-        } else if let envEmail = ProcessInfo.processInfo.environment["IPATOOL_EMAIL"] {
-            email = envEmail
-        } else if let inputEmail = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter Apple ID email: ", level: .warning)))) {
-            email = inputEmail
+    }
+    
+    mutating func email() -> String {
+        if let email = emailArgument {
+            return email
+        } else if let email = ProcessInfo.processInfo.environment["IPATOOL_EMAIL"] {
+            return email
+        } else if let email = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter Apple ID email: ", level: .warning)))) {
+            return email
         } else {
             logger.log("An Apple ID email address is required.", level: .error)
             _exit(1)
         }
-        
-        if let cliPassword = self.password {
-            password = cliPassword
-        } else if let envPassword = ProcessInfo.processInfo.environment["IPATOOL_PASSWORD"] {
-            password = envPassword
-        } else if let inputPassword = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter Apple ID password: ", level: .warning)))) {
-            password = inputPassword
+    }
+    
+    mutating func password() -> String {
+        if let password = passwordArgument {
+            return password
+        } else if let password = ProcessInfo.processInfo.environment["IPATOOL_PASSWORD"] {
+            return password
+        } else if let password = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter Apple ID password: ", level: .warning)))) {
+            return password
         } else {
             logger.log("An Apple ID password is required.", level: .error)
             _exit(1)
         }
+    }
+    
+    mutating func authenticate(email: String, password: String) -> StoreResponse.Account {
+        logger.log("Creating HTTP client...", level: .debug)
+        let httpClient = HTTPClient(urlSession: URLSession.shared)
 
-        let account: StoreResponse.Account
+        logger.log("Creating App Store client...", level: .debug)
+        let storeClient = StoreClient(httpClient: httpClient)
 
         do {
             logger.log("Authenticating with the App Store...", level: .info)
-            account = try storeClient.authenticate(email: email, password: password)
+            return try storeClient.authenticate(email: email, password: password)
         } catch {
             switch error {
             case StoreResponse.Error.codeRequired:
                 let code = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter 2FA code: ", level: .warning))))
                 
                 do {
-                    account = try storeClient.authenticate(email: email, password: password, code: code)
+                    return try storeClient.authenticate(email: email, password: password, code: code)
                 } catch {
                     logger.log("\(error)", level: .debug)
                     
@@ -135,13 +133,19 @@ extension Download {
                 _exit(1)
             }
         }
-        logger.log("Authenticated as '\(account.firstName) \(account.lastName)'.", level: .info)
 
-        logger.log("Requesting a signed copy of '\(app.identifier)' from the App Store...", level: .info)
-        let item: StoreResponse.Item
+    }
+    
+    mutating func item(from app: iTunesResponse.Result, account: StoreResponse.Account) -> StoreResponse.Item {
+        logger.log("Creating HTTP client...", level: .debug)
+        let httpClient = HTTPClient(urlSession: URLSession.shared)
+
+        logger.log("Creating App Store client...", level: .debug)
+        let storeClient = StoreClient(httpClient: httpClient)
 
         do {
-            item = try storeClient.item(identifier: "\(app.identifier)", directoryServicesIdentifier: account.directoryServicesIdentifier)
+            logger.log("Requesting a signed copy of '\(app.identifier)' from the App Store...", level: .info)
+            return try storeClient.item(identifier: "\(app.identifier)", directoryServicesIdentifier: account.directoryServicesIdentifier)
         } catch {
             logger.log("\(error)", level: .debug)
             
@@ -158,28 +162,32 @@ extension Download {
             
             _exit(1)
         }
-        
-        logger.log("Received a response of the signed copy: \(item.md5).", level: .debug)
-        
-        logger.log("Creating signature client...", level: .debug)
-        let path = FileManager.default.currentDirectoryPath
-            .appending("/\(bundleIdentifier)_\(app.identifier)_v\(app.version)_\(Int.random(in: 100...999))")
-            .appending(".ipa")
+    }
+    
+    mutating func download(item: StoreResponse.Item, to targetURL: URL) {
+        logger.log("Creating download client...", level: .debug)
+        let downloadClient = HTTPDownloadClient()
 
-        logger.log("Output path: \(path).", level: .debug)
+        do {
+            logger.log("Downloading app package...", level: .info)
+            try downloadClient.download(from: item.url, to: targetURL) { [logger] progress in
+                logger.log("Downloading app package... [\(Int((progress * 100).rounded()))%]",
+                           prefix: "\u{1B}[1A\u{1B}[K",
+                           level: .info)
+            }
+        } catch {
+            logger.log("\(error)", level: .debug)
+            logger.log("An error has occurred while downloading the app package.", level: .error)
+            _exit(1)
+        }
+    }
+    
+    mutating func applyPatches(item: StoreResponse.Item, email: String, path: String) {
+        logger.log("Creating signature client...", level: .debug)
         let signatureClient = SignatureClient(fileManager: .default, filePath: path)
 
-        logger.log("Downloading app package...", level: .info)
-        try downloadClient.download(from: item.url, to: URL(fileURLWithPath: path)) { progress in
-            logger.log("Downloading app package... [\(Int((progress * 100).rounded()))%]",
-                       prefix: "\u{1B}[1A\u{1B}[K",
-                       level: .info)
-        }
-        logger.log("Saved app package to \(URL(fileURLWithPath: path).lastPathComponent).", level: .info)
-
-        logger.log("Applying patches...", level: .info)
-        
         do {
+            logger.log("Applying patches...", level: .info)
             try signatureClient.appendMetadata(item: item, email: email)
             try signatureClient.appendSignature(item: item)
         } catch {
@@ -187,7 +195,39 @@ extension Download {
             logger.log("Failed to apply patches. The ipa file will be left incomplete.", level: .error)
             _exit(1)
         }
+    }
+    
+    mutating func run() throws {
+        // Query for app
+        let app: iTunesResponse.Result = app(with: bundleIdentifier)
+        logger.log("Found app: \(app.name) (\(app.version)).", level: .debug)
         
+        // Get Apple ID email
+        let email: String = email()
+
+        // Get Apple ID password
+        let password: String = password()
+
+        // Authenticate with the App Store
+        let account: StoreResponse.Account = authenticate(email: email, password: password)
+        logger.log("Authenticated as '\(account.firstName) \(account.lastName)'.", level: .info)
+
+        // Query for store item
+        let item: StoreResponse.Item = item(from: app, account: account)
+        logger.log("Received a response of the signed copy: \(item.md5).", level: .debug)
+
+        // Generate file name
+        let path = FileManager.default.currentDirectoryPath
+            .appending("/\(bundleIdentifier)_\(app.identifier)_v\(app.version)_\(Int.random(in: 100...999))")
+            .appending(".ipa")
+        logger.log("Output path: \(path).", level: .debug)
+
+        // Download app package
+        download(item: item, to: URL(fileURLWithPath: path))
+        logger.log("Saved app package to \(URL(fileURLWithPath: path).lastPathComponent).", level: .info)
+
+        // Apply patches
+        applyPatches(item: item, email: email, path: path)
         logger.log("Done.", level: .info)
     }
 }
