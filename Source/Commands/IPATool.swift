@@ -11,7 +11,7 @@ struct IPATool: ParsableCommand {
     static var configuration: CommandConfiguration {
         return .init(commandName: "ipatool",
                      abstract: "A cli tool for interacting with Apple's ipa files.",
-                     version: "1.0.2",
+                     version: "1.0.3",
                      subcommands: [Download.self, Search.self])
     }
 }
