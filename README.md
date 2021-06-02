@@ -80,6 +80,6 @@ Maybe, but probably not. While this tool communicates with iTunes and the App St
 
 **No**. This is is not a piracy tool; you can only download apps that you have previously installed on your iOS device. This limitation applies to free apps as well. Essentially, your account must already have a license for the app you are trying to download.
 
-**Can I use this tool to sideload unuspported iOS apps on Apple Silicon Macs?**
+**Can I use this tool to sideload unsupported iOS apps on Apple Silicon Macs?**
 
 While it was previously possible to download ipa files using this tool and install them on Macs running on Apple Silicon, this is no longer the case as of recently. Apple stopped serving macOS compatible `sinf` data for the app package. You could, however, use this tool to get a copy of the iOS app and use a jailbroken iOS device to strip any codesigning requirements then codesign the app again using an adhoc signature to run on Apple Silicon.
