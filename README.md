@@ -34,13 +34,14 @@ To search for apps on the App Store, use the `search` command.
 ```
 OVERVIEW: Search for iOS apps available on the App Store.
 
-USAGE: ipatool search [--limit <limit>] <term> [--log-level <log-level>]
+USAGE: ipatool search [--limit <limit>] [--country <country>] <term> [--log-level <log-level>]
 
 ARGUMENTS:
   <term>                  The term to search for. 
 
 OPTIONS:
   --limit <limit>         (default: 5)
+  --country <country>     The country to search in. (default: US)
   --log-level <log-level> (default: info)
   --version               Show the version.
   -h, --help              Show help information.
@@ -56,6 +57,7 @@ USAGE: ipatool download --bundle-identifier <bundle-identifier> [--email <email>
 OPTIONS:
   -b, --bundle-identifier <bundle-identifier>
                           The bundle identifier of the target iOS app. 
+  -c, --country <country> The country of the target iOS app. (default: US)
   -e, --email <email>     The email address for the Apple ID. 
   -p, --password <password>
                           The password for the Apple ID. 
