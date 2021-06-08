@@ -16,6 +16,9 @@ struct Download: ParsableCommand {
     @Option(name: [.short, .long], help: "The bundle identifier of the target iOS app.")
     private var bundleIdentifier: String
 
+    @Option(name: [.short, .long], help: "The country of the target iOS app.")
+    private var country: String = "US"
+
     @Option(name: [.short, .customLong("email")], help: "The email address for the Apple ID.")
     private var emailArgument: String?
 
@@ -29,7 +32,7 @@ struct Download: ParsableCommand {
 }
 
 extension Download {
-    mutating func app(with bundleIdentifier: String) -> iTunesResponse.Result {
+    mutating func app(with bundleIdentifier: String, country: String) -> iTunesResponse.Result {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(urlSession: URLSession.shared)
 
@@ -37,8 +40,8 @@ extension Download {
         let itunesClient = iTunesClient(httpClient: httpClient)
 
         do {
-            logger.log("Querying the iTunes Store for '\(bundleIdentifier)'...", level: .info)
-            return try itunesClient.lookup(bundleIdentifier: bundleIdentifier)
+            logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(country)'...", level: .info)
+            return try itunesClient.lookup(bundleIdentifier: bundleIdentifier, country: country)
         } catch {
             logger.log("\(error)", level: .debug)
 
@@ -199,7 +202,7 @@ extension Download {
     
     mutating func run() throws {
         // Query for app
-        let app: iTunesResponse.Result = app(with: bundleIdentifier)
+        let app: iTunesResponse.Result = app(with: bundleIdentifier, country: country)
         logger.log("Found app: \(app.name) (\(app.version)).", level: .debug)
         
         // Get Apple ID email
