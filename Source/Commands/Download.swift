@@ -16,14 +16,14 @@ struct Download: ParsableCommand {
     @Option(name: [.short, .long], help: "The bundle identifier of the target iOS app.")
     private var bundleIdentifier: String
 
-    @Option(name: [.short, .long], help: "The country of the target iOS app.")
-    private var country: String = "US"
-
     @Option(name: [.short, .customLong("email")], help: "The email address for the Apple ID.")
     private var emailArgument: String?
 
     @Option(name: [.short, .customLong("password")], help: "The password for the Apple ID.")
     private var passwordArgument: String?
+
+    @Option(name: [.short, .long], help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store.")
+    private var country: String = "US"
 
     @Option
     private var logLevel: LogLevel = .info

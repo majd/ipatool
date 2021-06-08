@@ -34,14 +34,16 @@ To search for apps on the App Store, use the `search` command.
 ```
 OVERVIEW: Search for iOS apps available on the App Store.
 
-USAGE: ipatool search [--limit <limit>] [--country <country>] <term> [--log-level <log-level>]
+USAGE: ipatool search <term> [--limit <limit>] [--country <country>] [--log-level <log-level>]
 
 ARGUMENTS:
   <term>                  The term to search for. 
 
 OPTIONS:
-  --limit <limit>         (default: 5)
-  --country <country>     The country to search in. (default: US)
+  -l, --limit <limit>     The maximum amount of search results to retrieve.
+                          (default: 5)
+  -c, --country <country> The two-letter (ISO 3166-1 alpha-2) country code for
+                          the iTunes Store. (default: US)
   --log-level <log-level> (default: info)
   --version               Show the version.
   -h, --help              Show help information.
@@ -52,15 +54,16 @@ To download a copy of the ipa file, use the `download` command.
 ```
 OVERVIEW: Download (encrypted) iOS app packages from the App Store.
 
-USAGE: ipatool download --bundle-identifier <bundle-identifier> [--email <email>] [--password <password>] [--log-level <log-level>]
+USAGE: ipatool download --bundle-identifier <bundle-identifier> [--email <email>] [--password <password>] [--country <country>] [--log-level <log-level>]
 
 OPTIONS:
   -b, --bundle-identifier <bundle-identifier>
                           The bundle identifier of the target iOS app. 
-  -c, --country <country> The country of the target iOS app. (default: US)
   -e, --email <email>     The email address for the Apple ID. 
   -p, --password <password>
                           The password for the Apple ID. 
+  -c, --country <country> The two-letter (ISO 3166-1 alpha-2) country code for
+                          the iTunes Store. (default: US)
   --log-level <log-level> (default: info)
   --version               Show the version.
   -h, --help              Show help information.
