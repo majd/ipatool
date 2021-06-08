@@ -122,8 +122,8 @@
 			isa = PBXGroup;
 			children = (
 				A9CA48CC2658FBF700BC09D5 /* Download.swift */,
-				A9CA49022659627A00BC09D5 /* Search.swift */,
 				A9CA48CE2658FC7400BC09D5 /* IPATool.swift */,
+				A9CA49022659627A00BC09D5 /* Search.swift */,
 			);
 			path = Commands;
 			sourceTree = "<group>";

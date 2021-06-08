@@ -13,14 +13,14 @@ struct Search: ParsableCommand {
         return .init(abstract: "Search for iOS apps available on the App Store.")
     }
 
-    @Option
+    @Argument(help: "The term to search for.")
+    private var term: String
+
+    @Option(name: [.short, .long], help: "The maximum amount of search results to retrieve.")
     private var limit: Int = 5
 
-    @Option(help: "The two-letter (ISO 3166-1 alpha-2) country code for the store you want to search.")
-    var country: String = "US"
-
-    @Argument(help: "The term to search for.")
-    var term: String
+    @Option(name: [.short, .long], help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store.")
+    private var country: String = "US"
 
     @Option
     private var logLevel: LogLevel = .info
