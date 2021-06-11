@@ -25,9 +25,12 @@ struct Download: ParsableCommand {
     @Option(name: [.short, .long], help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store.")
     private var country: String = "US"
 
-    @Option
+    @Option(name: [.short, .long], help: "The device family to limit the search query to.")
+    private var deviceFamily: iTunesRequest.DeviceFamily = .phone
+
+    @Option(name: [.long], help: "The log level.")
     private var logLevel: LogLevel = .info
-    
+
     lazy var logger = ConsoleLogger(level: logLevel)
 }
 
@@ -41,7 +44,7 @@ extension Download {
 
         do {
             logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(country)'...", level: .info)
-            return try itunesClient.lookup(bundleIdentifier: bundleIdentifier, country: country)
+            return try itunesClient.lookup(bundleIdentifier: bundleIdentifier, country: country, deviceFamily: deviceFamily)
         } catch {
             logger.log("\(error)", level: .debug)
 
