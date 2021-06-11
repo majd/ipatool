@@ -34,7 +34,7 @@ To search for apps on the App Store, use the `search` command.
 ```
 OVERVIEW: Search for iOS apps available on the App Store.
 
-USAGE: ipatool search <term> [--limit <limit>] [--country <country>] [--log-level <log-level>]
+USAGE: ipatool search <term> [--limit <limit>] [--country <country>] [--device-family <device-family>] [--log-level <log-level>]
 
 ARGUMENTS:
   <term>                  The term to search for. 
@@ -44,7 +44,10 @@ OPTIONS:
                           (default: 5)
   -c, --country <country> The two-letter (ISO 3166-1 alpha-2) country code for
                           the iTunes Store. (default: US)
-  --log-level <log-level> (default: info)
+  -d, --device-family <device-family>
+                          The device family to limit the search query to.
+                          (default: iPhone)
+  --log-level <log-level> The log level. (default: info)
   --version               Show the version.
   -h, --help              Show help information.
 ```
@@ -54,7 +57,7 @@ To download a copy of the ipa file, use the `download` command.
 ```
 OVERVIEW: Download (encrypted) iOS app packages from the App Store.
 
-USAGE: ipatool download --bundle-identifier <bundle-identifier> [--email <email>] [--password <password>] [--country <country>] [--log-level <log-level>]
+USAGE: ipatool download --bundle-identifier <bundle-identifier> [--email <email>] [--password <password>] [--country <country>] [--device-family <device-family>] [--log-level <log-level>]
 
 OPTIONS:
   -b, --bundle-identifier <bundle-identifier>
@@ -64,7 +67,10 @@ OPTIONS:
                           The password for the Apple ID. 
   -c, --country <country> The two-letter (ISO 3166-1 alpha-2) country code for
                           the iTunes Store. (default: US)
-  --log-level <log-level> (default: info)
+  -d, --device-family <device-family>
+                          The device family to limit the search query to.
+                          (default: iPhone)
+  --log-level <log-level> The log level. (default: info)
   --version               Show the version.
   -h, --help              Show help information.
 ```

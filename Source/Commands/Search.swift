@@ -22,7 +22,10 @@ struct Search: ParsableCommand {
     @Option(name: [.short, .long], help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store.")
     private var country: String = "US"
 
-    @Option
+    @Option(name: [.short, .long], help: "The device family to limit the search query to.")
+    private var deviceFamily: iTunesRequest.DeviceFamily = .phone
+
+    @Option(name: [.long], help: "The log level.")
     private var logLevel: LogLevel = .info
     
     lazy var logger = ConsoleLogger(level: logLevel)
@@ -38,7 +41,7 @@ extension Search {
         
         do {
             logger.log("Searching for '\(term)' using the '\(country)' store front...", level: .info)
-            let results = try itunesClient.search(term: term, limit: limit, country: country)
+            let results = try itunesClient.search(term: term, limit: limit, country: country, deviceFamily: deviceFamily)
             
             guard !results.isEmpty else {
                 logger.log("No results found.", level: .error)

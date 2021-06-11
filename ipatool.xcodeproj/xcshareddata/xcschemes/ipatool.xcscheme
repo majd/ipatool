@@ -53,6 +53,14 @@
       <CommandLineArguments>
          <CommandLineArgument
             argument = "download --help"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "search &quot;Swift Playgrounds&quot; --device-family iPhone"
+            isEnabled = "NO">
+         </CommandLineArgument>
+         <CommandLineArgument
+            argument = "search &quot;Swift Playgrounds&quot; --device-family iPad"
             isEnabled = "YES">
          </CommandLineArgument>
          <CommandLineArgument

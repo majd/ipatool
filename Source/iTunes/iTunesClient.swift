@@ -8,16 +8,23 @@
 import Foundation
 
 protocol iTunesClientInterface {
-    func lookup(bundleIdentifier: String, country: String, completion: @escaping (Result<iTunesResponse.Result, Error>) -> Void)
-    func search(term: String, limit: Int, country: String, completion: @escaping (Result<[iTunesResponse.Result], Error>) -> Void)
+    func lookup(bundleIdentifier: String,
+                country: String,
+                deviceFamily: iTunesRequest.DeviceFamily,
+                completion: @escaping (Result<iTunesResponse.Result, Error>) -> Void)
+    func search(term: String,
+                limit: Int,
+                country: String,
+                deviceFamily: iTunesRequest.DeviceFamily,
+                completion: @escaping (Result<[iTunesResponse.Result], Error>) -> Void)
 }
 
 extension iTunesClientInterface {
-    func lookup(bundleIdentifier: String, country: String) throws -> iTunesResponse.Result {
+    func lookup(bundleIdentifier: String, country: String, deviceFamily: iTunesRequest.DeviceFamily) throws -> iTunesResponse.Result {
         let semaphore = DispatchSemaphore(value: 0)
         var result: Result<iTunesResponse.Result, Error>?
         
-        lookup(bundleIdentifier: bundleIdentifier, country: country) {
+        lookup(bundleIdentifier: bundleIdentifier, country: country, deviceFamily: deviceFamily) {
             result = $0
             semaphore.signal()
         }
@@ -34,11 +41,11 @@ extension iTunesClientInterface {
         }
     }
     
-    func search(term: String, limit: Int, country: String) throws -> [iTunesResponse.Result] {
+    func search(term: String, limit: Int, country: String, deviceFamily: iTunesRequest.DeviceFamily) throws -> [iTunesResponse.Result] {
         let semaphore = DispatchSemaphore(value: 0)
         var result: Result<[iTunesResponse.Result], Error>?
         
-        search(term: term, limit: limit, country: country) {
+        search(term: term, limit: limit, country: country, deviceFamily: deviceFamily) {
             result = $0
             semaphore.signal()
         }
@@ -63,8 +70,11 @@ final class iTunesClient: iTunesClientInterface {
         self.httpClient = httpClient
     }
     
-    func lookup(bundleIdentifier: String, country: String, completion: @escaping (Result<iTunesResponse.Result, Swift.Error>) -> Void) {
-        let request = iTunesRequest.lookup(bundleIdentifier: bundleIdentifier, country: country)
+    func lookup(bundleIdentifier: String,
+                country: String,
+                deviceFamily: iTunesRequest.DeviceFamily,
+                completion: @escaping (Result<iTunesResponse.Result, Swift.Error>) -> Void) {
+        let request = iTunesRequest.lookup(bundleIdentifier: bundleIdentifier, country: country, deviceFamily: deviceFamily)
         
         httpClient.send(request) { result in
             switch result {
@@ -82,8 +92,12 @@ final class iTunesClient: iTunesClientInterface {
         }
     }
     
-    func search(term: String, limit: Int, country: String, completion: @escaping (Result<[iTunesResponse.Result], Swift.Error>) -> Void) {
-        let request = iTunesRequest.search(term: term, limit: limit, country: country)
+    func search(term: String,
+                limit: Int,
+                country: String,
+                deviceFamily: iTunesRequest.DeviceFamily,
+                completion: @escaping (Result<[iTunesResponse.Result], Swift.Error>) -> Void) {
+        let request = iTunesRequest.search(term: term, limit: limit, country: country, deviceFamily: deviceFamily)
         
         httpClient.send(request) { result in
             switch result {

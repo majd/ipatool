@@ -5,11 +5,31 @@
 //  Created by Majd Alfhaily on 22.05.21.
 //
 
-import Foundation
+import ArgumentParser
 
 enum iTunesRequest {
-    case search(term: String, limit: Int, country: String)
-    case lookup(bundleIdentifier: String, country: String)
+    case search(term: String, limit: Int, country: String, deviceFamily: DeviceFamily = .phone)
+    case lookup(bundleIdentifier: String, country: String, deviceFamily: DeviceFamily = .phone)
+}
+
+extension iTunesRequest {
+    enum DeviceFamily: String, ExpressibleByArgument {
+        case phone = "iPhone"
+        case pad = "iPad"
+        
+        var defaultValueDescription: String {
+            return rawValue
+        }
+        
+        var entity: String {
+            switch self {
+            case .phone:
+                return "software"
+            case .pad:
+                return "iPadSoftware"
+            }
+        }
+    }
 }
 
 extension iTunesRequest: HTTPRequest {
@@ -28,10 +48,10 @@ extension iTunesRequest: HTTPRequest {
 
     var payload: HTTPPayload? {
         switch self {
-        case let .lookup(bundleIdentifier, country):
-            return .urlEncoding(["media": "software", "bundleId": bundleIdentifier, "limit": "1", "country": country])
-        case let .search(term, limit, country):
-            return .urlEncoding(["media": "software", "term": term, "limit": "\(limit)", "country": country])
+        case let .lookup(bundleIdentifier, country, deviceFamily):
+            return .urlEncoding(["media": "software", "bundleId": bundleIdentifier, "limit": "1", "country": country, "entity": deviceFamily.entity])
+        case let .search(term, limit, country, deviceFamily):
+            return .urlEncoding(["media": "software", "term": term, "limit": "\(limit)", "country": country, "entity": deviceFamily.entity])
         }
     }
 }
