@@ -22,6 +22,9 @@ struct Download: ParsableCommand {
     @Option(name: [.short, .customLong("password")], help: "The password for the Apple ID.")
     private var passwordArgument: String?
 
+    @Option(name: [.customLong("auth-code")], help: "The 2FA code for the Apple ID.")
+    private var authCodeArgument: String?
+
     @Option(name: [.short, .long], help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store.")
     private var country: String = "US"
 
@@ -84,7 +87,20 @@ extension Download {
             _exit(1)
         }
     }
-    
+
+    mutating func authCode() -> String {
+        if let authCode = authCodeArgument {
+            return authCode
+        } else if let authCode = ProcessInfo.processInfo.environment["IPATOOL_2FA_CODE"] {
+            return authCode
+        } else if let authCode = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter 2FA code: ", level: .warning)))) {
+            return authCode
+        } else {
+            logger.log("A 2FA auth-code is required.", level: .error)
+            _exit(1)
+        }
+    }
+
     mutating func authenticate(email: String, password: String) -> StoreResponse.Account {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(urlSession: URLSession.shared)
@@ -98,10 +114,8 @@ extension Download {
         } catch {
             switch error {
             case StoreResponse.Error.codeRequired:
-                let code = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter 2FA code: ", level: .warning))))
-                
                 do {
-                    return try storeClient.authenticate(email: email, password: password, code: code)
+                    return try storeClient.authenticate(email: email, password: password, code: authCode())
                 } catch {
                     logger.log("\(error)", level: .debug)
                     

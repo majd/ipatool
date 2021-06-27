@@ -57,7 +57,7 @@ To download a copy of the ipa file, use the `download` command.
 ```
 OVERVIEW: Download (encrypted) iOS app packages from the App Store.
 
-USAGE: ipatool download --bundle-identifier <bundle-identifier> [--email <email>] [--password <password>] [--country <country>] [--device-family <device-family>] [--log-level <log-level>]
+USAGE: ipatool download --bundle-identifier <bundle-identifier> [--email <email>] [--password <password>] [--auth-code <auth-code>] [--country <country>] [--device-family <device-family>] [--log-level <log-level>]
 
 OPTIONS:
   -b, --bundle-identifier <bundle-identifier>
@@ -65,17 +65,16 @@ OPTIONS:
   -e, --email <email>     The email address for the Apple ID. 
   -p, --password <password>
                           The password for the Apple ID. 
-  -c, --country <country> The two-letter (ISO 3166-1 alpha-2) country code for
-                          the iTunes Store. (default: US)
+  --auth-code <auth-code> The 2FA code for the Apple ID. 
+  -c, --country <country> The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store. (default: US)
   -d, --device-family <device-family>
-                          The device family to limit the search query to.
-                          (default: iPhone)
+                          The device family to limit the search query to. (default: iPhone)
   --log-level <log-level> The log level. (default: info)
   --version               Show the version.
   -h, --help              Show help information.
 ```
 
-**Note:** You can specify the Apple ID email address and username as arguments when using the tool or by setting them as environment variables (`IPATOOL_EMAIL` and `IPATOOL_PASSWORD`). If you do not specify this information using either of those methods, the tool will prompt for user input in an interactive session.
+**Note:** You can specify the Apple ID email address and username as arguments when using the tool or by setting them as environment variables (`IPATOOL_EMAIL` and `IPATOOL_PASSWORD`). If you do not specify this information using either of those methods, the tool will prompt for user input in an interactive session. Similarly, you can supply the 2FA code interactively or using the environment variable `IPATOOL_2FA_CODE`.
 
 ## Common Knowledge
 
