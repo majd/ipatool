@@ -16,6 +16,7 @@ extension iTunesRequest {
     enum DeviceFamily: String, ExpressibleByArgument {
         case phone = "iPhone"
         case pad = "iPad"
+        case tv = "AppleTV"
         
         var defaultValueDescription: String {
             return rawValue
@@ -27,6 +28,8 @@ extension iTunesRequest {
                 return "software"
             case .pad:
                 return "iPadSoftware"
+            case .tv:
+                return "tvSoftware"
             }
         }
     }
