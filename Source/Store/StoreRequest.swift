@@ -28,7 +28,7 @@ extension StoreRequest: HTTPRequest {
     
     var headers: [String: String] {
         var headers: [String: String] = [
-            "User-Agent": "Configurator/2.0 (Macintosh; OS X 10.12.6; 16G29) AppleWebKit/2603.3.8",
+            "User-Agent": "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8",
             "Content-Type": "application/x-www-form-urlencoded"
         ]
         
