@@ -108,4 +108,4 @@ correct email/password/auth code:
 then see [issue #30](https://github.com/majd/ipatool/issues/30)
 (particularly [this
 comment](https://github.com/majd/ipatool/issues/30#issuecomment-977852648))
-for a fix. Note that you may need version 1.07.
+for a fix. Note that you may need version 1.0.7 or later.
