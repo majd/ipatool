@@ -93,3 +93,19 @@ Maybe, but probably not. While this tool communicates with iTunes and the App St
 **Can I use this tool to sideload unsupported iOS apps on Apple Silicon Macs?**
 
 While it was previously possible to download ipa files using this tool and install them on Macs running on Apple Silicon, this is no longer the case as of recently. Apple stopped serving macOS compatible `sinf` data for the app package. You could, however, use this tool to get a copy of the iOS app and use a jailbroken iOS device to strip any codesigning requirements then codesign the app again using an adhoc signature to run on Apple Silicon.
+
+## Troubleshooting
+
+If `ipatool download` fails with the following error despite providing
+correct email/password/auth code:
+
+```
+==> ℹ️  [Info] Querying the iTunes Store for '<bundle-identifier>' in country '<country>'...
+==> ℹ️  [Info] Authenticating with the App Store...
+==> ❌ [Error] An unknown error has occurred.
+```
+
+then see [issue #30](https://github.com/majd/ipatool/issues/30)
+(particularly [this
+comment](https://github.com/majd/ipatool/issues/30#issuecomment-977852648))
+for a fix. Note that you may need version 1.07.
