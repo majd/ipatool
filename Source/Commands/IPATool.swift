@@ -15,3 +15,7 @@ struct IPATool: ParsableCommand {
                      subcommands: [Download.self, Search.self])
     }
 }
+
+@main enum Main: AsyncMain {
+  typealias Command = IPATool
+}
