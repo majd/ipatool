@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A9CA48C22658F93F00BC09D5 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48C12658F93F00BC09D5 /* main.swift */; };
+		A9BDE1CF2784E5B0003B662A /* AsyncSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9BDE1CE2784E5B0003B662A /* AsyncSupport.swift */; };
 		A9CA48CA2658FB6900BC09D5 /* ArgumentParser in Frameworks */ = {isa = PBXBuildFile; productRef = A9CA48C92658FB6900BC09D5 /* ArgumentParser */; };
 		A9CA48CD2658FBF700BC09D5 /* Download.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48CC2658FBF700BC09D5 /* Download.swift */; };
 		A9CA48CF2658FC7400BC09D5 /* IPATool.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9CA48CE2658FC7400BC09D5 /* IPATool.swift */; };
@@ -48,8 +48,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		A9BDE1CE2784E5B0003B662A /* AsyncSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AsyncSupport.swift; sourceTree = "<group>"; };
 		A9CA48BE2658F93F00BC09D5 /* ipatool */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = ipatool; sourceTree = BUILT_PRODUCTS_DIR; };
-		A9CA48C12658F93F00BC09D5 /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A9CA48CC2658FBF700BC09D5 /* Download.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Download.swift; sourceTree = "<group>"; };
 		A9CA48CE2658FC7400BC09D5 /* IPATool.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IPATool.swift; sourceTree = "<group>"; };
 		A9CA48D1265913B300BC09D5 /* HTTPRequest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HTTPRequest.swift; sourceTree = "<group>"; };
@@ -113,7 +113,7 @@
 				A9CA48D02659138600BC09D5 /* Networking */,
 				A9CA48F6265942A600BC09D5 /* Signature */,
 				A9CA48EA265929E000BC09D5 /* Store */,
-				A9CA48C12658F93F00BC09D5 /* main.swift */,
+				A9BDE1CE2784E5B0003B662A /* AsyncSupport.swift */,
 			);
 			path = Source;
 			sourceTree = "<group>";
@@ -259,7 +259,6 @@
 				A9CA48E5265926DB00BC09D5 /* iTunesRequest.swift in Sources */,
 				A9CA48D2265913B300BC09D5 /* HTTPRequest.swift in Sources */,
 				A9CA48FD26594B5F00BC09D5 /* Logging.swift in Sources */,
-				A9CA48C22658F93F00BC09D5 /* main.swift in Sources */,
 				A9CA48EC26592DD100BC09D5 /* StoreClient.swift in Sources */,
 				A9CA490126594BB000BC09D5 /* ConsoleLogger.swift in Sources */,
 				A9CA48F8265942D500BC09D5 /* SignatureClient.swift in Sources */,
@@ -268,6 +267,7 @@
 				A9CA48EE26592DD800BC09D5 /* StoreEndpoint.swift in Sources */,
 				A9CA48DC26591CF100BC09D5 /* HTTPPayload.swift in Sources */,
 				A9CA48E72659273700BC09D5 /* iTunesEndpoint.swift in Sources */,
+				A9BDE1CF2784E5B0003B662A /* AsyncSupport.swift in Sources */,
 				A9CA48F22659317E00BC09D5 /* StoreResponse.swift in Sources */,
 				A9CA49032659627A00BC09D5 /* Search.swift in Sources */,
 				A9CA48FA2659478600BC09D5 /* HTTPDownloadClient.swift in Sources */,

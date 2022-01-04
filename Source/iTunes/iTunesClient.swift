@@ -8,59 +8,17 @@
 import Foundation
 
 protocol iTunesClientInterface {
-    func lookup(bundleIdentifier: String,
-                country: String,
-                deviceFamily: iTunesRequest.DeviceFamily,
-                completion: @escaping (Result<iTunesResponse.Result, Error>) -> Void)
-    func search(term: String,
-                limit: Int,
-                country: String,
-                deviceFamily: iTunesRequest.DeviceFamily,
-                completion: @escaping (Result<[iTunesResponse.Result], Error>) -> Void)
-}
-
-extension iTunesClientInterface {
-    func lookup(bundleIdentifier: String, country: String, deviceFamily: iTunesRequest.DeviceFamily) throws -> iTunesResponse.Result {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<iTunesResponse.Result, Error>?
-        
-        lookup(bundleIdentifier: bundleIdentifier, country: country, deviceFamily: deviceFamily) {
-            result = $0
-            semaphore.signal()
-        }
-        
-        _ = semaphore.wait(timeout: .distantFuture)
-        
-        switch result {
-        case .none:
-            throw iTunesClient.Error.timeout
-        case let .failure(error):
-            throw error
-        case let .success(result):
-            return result
-        }
-    }
-    
-    func search(term: String, limit: Int, country: String, deviceFamily: iTunesRequest.DeviceFamily) throws -> [iTunesResponse.Result] {
-        let semaphore = DispatchSemaphore(value: 0)
-        var result: Result<[iTunesResponse.Result], Error>?
-        
-        search(term: term, limit: limit, country: country, deviceFamily: deviceFamily) {
-            result = $0
-            semaphore.signal()
-        }
-        
-        _ = semaphore.wait(timeout: .distantFuture)
-        
-        switch result {
-        case .none:
-            throw iTunesClient.Error.timeout
-        case let .failure(error):
-            throw error
-        case let .success(result):
-            return result
-        }
-    }
+    func lookup(
+        bundleIdentifier: String,
+        country: String,
+        deviceFamily: iTunesRequest.DeviceFamily
+    ) async throws -> iTunesResponse.Result
+    func search(
+        term: String,
+        limit: Int,
+        country: String,
+        deviceFamily: iTunesRequest.DeviceFamily
+    ) async throws -> [iTunesResponse.Result]
 }
 
 final class iTunesClient: iTunesClientInterface {
@@ -70,48 +28,32 @@ final class iTunesClient: iTunesClientInterface {
         self.httpClient = httpClient
     }
     
-    func lookup(bundleIdentifier: String,
-                country: String,
-                deviceFamily: iTunesRequest.DeviceFamily,
-                completion: @escaping (Result<iTunesResponse.Result, Swift.Error>) -> Void) {
-        let request = iTunesRequest.lookup(bundleIdentifier: bundleIdentifier, country: country, deviceFamily: deviceFamily)
-        
-        httpClient.send(request) { result in
-            switch result {
-            case let .success(response):
-                do {
-                    let decoded = try response.decode(iTunesResponse.self, as: .json)
-                    guard let result = decoded.results.first else { return completion(.failure(Error.appNotFound)) }
-                    completion(.success(result))
-                } catch {
-                    completion(.failure(error))
-                }
-            case let .failure(error):
-                completion(.failure(error))
-            }
-        }
+    func lookup(
+        bundleIdentifier: String,
+        country: String,
+        deviceFamily: iTunesRequest.DeviceFamily
+    ) async throws -> iTunesResponse.Result {
+        let request = iTunesRequest.lookup(
+            bundleIdentifier: bundleIdentifier,
+            country: country,
+            deviceFamily: deviceFamily
+        )
+        let response = try await httpClient.send(request)
+        let decoded = try response.decode(iTunesResponse.self, as: .json)
+        guard let result = decoded.results.first else { throw Error.appNotFound }
+        return result
     }
     
-    func search(term: String,
-                limit: Int,
-                country: String,
-                deviceFamily: iTunesRequest.DeviceFamily,
-                completion: @escaping (Result<[iTunesResponse.Result], Swift.Error>) -> Void) {
+    func search(
+        term: String,
+        limit: Int,
+        country: String,
+        deviceFamily: iTunesRequest.DeviceFamily
+    ) async throws -> [iTunesResponse.Result] {
         let request = iTunesRequest.search(term: term, limit: limit, country: country, deviceFamily: deviceFamily)
-        
-        httpClient.send(request) { result in
-            switch result {
-            case let .success(response):
-                do {
-                    let decoded = try response.decode(iTunesResponse.self, as: .json)
-                    completion(.success(decoded.results))
-                } catch {
-                    completion(.failure(error))
-                }
-            case let .failure(error):
-                completion(.failure(error))
-            }
-        }
+        let response = try await httpClient.send(request)
+        let decoded = try response.decode(iTunesResponse.self, as: .json)
+        return decoded.results
     }
 }
 
