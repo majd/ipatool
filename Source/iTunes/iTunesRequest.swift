@@ -49,9 +49,21 @@ extension iTunesRequest: HTTPRequest {
     var payload: HTTPPayload? {
         switch self {
         case let .lookup(bundleIdentifier, country, deviceFamily):
-            return .urlEncoding(["media": "software", "bundleId": bundleIdentifier, "limit": "1", "country": country, "entity": deviceFamily.entity])
+            return .urlEncoding([
+                "media": "software",
+                "bundleId": bundleIdentifier,
+                "limit": "1",
+                "country": country,
+                "entity": deviceFamily.entity
+            ])
         case let .search(term, limit, country, deviceFamily):
-            return .urlEncoding(["media": "software", "term": term, "limit": "\(limit)", "country": country, "entity": deviceFamily.entity])
+            return .urlEncoding([
+                "media": "software",
+                "term": term,
+                "limit": "\(limit)",
+                "country": country,
+                "entity": deviceFamily.entity
+            ])
         }
     }
 }

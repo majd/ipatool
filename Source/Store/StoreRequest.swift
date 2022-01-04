@@ -66,7 +66,8 @@ extension StoreRequest: HTTPRequest {
 }
 
 extension StoreRequest {
-    // This identifier is calculated by reading the MAC address of the device and stripping the nonalphabetic characters from the string.
+    // This identifier is calculated by reading the MAC address of the device
+    // and stripping the nonalphabetic characters from the string.
     // https://stackoverflow.com/a/31838376
     private var guid: String {
         let MAC_ADDRESS_LENGTH = 6
@@ -86,14 +87,18 @@ extension StoreRequest {
         let bsdData = Data(bsd.utf8)
         var managementInfoBase = [CTL_NET, AF_ROUTE, 0, AF_LINK, NET_RT_IFLIST, bsdIndex]
 
-        guard sysctl(&managementInfoBase, 6, nil, &length, nil, 0) >= 0 else { fatalError("Could not read MAC address") }
+        guard sysctl(&managementInfoBase, 6, nil, &length, nil, 0) >= 0 else {
+            fatalError("Could not read MAC address")
+        }
 
         buffer = [CChar](unsafeUninitializedCapacity: length, initializingWith: {buffer, initializedCount in
             for x in 0..<length { buffer[x] = 0 }
             initializedCount = length
         })
 
-        guard sysctl(&managementInfoBase, 6, &buffer, &length, nil, 0) >= 0 else { fatalError("Could not read MAC address") }
+        guard sysctl(&managementInfoBase, 6, &buffer, &length, nil, 0) >= 0 else {
+            fatalError("Could not read MAC address")
+        }
 
         let infoData = Data(bytes: buffer, count: length)
         let indexAfterMsghdr = MemoryLayout<if_msghdr>.stride + 1

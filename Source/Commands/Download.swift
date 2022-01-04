@@ -8,7 +8,7 @@
 import ArgumentParser
 import Foundation
 
-struct Download: ParsableCommand {
+struct Download: AsyncParsableCommand {
     static var configuration: CommandConfiguration {
         return .init(abstract: "Download (encrypted) iOS app packages from the App Store.")
     }
@@ -38,16 +38,20 @@ struct Download: ParsableCommand {
 }
 
 extension Download {
-    mutating func app(with bundleIdentifier: String, country: String) -> iTunesResponse.Result {
+    mutating func app(with bundleIdentifier: String, country: String) async -> iTunesResponse.Result {
         logger.log("Creating HTTP client...", level: .debug)
-        let httpClient = HTTPClient(urlSession: URLSession.shared)
+        let httpClient = HTTPClient(session: URLSession.shared)
 
         logger.log("Creating iTunes client...", level: .debug)
         let itunesClient = iTunesClient(httpClient: httpClient)
 
         do {
             logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(country)'...", level: .info)
-            return try itunesClient.lookup(bundleIdentifier: bundleIdentifier, country: country, deviceFamily: deviceFamily)
+            return try await itunesClient.lookup(
+                bundleIdentifier: bundleIdentifier,
+                country: country,
+                deviceFamily: deviceFamily
+            )
         } catch {
             logger.log("\(error)", level: .debug)
 
@@ -101,21 +105,21 @@ extension Download {
         }
     }
 
-    mutating func authenticate(email: String, password: String) -> StoreResponse.Account {
+    mutating func authenticate(email: String, password: String) async -> StoreResponse.Account {
         logger.log("Creating HTTP client...", level: .debug)
-        let httpClient = HTTPClient(urlSession: URLSession.shared)
+        let httpClient = HTTPClient(session: URLSession.shared)
 
         logger.log("Creating App Store client...", level: .debug)
         let storeClient = StoreClient(httpClient: httpClient)
 
         do {
             logger.log("Authenticating with the App Store...", level: .info)
-            return try storeClient.authenticate(email: email, password: password)
+            return try await storeClient.authenticate(email: email, password: password, code: nil)
         } catch {
             switch error {
             case StoreResponse.Error.codeRequired:
                 do {
-                    return try storeClient.authenticate(email: email, password: password, code: authCode())
+                    return try await storeClient.authenticate(email: email, password: password, code: authCode())
                 } catch {
                     logger.log("\(error)", level: .debug)
                     
@@ -156,16 +160,19 @@ extension Download {
 
     }
     
-    mutating func item(from app: iTunesResponse.Result, account: StoreResponse.Account) -> StoreResponse.Item {
+    mutating func item(from app: iTunesResponse.Result, account: StoreResponse.Account) async -> StoreResponse.Item {
         logger.log("Creating HTTP client...", level: .debug)
-        let httpClient = HTTPClient(urlSession: URLSession.shared)
+        let httpClient = HTTPClient(session: URLSession.shared)
 
         logger.log("Creating App Store client...", level: .debug)
         let storeClient = StoreClient(httpClient: httpClient)
 
         do {
             logger.log("Requesting a signed copy of '\(app.identifier)' from the App Store...", level: .info)
-            return try storeClient.item(identifier: "\(app.identifier)", directoryServicesIdentifier: account.directoryServicesIdentifier)
+            return try await storeClient.item(
+                identifier: "\(app.identifier)",
+                directoryServicesIdentifier: account.directoryServicesIdentifier
+            )
         } catch {
             logger.log("\(error)", level: .debug)
             
@@ -184,13 +191,13 @@ extension Download {
         }
     }
     
-    mutating func download(item: StoreResponse.Item, to targetURL: URL) {
+    mutating func download(item: StoreResponse.Item, to targetURL: URL) async {
         logger.log("Creating download client...", level: .debug)
         let downloadClient = HTTPDownloadClient()
 
         do {
             logger.log("Downloading app package...", level: .info)
-            try downloadClient.download(from: item.url, to: targetURL) { [logger] progress in
+            try await downloadClient.download(from: item.url, to: targetURL) { [logger] progress in
                 logger.log("Downloading app package... [\(Int((progress * 100).rounded()))%]",
                            prefix: "\u{1B}[1A\u{1B}[K",
                            level: .info)
@@ -216,10 +223,10 @@ extension Download {
             _exit(1)
         }
     }
-    
-    mutating func run() throws {
+
+    mutating func run() async throws {
         // Query for app
-        let app: iTunesResponse.Result = app(with: bundleIdentifier, country: country)
+        let app: iTunesResponse.Result = await app(with: bundleIdentifier, country: country)
         logger.log("Found app: \(app.name) (\(app.version)).", level: .debug)
         
         // Get Apple ID email
@@ -229,11 +236,11 @@ extension Download {
         let password: String = password()
 
         // Authenticate with the App Store
-        let account: StoreResponse.Account = authenticate(email: email, password: password)
+        let account: StoreResponse.Account = await authenticate(email: email, password: password)
         logger.log("Authenticated as '\(account.firstName) \(account.lastName)'.", level: .info)
 
         // Query for store item
-        let item: StoreResponse.Item = item(from: app, account: account)
+        let item: StoreResponse.Item = await item(from: app, account: account)
         logger.log("Received a response of the signed copy: \(item.md5).", level: .debug)
 
         // Generate file name
@@ -243,7 +250,7 @@ extension Download {
         logger.log("Output path: \(path).", level: .debug)
 
         // Download app package
-        download(item: item, to: URL(fileURLWithPath: path))
+        await download(item: item, to: URL(fileURLWithPath: path))
         logger.log("Saved app package to \(URL(fileURLWithPath: path).lastPathComponent).", level: .info)
 
         // Apply patches

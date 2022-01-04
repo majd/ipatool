@@ -8,7 +8,7 @@
 import ArgumentParser
 import Foundation
 
-struct Search: ParsableCommand {
+struct Search: AsyncParsableCommand {
     static var configuration: CommandConfiguration {
         return .init(abstract: "Search for iOS apps available on the App Store.")
     }
@@ -32,17 +32,23 @@ struct Search: ParsableCommand {
 }
 
 extension Search {
-    mutating func results(with term: String, country: String) -> [iTunesResponse.Result] {
+    mutating func results(with term: String, country: String) async -> [iTunesResponse.Result] {
         logger.log("Creating HTTP client...", level: .debug)
-        let httpClient = HTTPClient(urlSession: URLSession.shared)
+        let httpClient = HTTPClient(session: URLSession.shared)
 
         logger.log("Creating iTunes client...", level: .debug)
         let itunesClient = iTunesClient(httpClient: httpClient)
-        
+
+        logger.log("Searching for '\(term)' using the '\(country)' store front...", level: .info)
+
         do {
-            logger.log("Searching for '\(term)' using the '\(country)' store front...", level: .info)
-            let results = try itunesClient.search(term: term, limit: limit, country: country, deviceFamily: deviceFamily)
-            
+            let results = try await itunesClient.search(
+                term: term,
+                limit: limit,
+                country: country,
+                deviceFamily: deviceFamily
+            )
+
             guard !results.isEmpty else {
                 logger.log("No results found.", level: .error)
                 _exit(1)
@@ -56,9 +62,9 @@ extension Search {
         }
     }
     
-    mutating func run() throws {
+    mutating func run() async throws {
         // Search the iTunes store
-        let results = results(with: term, country: country)
+        let results = await results(with: term, country: country)
 
         // Compile output
         let output = results
