@@ -1,6 +1,6 @@
 //
 //  StoreEndpoint.swift
-//  IPATool
+//  StoreAPI
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //

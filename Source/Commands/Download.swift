@@ -8,6 +8,7 @@
 import ArgumentParser
 import Foundation
 import Networking
+import StoreAPI
 
 struct Download: AsyncParsableCommand {
     static var configuration: CommandConfiguration {
@@ -30,7 +31,7 @@ struct Download: AsyncParsableCommand {
     private var country: String = "US"
 
     @Option(name: [.short, .long], help: "The device family to limit the search query to.")
-    private var deviceFamily: iTunesRequest.DeviceFamily = .phone
+    private var deviceFamily: DeviceFamily = .phone
 
     @Option(name: [.long], help: "The log level.")
     private var logLevel: LogLevel = .info

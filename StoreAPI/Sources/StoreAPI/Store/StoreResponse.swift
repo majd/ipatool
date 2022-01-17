@@ -1,33 +1,33 @@
 //
 //  StoreResponse.swift
-//  IPATool
+//  StoreAPI
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
 
 import Foundation
 
-enum StoreResponse {
+public enum StoreResponse {
     case failure(error: Swift.Error)
     case account(Account)
     case item(Item)
 }
 
 extension StoreResponse {
-    struct Account {
-        let firstName: String
-        let lastName: String
-        let directoryServicesIdentifier: String
+    public struct Account {
+        public let firstName: String
+        public let lastName: String
+        public let directoryServicesIdentifier: String
     }
     
-    struct Item {
-        let url: URL
-        let md5: String
-        let signatures: [Signature]
-        let metadata: [String: Any]
+    public struct Item {
+        public let url: URL
+        public let md5: String
+        public let signatures: [Signature]
+        public let metadata: [String: Any]
     }
 
-    enum Error: Int, Swift.Error {
+    public enum Error: Int, Swift.Error {
         case unknownError = 0
         case genericError = 5002
         case codeRequired = 1
@@ -40,7 +40,7 @@ extension StoreResponse {
 }
 
 extension StoreResponse: Decodable {
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         let error = try container.decodeIfPresent(String.self, forKey: .error)
@@ -91,7 +91,7 @@ extension StoreResponse: Decodable {
 }
 
 extension StoreResponse.Item: Decodable {
-    init(from decoder: Decoder) throws {
+    public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let md5 = try container.decode(String.self, forKey: .md5)
 
@@ -117,9 +117,9 @@ extension StoreResponse.Item: Decodable {
         }
     }
     
-    struct Signature: Decodable {
-        let id: Int
-        let sinf: Data
+    public struct Signature: Decodable {
+        public let id: Int
+        public let sinf: Data
     }
     
     enum CodingKeys: String, CodingKey {

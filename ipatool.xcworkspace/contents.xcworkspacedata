@@ -5,6 +5,9 @@
       location = "group:ipatool.xcodeproj">
    </FileRef>
    <FileRef
+      location = "group:StoreAPI">
+   </FileRef>
+   <FileRef
       location = "group:Networking">
    </FileRef>
 </Workspace>

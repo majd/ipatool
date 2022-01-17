@@ -1,6 +1,6 @@
 //
 //  SignatureClient.swift
-//  IPATool
+//  StoreAPI
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
@@ -8,21 +8,21 @@
 import Foundation
 import ZIPFoundation
 
-protocol SignatureClientInterface {
+public protocol SignatureClientInterface {
     func appendMetadata(item: StoreResponse.Item, email: String) throws
     func appendSignature(item: StoreResponse.Item) throws
 }
 
-final class SignatureClient: SignatureClientInterface {
+public final class SignatureClient: SignatureClientInterface {
     private let fileManager: FileManager
     private let filePath: String
     
-    init(fileManager: FileManager, filePath: String) {
+    public init(fileManager: FileManager, filePath: String) {
         self.fileManager = fileManager
         self.filePath = filePath
     }
     
-    func appendMetadata(item: StoreResponse.Item, email: String) throws {
+    public func appendMetadata(item: StoreResponse.Item, email: String) throws {
         guard let archive = Archive(url: URL(fileURLWithPath: filePath), accessMode: .update) else  {
             throw Error.invalidArchive
         }
@@ -39,7 +39,7 @@ final class SignatureClient: SignatureClientInterface {
         try fileManager.removeItem(at: metadataUrl)
     }
     
-    func appendSignature(item: StoreResponse.Item) throws {
+    public func appendSignature(item: StoreResponse.Item) throws {
         guard let archive = Archive(url: URL(fileURLWithPath: filePath), accessMode: .update) else  {
             throw Error.invalidArchive
         }
