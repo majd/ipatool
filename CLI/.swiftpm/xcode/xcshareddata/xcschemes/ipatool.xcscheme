@@ -14,10 +14,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "A9CA48BD2658F93F00BC09D5"
+               BlueprintIdentifier = "ipatool"
                BuildableName = "ipatool"
-               BlueprintName = "IPATool"
-               ReferencedContainer = "container:ipatool.xcodeproj">
+               BlueprintName = "ipatool"
+               ReferencedContainer = "container:">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -44,36 +44,20 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A9CA48BD2658F93F00BC09D5"
+            BlueprintIdentifier = "ipatool"
             BuildableName = "ipatool"
-            BlueprintName = "IPATool"
-            ReferencedContainer = "container:ipatool.xcodeproj">
+            BlueprintName = "ipatool"
+            ReferencedContainer = "container:">
          </BuildableReference>
       </BuildableProductRunnable>
       <CommandLineArguments>
          <CommandLineArgument
-            argument = "download --help"
-            isEnabled = "NO">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "search &quot;Swift Playgrounds&quot; --device-family iPhone"
-            isEnabled = "NO">
-         </CommandLineArgument>
-         <CommandLineArgument
             argument = "search &quot;Swift Playgrounds&quot; --device-family iPad"
-            isEnabled = "YES">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "download -b com.apple.TestFlight"
             isEnabled = "NO">
          </CommandLineArgument>
          <CommandLineArgument
             argument = "search --help"
-            isEnabled = "NO">
-         </CommandLineArgument>
-         <CommandLineArgument
-            argument = "search TestFlight --limit 5"
-            isEnabled = "NO">
+            isEnabled = "YES">
          </CommandLineArgument>
       </CommandLineArguments>
    </LaunchAction>
@@ -87,10 +71,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "A9CA48BD2658F93F00BC09D5"
+            BlueprintIdentifier = "ipatool"
             BuildableName = "ipatool"
-            BlueprintName = "IPATool"
-            ReferencedContainer = "container:ipatool.xcodeproj">
+            BlueprintName = "ipatool"
+            ReferencedContainer = "container:">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
