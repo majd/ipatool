@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Networking
 
 enum StoreEndpoint {
     case authenticate(prefix: String, guid: String)

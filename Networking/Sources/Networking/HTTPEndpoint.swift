@@ -1,12 +1,12 @@
 //
 //  HTTPEndpoint.swift
-//  IPATool
+//  Networking
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
 
 import Foundation
 
-protocol HTTPEndpoint {
+public protocol HTTPEndpoint {
     var url: URL { get }
 }

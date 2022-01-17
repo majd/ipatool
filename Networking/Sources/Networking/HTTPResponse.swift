@@ -1,19 +1,19 @@
 //
 //  HTTPResponse.swift
-//  IPATool
+//  Networking
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
 
 import Foundation
 
-struct HTTPResponse {
+public struct HTTPResponse {
     let statusCode: Int
     let data: Data?
 }
 
 extension HTTPResponse {
-    func decode<T: Decodable>(_ type: T.Type, as decoder: Decoder) throws -> T {
+    public func decode<T: Decodable>(_ type: T.Type, as decoder: Decoder) throws -> T {
         guard let data = data else {
             throw Error.noData
         }
@@ -32,12 +32,12 @@ extension HTTPResponse {
 }
 
 extension HTTPResponse {
-    enum Decoder {
+    public enum Decoder {
         case json
         case xml
     }
     
-    enum Error: Swift.Error {
+    public enum Error: Swift.Error {
         case noData
     }
 }

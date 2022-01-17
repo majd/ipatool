@@ -1,18 +1,18 @@
 //
 //  URLSession.swift
-//  IPATool
+//  Networking
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
 
 import Foundation
 
-protocol URLSessionInterface {
+public protocol URLSessionInterface {
     func data(for request: URLRequest) async throws -> (Data, URLResponse)
 }
 
 extension URLSession: URLSessionInterface {
-    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+    public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         try await withCheckedThrowingContinuation { continuation in
             let task = dataTask(with: request) { data, response, error in
                 guard let data = data, let response = response else {

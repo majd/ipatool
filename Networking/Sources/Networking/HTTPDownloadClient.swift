@@ -1,28 +1,28 @@
 //
 //  HTTPDownloadClient.swift
-//  IPATool
+//  Networking
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
 
 import Foundation
 
-protocol HTTPDownloadClientInterface {
+public protocol HTTPDownloadClientInterface {
     func download(from source: URL, to target: URL, progress: @escaping (Float) -> Void) async throws
 }
 
-final class HTTPDownloadClient: NSObject, HTTPDownloadClientInterface {
+public final class HTTPDownloadClient: NSObject, HTTPDownloadClientInterface {
     private var session: URLSession!
     private var progressHandler: ((Float) -> Void)?
     private var continuation: CheckedContinuation<Void, Swift.Error>?
     private var targetURL: URL?
 
-    override init() {
+    public override init() {
         super.init()
         self.session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
     }
     
-    func download(from source: URL, to target: URL, progress: @escaping (Float) -> Void) async throws {
+    public func download(from source: URL, to target: URL, progress: @escaping (Float) -> Void) async throws {
         assert(progressHandler == nil)
         assert(continuation == nil)
         assert(targetURL == nil)
@@ -39,7 +39,7 @@ final class HTTPDownloadClient: NSObject, HTTPDownloadClientInterface {
 }
 
 extension HTTPDownloadClient: URLSessionDownloadDelegate {
-    func urlSession(
+    public func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
         didWriteData bytesWritten: Int64,
@@ -49,7 +49,11 @@ extension HTTPDownloadClient: URLSessionDownloadDelegate {
         progressHandler?(Float(totalBytesWritten) / Float(totalBytesExpectedToWrite))
     }
     
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+    public func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didFinishDownloadingTo location: URL
+    ) {
         defer {
             progressHandler = nil
             continuation = nil

@@ -1,24 +1,24 @@
 //
 //  HTTPClient.swift
-//  IPATool
+//  Networking
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
 
 import Foundation
 
-protocol HTTPClientInterface {
+public protocol HTTPClientInterface {
     func send(_ request: HTTPRequest) async throws -> HTTPResponse
 }
 
-final class HTTPClient: HTTPClientInterface {
+public final class HTTPClient: HTTPClientInterface {
     private let session: URLSessionInterface
     
-    init(session: URLSessionInterface) {
+    public init(session: URLSessionInterface) {
         self.session = session
     }
 
-    func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+    public func send(_ request: HTTPRequest) async throws -> HTTPResponse {
         let request = try makeURLRequest(from: request)
         let (data, response) = try await session.data(for: request)
 
