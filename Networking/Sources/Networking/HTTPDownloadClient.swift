@@ -39,6 +39,20 @@ public final class HTTPDownloadClient: NSObject, HTTPDownloadClientInterface {
 }
 
 extension HTTPDownloadClient: URLSessionDownloadDelegate {
+    public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Swift.Error?) {
+        guard let error = error else {
+            return
+        }
+
+        defer {
+            progressHandler = nil
+            continuation = nil
+            targetURL = nil
+        }
+
+        continuation?.resume(throwing: error)
+    }
+    
     public func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
