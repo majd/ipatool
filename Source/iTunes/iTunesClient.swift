@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Networking
 
 protocol iTunesClientInterface {
     func lookup(

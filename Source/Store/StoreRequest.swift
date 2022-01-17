@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Networking
 
 enum StoreRequest {
     case authenticate(email: String, password: String, code: String? = nil)
