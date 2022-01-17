@@ -1,6 +1,6 @@
 //
 //  StoreClient.swift
-//  IPATool
+//  StoreAPI
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
@@ -8,20 +8,38 @@
 import Foundation
 import Networking
 
-protocol StoreClientInterface {
+public protocol StoreClientInterface {
     func authenticate(email: String, password: String, code: String?) async throws -> StoreResponse.Account
     func item(identifier: String, directoryServicesIdentifier: String) async throws -> StoreResponse.Item
 }
 
-final class StoreClient: StoreClientInterface {
+public final class StoreClient: StoreClientInterface {
     private let httpClient: HTTPClient
     
-    init(httpClient: HTTPClient) {
+    public init(httpClient: HTTPClient) {
         self.httpClient = httpClient
     }
     
-    func authenticate(email: String, password: String, code: String?) async throws -> StoreResponse.Account {
+    public func authenticate(email: String, password: String, code: String?) async throws -> StoreResponse.Account {
         try await authenticate(email: email, password: password, code: code, isFirstAttempt: true)
+    }
+    
+    public func item(identifier: String, directoryServicesIdentifier: String) async throws -> StoreResponse.Item {
+        let request = StoreRequest.download(
+            appIdentifier: identifier,
+            directoryServicesIdentifier: directoryServicesIdentifier
+        )
+        let response = try await httpClient.send(request)
+        let decoded = try response.decode(StoreResponse.self, as: .xml)
+
+        switch decoded {
+        case let .item(item):
+            return item
+        case .account:
+            throw Error.invalidResponse
+        case let .failure(error):
+            throw error
+        }
     }
     
     private func authenticate(email: String,
@@ -50,28 +68,10 @@ final class StoreClient: StoreClientInterface {
             }
         }
     }
-    
-    func item(identifier: String, directoryServicesIdentifier: String) async throws -> StoreResponse.Item {
-        let request = StoreRequest.download(
-            appIdentifier: identifier,
-            directoryServicesIdentifier: directoryServicesIdentifier
-        )
-        let response = try await httpClient.send(request)
-        let decoded = try response.decode(StoreResponse.self, as: .xml)
-
-        switch decoded {
-        case let .item(item):
-            return item
-        case .account:
-            throw Error.invalidResponse
-        case let .failure(error):
-            throw error
-        }
-    }
 }
 
 extension StoreClient {
-    enum Error: Swift.Error {
+    public enum Error: Swift.Error {
         case timeout
         case invalidResponse
     }
