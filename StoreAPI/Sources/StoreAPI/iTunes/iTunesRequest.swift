@@ -50,10 +50,6 @@ extension iTunesRequest: HTTPRequest {
 }
 
 private extension DeviceFamily {
-    var defaultValueDescription: String {
-        return rawValue
-    }
-    
     var entity: String {
         switch self {
         case .phone:

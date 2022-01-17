@@ -11,4 +11,8 @@ import ArgumentParser
 public enum DeviceFamily: String, ExpressibleByArgument {
     case phone = "iPhone"
     case pad = "iPad"
+
+    public var defaultValueDescription: String {
+        return rawValue
+    }
 }
