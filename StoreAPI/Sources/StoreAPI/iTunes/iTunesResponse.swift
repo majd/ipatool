@@ -1,23 +1,23 @@
 //
 //  iTunesResponse.swift
-//  IPATool
+//  StoreAPI
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
 
 import Foundation
 
-struct iTunesResponse {
+public struct iTunesResponse {
     let results: [Result]
     let count: Int
 }
 
 extension iTunesResponse {
-    struct Result {
-        let bundleIdentifier: String
-        let version: String
-        let identifier: Int
-        let name: String
+    public struct Result {
+        public let bundleIdentifier: String
+        public let version: String
+        public let identifier: Int
+        public let name: String
     }
 }
 

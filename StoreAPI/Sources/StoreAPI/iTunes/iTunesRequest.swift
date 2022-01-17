@@ -1,6 +1,6 @@
 //
 //  iTunesRequest.swift
-//  IPATool
+//  StoreAPI
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
@@ -11,26 +11,6 @@ import Networking
 enum iTunesRequest {
     case search(term: String, limit: Int, country: String, deviceFamily: DeviceFamily = .phone)
     case lookup(bundleIdentifier: String, country: String, deviceFamily: DeviceFamily = .phone)
-}
-
-extension iTunesRequest {
-    enum DeviceFamily: String, ExpressibleByArgument {
-        case phone = "iPhone"
-        case pad = "iPad"
-        
-        var defaultValueDescription: String {
-            return rawValue
-        }
-        
-        var entity: String {
-            switch self {
-            case .phone:
-                return "software"
-            case .pad:
-                return "iPadSoftware"
-            }
-        }
-    }
 }
 
 extension iTunesRequest: HTTPRequest {
@@ -65,6 +45,21 @@ extension iTunesRequest: HTTPRequest {
                 "country": country,
                 "entity": deviceFamily.entity
             ])
+        }
+    }
+}
+
+private extension DeviceFamily {
+    var defaultValueDescription: String {
+        return rawValue
+    }
+    
+    var entity: String {
+        switch self {
+        case .phone:
+            return "software"
+        case .pad:
+            return "iPadSoftware"
         }
     }
 }

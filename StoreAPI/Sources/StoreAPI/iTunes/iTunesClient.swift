@@ -1,6 +1,6 @@
 //
 //  iTunesClient.swift
-//  IPATool
+//  StoreAPI
 //
 //  Created by Majd Alfhaily on 22.05.21.
 //
@@ -8,31 +8,32 @@
 import Foundation
 import Networking
 
-protocol iTunesClientInterface {
+public protocol iTunesClientInterface {
     func lookup(
         bundleIdentifier: String,
         country: String,
-        deviceFamily: iTunesRequest.DeviceFamily
+        deviceFamily: DeviceFamily
     ) async throws -> iTunesResponse.Result
+
     func search(
         term: String,
         limit: Int,
         country: String,
-        deviceFamily: iTunesRequest.DeviceFamily
+        deviceFamily: DeviceFamily
     ) async throws -> [iTunesResponse.Result]
 }
 
-final class iTunesClient: iTunesClientInterface {
+public final class iTunesClient: iTunesClientInterface {
     private let httpClient: HTTPClient
     
-    init(httpClient: HTTPClient) {
+    public init(httpClient: HTTPClient) {
         self.httpClient = httpClient
     }
     
-    func lookup(
+    public func lookup(
         bundleIdentifier: String,
         country: String,
-        deviceFamily: iTunesRequest.DeviceFamily
+        deviceFamily: DeviceFamily
     ) async throws -> iTunesResponse.Result {
         let request = iTunesRequest.lookup(
             bundleIdentifier: bundleIdentifier,
@@ -45,11 +46,11 @@ final class iTunesClient: iTunesClientInterface {
         return result
     }
     
-    func search(
+    public func search(
         term: String,
         limit: Int,
         country: String,
-        deviceFamily: iTunesRequest.DeviceFamily
+        deviceFamily: DeviceFamily
     ) async throws -> [iTunesResponse.Result] {
         let request = iTunesRequest.search(term: term, limit: limit, country: country, deviceFamily: deviceFamily)
         let response = try await httpClient.send(request)
@@ -59,7 +60,7 @@ final class iTunesClient: iTunesClientInterface {
 }
 
 extension iTunesClient {
-    enum Error: Swift.Error {
+    public enum Error: Swift.Error {
         case timeout
         case appNotFound
     }
