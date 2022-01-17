@@ -6,6 +6,7 @@
 //
 
 import ArgumentParser
+import Networking
 
 enum iTunesRequest {
     case search(term: String, limit: Int, country: String, deviceFamily: DeviceFamily = .phone)

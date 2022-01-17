@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import Networking
 
 protocol StoreClientInterface {
     func authenticate(email: String, password: String, code: String?) async throws -> StoreResponse.Account

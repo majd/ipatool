@@ -7,6 +7,7 @@
 
 import ArgumentParser
 import Foundation
+import Networking
 
 struct Download: AsyncParsableCommand {
     static var configuration: CommandConfiguration {
