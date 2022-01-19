@@ -11,8 +11,8 @@ let package = Package(
         .library(name: "Networking", targets: ["Networking"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", from: "0.4.3"),
-        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.12")
+        .package(url: "https://github.com/apple/swift-argument-parser", revision: "1.0.2"),
+        .package(url: "https://github.com/weichsel/ZIPFoundation", revision: "0.9.14")
     ],
     targets: [
         .executableTarget(name: "CLI", dependencies: [
