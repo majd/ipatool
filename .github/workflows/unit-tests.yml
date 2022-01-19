@@ -10,7 +10,8 @@ jobs:
     name: Test Networking
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v2
       - name: Configure Xcode
         run: sudo xcode-select -s "/Applications/Xcode_13.2.1.app"
       - name: Build
