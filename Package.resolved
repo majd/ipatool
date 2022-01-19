@@ -5,18 +5,18 @@
         "package": "swift-argument-parser",
         "repositoryURL": "https://github.com/apple/swift-argument-parser",
         "state": {
-          "branch": null,
-          "revision": "6b2aa2748a7881eebb9f84fb10c01293e15b52ca",
-          "version": "0.5.0"
+          "branch": "1.0.2",
+          "revision": "e1465042f195f374b94f915ba8ca49de24300a0d",
+          "version": null
         }
       },
       {
         "package": "ZIPFoundation",
-        "repositoryURL": "https://github.com/weichsel/ZIPFoundation.git",
+        "repositoryURL": "https://github.com/weichsel/ZIPFoundation",
         "state": {
-          "branch": null,
+          "branch": "0.9.14",
           "revision": "7254c74b49cec2cb81520523ba993c671f71b066",
-          "version": "0.9.14"
+          "version": null
         }
       }
     ]
