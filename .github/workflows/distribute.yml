@@ -23,6 +23,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Configure Xcode
         run: sudo xcode-select -s "/Applications/Xcode_13.2.1.app"
+      - name: Inject version
+        run: ./Scripts/version
       - name: Build
         run: swift build
       - name: Run tests
@@ -36,6 +38,8 @@ jobs:
         uses: actions/checkout@v2
       - name: Configure Xcode
         run: sudo xcode-select -s "/Applications/Xcode_13.2.1.app"
+      - name: Inject version
+        run: ./Scripts/version
       - name: Build
         run: make build
       - name: Upload binary
