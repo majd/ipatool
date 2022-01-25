@@ -63,6 +63,7 @@ playground.xcworkspace
 /*.xcodeproj
 .swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
 .build/
+Sources/CLI/Package.swift
 
 ### Xcode Patch ###
 *.xcodeproj/*

@@ -1,0 +1,13 @@
+#!/bin/bash -e
+
+VERSION=$(git describe --abbrev=0 --tags | cut -c 2-)
+
+cat <<EOF >"$PWD/Sources/CLI/Package.swift"
+// Automatically generated
+
+enum Package {
+    static let version = "${VERSION}"
+}
+EOF
+
+echo "Version ${VERSION}"
