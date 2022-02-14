@@ -33,6 +33,9 @@ struct Download: AsyncParsableCommand {
     @Option(name: [.short, .long], help: "The device family to limit the search query to.")
     private var deviceFamily: DeviceFamily = .phone
 
+    @Option(name: [.short, .long], help: "The destination path of the downloaded app package.")
+    private var output: String?
+
     @Option(name: [.long], help: "The log level.")
     private var logLevel: LogLevel = .info
 
@@ -40,7 +43,7 @@ struct Download: AsyncParsableCommand {
 }
 
 extension Download {
-    mutating func app(with bundleIdentifier: String, country: String) async -> iTunesResponse.Result {
+    private mutating func app(with bundleIdentifier: String, country: String) async -> iTunesResponse.Result {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -68,7 +71,7 @@ extension Download {
         }
     }
     
-    mutating func email() -> String {
+    private mutating func email() -> String {
         if let email = emailArgument {
             return email
         } else if let email = ProcessInfo.processInfo.environment["IPATOOL_EMAIL"] {
@@ -81,7 +84,7 @@ extension Download {
         }
     }
     
-    mutating func password() -> String {
+    private mutating func password() -> String {
         if let password = passwordArgument {
             return password
         } else if let password = ProcessInfo.processInfo.environment["IPATOOL_PASSWORD"] {
@@ -94,7 +97,7 @@ extension Download {
         }
     }
 
-    mutating func authCode() -> String {
+    private mutating func authCode() -> String {
         if let authCode = authCodeArgument {
             return authCode
         } else if let authCode = ProcessInfo.processInfo.environment["IPATOOL_2FA_CODE"] {
@@ -107,7 +110,7 @@ extension Download {
         }
     }
 
-    mutating func authenticate(email: String, password: String) async -> StoreResponse.Account {
+    private mutating func authenticate(email: String, password: String) async -> StoreResponse.Account {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -162,7 +165,10 @@ extension Download {
 
     }
     
-    mutating func item(from app: iTunesResponse.Result, account: StoreResponse.Account) async -> StoreResponse.Item {
+    private mutating func item(
+        from app: iTunesResponse.Result,
+        account: StoreResponse.Account
+    ) async -> StoreResponse.Item {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -193,7 +199,7 @@ extension Download {
         }
     }
     
-    mutating func download(item: StoreResponse.Item, to targetURL: URL) async {
+    private mutating func download(item: StoreResponse.Item, to targetURL: URL) async {
         logger.log("Creating download client...", level: .debug)
         let downloadClient = HTTPDownloadClient()
 
@@ -211,7 +217,7 @@ extension Download {
         }
     }
     
-    mutating func applyPatches(item: StoreResponse.Item, email: String, path: String) {
+    private mutating func applyPatches(item: StoreResponse.Item, email: String, path: String) {
         logger.log("Creating signature client...", level: .debug)
         let signatureClient = SignatureClient(fileManager: .default, filePath: path)
 
@@ -225,7 +231,30 @@ extension Download {
             _exit(1)
         }
     }
+    
+    private mutating func makeOutputPath(app: iTunesResponse.Result) -> String {
+        let fileName: String = "/\(bundleIdentifier)_\(app.identifier)_v\(app.version)_\(Int.random(in: 100...999)).ipa"
+        
+        guard let output = output else {
+            return FileManager.default.currentDirectoryPath.appending(fileName)
+        }
+        
+        var isDirectory: ObjCBool = false
+        FileManager.default.fileExists(atPath: output, isDirectory: &isDirectory)
+        
+        return isDirectory.boolValue ? output.appending(fileName) : output
+    }
 
+    mutating func validate() throws {
+        guard let output = output else { return }
+        
+        var isDirectory: ObjCBool = false
+        guard !FileManager.default.fileExists(atPath: output, isDirectory: &isDirectory) || isDirectory.boolValue else {
+            logger.log("A file already exists at \(output).", level: .error)
+            _exit(1)
+        }
+    }
+    
     mutating func run() async throws {
         // Query for app
         let app: iTunesResponse.Result = await app(with: bundleIdentifier, country: country)
@@ -246,9 +275,7 @@ extension Download {
         logger.log("Received a response of the signed copy: \(item.md5).", level: .debug)
 
         // Generate file name
-        let path = FileManager.default.currentDirectoryPath
-            .appending("/\(bundleIdentifier)_\(app.identifier)_v\(app.version)_\(Int.random(in: 100...999))")
-            .appending(".ipa")
+        let path = makeOutputPath(app: app)
         logger.log("Output path: \(path).", level: .debug)
 
         // Download app package
