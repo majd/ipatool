@@ -9,13 +9,21 @@
 
 ![Demo](./demo.gif)
 
+* [Requirements](#requirements)
+* [Installation](#installation)
+  * [Manual](#manual)
+  * [Homebrew](#homebrew)
+* [Usage](#usage)
+* [FAQ](https://github.com/majd/ipatool/wiki/FAQ)
+* [License](#license)
+
 ## Requirements
 * macOS 10.15 or later.
 * Apple ID set up to use the App Store.
 
 ## Installation
 
-### Manual Install
+### Manual
 
 You can grab the latest version of `ipatool` from [GitHub releases](https://github.com/majd/ipatool/releases).
 
@@ -77,36 +85,6 @@ OPTIONS:
 
 **Note:** You can specify the Apple ID email address and username as arguments when using the tool or by setting them as environment variables (`IPATOOL_EMAIL` and `IPATOOL_PASSWORD`). If you do not specify this information using either of those methods, the tool will prompt for user input in an interactive session. Similarly, you can supply the 2FA code interactively or using the environment variable `IPATOOL_2FA_CODE`.
 
-## Common Knowledge
+## License
 
-**Are my Apple ID credentials stored safely?**
-
-The tool does not store your credentials anywhere and it only communicates with Apple servers directly. Feel free to go through the source code.
-
-**Will my Apple ID get flagged for using this tool?**
-
-Maybe, but probably not. While this tool communicates with iTunes and the App Store directly, mimicking the behavior of iTunes running on macOS, I cannot guarantee its safety. I recommend using a throwaway Apple ID. **Use this tool at your own risk**.
-
-**Can I use this tool to download paid apps without paying for them?**
-
-**No**. This is is not a piracy tool; you can only download apps that you have previously installed on your iOS device. This limitation applies to free apps as well. Essentially, your account must already have a license for the app you are trying to download.
-
-**Can I use this tool to sideload unsupported iOS apps on Apple Silicon Macs?**
-
-While it was previously possible to download ipa files using this tool and install them on Macs running on Apple Silicon, this is no longer the case as of recently. Apple stopped serving macOS compatible `sinf` data for the app package. You could, however, use this tool to get a copy of the iOS app and use a jailbroken iOS device to strip any codesigning requirements then codesign the app again using an adhoc signature to run on Apple Silicon.
-
-## Troubleshooting
-
-If `ipatool download` fails with the following error despite providing
-correct email/password/auth code:
-
-```
-==> ℹ️  [Info] Querying the iTunes Store for '<bundle-identifier>' in country '<country>'...
-==> ℹ️  [Info] Authenticating with the App Store...
-==> ❌ [Error] An unknown error has occurred.
-```
-
-then see [issue #30](https://github.com/majd/ipatool/issues/30)
-(particularly [this
-comment](https://github.com/majd/ipatool/issues/30#issuecomment-977852648))
-for a fix. Note that you may need version 1.0.7 or later.
+IPATool is released under the [MIT license](https://github.com/majd/ipatool/blob/main/LICENSE).
