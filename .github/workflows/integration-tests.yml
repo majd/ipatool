@@ -1,0 +1,45 @@
+name: Integration Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    name: Build
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Configure Xcode
+        run: sudo xcode-select -s "/Applications/Xcode_13.2.1.app"
+      - name: Inject version
+        run: ./Scripts/version
+      - name: Build
+        run: make build
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: ipatool
+          path: .build/ipatool
+          if-no-files-found: error
+  test:
+    name: Test
+    runs-on: ${{ matrix.macos }}
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        macos: [macos-10.15, macos-11]
+        command: [download, search]
+    steps:
+      - name: Download binary
+        uses: actions/download-artifact@v2
+        with:
+          name: ipatool
+          path: ipatool-current
+      - name: Update permissions
+        run: chmod +x ./ipatool-current/ipatool
+      - name: Run tests
+        run: ./ipatool-current/ipatool ${{ matrix.command }} --help

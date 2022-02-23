@@ -1,9 +1,11 @@
 # IPATool
 [![Release](https://img.shields.io/github/release/majd/ipatool.svg?label=Release)](https://GitHub.com/majd/ipatool/releases/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/majd/ipatool/blob/main/LICENSE)
-[![Unit Tests](https://github.com/majd/ipatool/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/majd/ipatool/actions/workflows/unit-tests.yml)
 ![Swift](https://img.shields.io/badge/Swift-5.5-green.svg)
 ![macOS](https://img.shields.io/badge/macOS-10.15%2B-green.svg)
+
+[![Unit Tests](https://github.com/majd/ipatool/actions/workflows/unit-tests.yml/badge.svg)](https://github.com/majd/ipatool/actions/workflows/unit-tests.yml)
+[![Integration Tests](https://github.com/majd/ipatool/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/majd/ipatool/actions/workflows/integration-tests.yml)
 
 `ipatool` is a command line tool that allows you to search for iOS apps on the [App Store](https://apps.apple.com) and download a copy of the app package, known as an _ipa_ file.
 
