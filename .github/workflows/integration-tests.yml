@@ -39,5 +39,11 @@ jobs:
           path: ipatool-current
       - name: Update permissions
         run: chmod +x ./ipatool-current/ipatool
+      - name: Install Swift toolchain
+        run: |
+          wget https://download.swift.org/swift-5.5.3-release/xcode/swift-5.5.3-RELEASE/swift-5.5.3-RELEASE-osx.pkg
+          sudo installer -pkg swift-5.5.3-RELEASE-osx.pkg -target /
       - name: Run tests
-        run: ./ipatool-current/ipatool ${{ matrix.command }} --help
+        run: |
+          export DYLD_LIBRARY_PATH=/Library/Developer/Toolchains/swift-5.5.3-RELEASE.xctoolchain/usr/lib/swift/macosx
+          ./ipatool-current/ipatool ${{ matrix.command }} --help
