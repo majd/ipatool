@@ -8,7 +8,7 @@ on:
 jobs:
   get_version:
     name: Get version
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - name: Set output
         id: set_output
@@ -17,12 +17,10 @@ jobs:
       version: ${{ steps.set_output.outputs.version }}
   test:
     name: Run tests
-    runs-on: macos-latest
+    runs-on: macos-11
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Configure Xcode
-        run: sudo xcode-select -s "/Applications/Xcode_13.2.1.app"
       - name: Inject version
         run: ./Scripts/version
       - name: Build
@@ -31,13 +29,11 @@ jobs:
         run: swift test
   build:
     name: Build
-    runs-on: macos-latest
+    runs-on: macos-11
     needs: [get_version, test]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Configure Xcode
-        run: sudo xcode-select -s "/Applications/Xcode_13.2.1.app"
       - name: Inject version
         run: ./Scripts/version
       - name: Build
@@ -50,7 +46,7 @@ jobs:
           if-no-files-found: error
   distribute:
     name: Distribute
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     needs: [get_version, build]
     steps:
       - name: Download binary

@@ -15,11 +15,14 @@ let package = Package(
         .package(url: "https://github.com/weichsel/ZIPFoundation", revision: "0.9.14")
     ],
     targets: [
-        .executableTarget(name: "CLI", dependencies: [
-            .product(name: "ArgumentParser", package: "swift-argument-parser"),
-            .byName(name: "Networking"),
-            .byName(name: "StoreAPI")
-        ]),
+        .executableTarget(
+            name: "CLI",
+            dependencies: [
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .byName(name: "Networking"),
+                .byName(name: "StoreAPI")
+            ]
+        ),
         .target(
             name: "StoreAPI",
             dependencies: [

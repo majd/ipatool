@@ -8,12 +8,10 @@ on:
 jobs:
   test-networking:
     name: Test Networking
-    runs-on: macos-latest
+    runs-on: macos-11
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Configure Xcode
-        run: sudo xcode-select -s "/Applications/Xcode_13.2.1.app"
       - name: Inject version
         run: ./Scripts/version
       - name: Build
