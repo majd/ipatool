@@ -8,7 +8,7 @@
 import Foundation
 
 public struct HTTPResponse {
-    let statusCode: Int
+    public let statusCode: Int
     let data: Data?
 }
 
