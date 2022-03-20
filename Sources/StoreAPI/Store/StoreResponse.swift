@@ -11,6 +11,7 @@ public enum StoreResponse {
     case failure(error: Swift.Error)
     case account(Account)
     case item(Item)
+    case buyReceipt(BuyReceipt)
 }
 
 extension StoreResponse {
@@ -18,6 +19,7 @@ extension StoreResponse {
         public let firstName: String
         public let lastName: String
         public let directoryServicesIdentifier: String
+        public let passwordToken: String
     }
     
     public struct Item {
@@ -25,6 +27,11 @@ extension StoreResponse {
         public let md5: String
         public let signatures: [Signature]
         public let metadata: [String: Any]
+    }
+    
+    public struct BuyReceipt {
+        public let statusCode: Int
+        public let statusType: String
     }
 
     public enum Error: Int, Swift.Error {
@@ -36,6 +43,7 @@ extension StoreResponse {
         case invalidAccount = 5001
         case invalidItem = -10000
         case lockedAccount = -10001
+        case wrongCountry = -128
     }
 }
 
@@ -48,14 +56,20 @@ extension StoreResponse: Decodable {
 
         if container.contains(.account) {
             let directoryServicesIdentifier = try container.decode(String.self, forKey: .directoryServicesIdentifier)
+            let passwordToken = try container.decode(String.self, forKey: .passwordToken)
             let accountContainer = try container.nestedContainer(keyedBy: AccountInfoCodingKeys.self, forKey: .account)
             let addressContainer = try accountContainer.nestedContainer(keyedBy: AddressCodingKeys.self, forKey: .address)
             let firstName = try addressContainer.decode(String.self, forKey: .firstName)
             let lastName = try addressContainer.decode(String.self, forKey: .lastName)
             
-            self = .account(.init(firstName: firstName, lastName: lastName, directoryServicesIdentifier: directoryServicesIdentifier))
+            self = .account(.init(firstName: firstName, lastName: lastName, directoryServicesIdentifier: directoryServicesIdentifier, passwordToken: passwordToken))
         } else if let items = try container.decodeIfPresent([Item].self, forKey: .items), let item = items.first {
             self = .item(item)
+        } else if container.contains(.statusCode) {
+            let statusCode = try container.decode(Int.self, forKey: .statusCode)
+            let statusType = try container.decode(String.self, forKey: .statusType)
+            
+            self = .buyReceipt(.init(statusCode: statusCode, statusType: statusType))
         } else if let error = error, !error.isEmpty {
             self = .failure(error: Error(rawValue: Int(error) ?? 0) ?? .unknownError)
         } else {
@@ -76,10 +90,13 @@ extension StoreResponse: Decodable {
     
     private enum CodingKeys: String, CodingKey {
         case directoryServicesIdentifier = "dsPersonId"
+        case passwordToken = "passwordToken"
         case message = "customerMessage"
         case items = "songList"
         case error = "failureType"
         case account = "accountInfo"
+        case statusCode = "status"
+        case statusType = "jingleDocType"
     }
     
     private enum AccountInfoCodingKeys: String, CodingKey {

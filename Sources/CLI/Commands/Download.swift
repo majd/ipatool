@@ -179,7 +179,9 @@ extension Download {
             logger.log("Requesting a signed copy of '\(app.identifier)' from the App Store...", level: .info)
             return try await storeClient.item(
                 identifier: "\(app.identifier)",
-                directoryServicesIdentifier: account.directoryServicesIdentifier
+                directoryServicesIdentifier: account.directoryServicesIdentifier,
+                passwordToken: account.passwordToken,
+                country: country
             )
         } catch {
             logger.log("\(error)", level: .debug)
@@ -187,10 +189,14 @@ extension Download {
             switch error {
             case StoreClient.Error.invalidResponse:
                 logger.log("Received invalid response.", level: .error)
+            case StoreClient.Error.purchaseFailed:
+                logger.log("Buying the app failed.", level: .error)
             case StoreResponse.Error.invalidItem:
                 logger.log("Received invalid store item.", level: .error)
             case StoreResponse.Error.invalidLicense:
                 logger.log("Your Apple ID does not have a license for this app. Download the app on an iOS device to obtain a license.", level: .error)
+            case StoreResponse.Error.wrongCountry:
+                logger.log("Your Apple ID is not valid for the country you specified.", level: .error)
             default:
                 logger.log("An unknown error has occurred.", level: .error)
             }

@@ -11,6 +11,7 @@ import Networking
 enum StoreRequest {
     case authenticate(email: String, password: String, code: String? = nil)
     case download(appIdentifier: String, directoryServicesIdentifier: String)
+    case buy(appIdentifier: String, directoryServicesIdentifier: String, passwordToken: String, country: String)
 }
 
 extension StoreRequest: HTTPRequest {
@@ -20,6 +21,8 @@ extension StoreRequest: HTTPRequest {
             return StoreEndpoint.authenticate(prefix: (code == nil) ? "p25" : "p71", guid: guid)
         case .download:
             return StoreEndpoint.download(guid: guid)
+        case .buy:
+            return StoreEndpoint.buy
         }
     }
     
@@ -39,6 +42,12 @@ extension StoreRequest: HTTPRequest {
         case let .download(_, directoryServicesIdentifier):
             headers["X-Dsid"] = directoryServicesIdentifier
             headers["iCloud-DSID"] = directoryServicesIdentifier
+        case let .buy(_, directoryServicesIdentifier, passwordToken, country):
+            headers["X-Dsid"] = directoryServicesIdentifier
+            headers["iCloud-DSID"] = directoryServicesIdentifier
+            headers["Content-Type"] = "application/x-apple-plist"
+            headers["X-Apple-Store-Front"] = Storefront.forCountry(country)?.rawValue
+            headers["X-Token"] = passwordToken
         }
         
         return headers
@@ -61,6 +70,21 @@ extension StoreRequest: HTTPRequest {
                 "creditDisplay": "",
                 "guid": guid,
                 "salableAdamId": "\(appIdentifier)"
+            ])
+        case let .buy(appIdentifier, _, _, _):
+            return .xml([
+                "appExtVrsId": "0",
+                "hasAskedToFulfillPreorder": "true",
+                "buyWithoutAuthorization": "true",
+                "hasDoneAgeCheck": "true",
+                "guid": guid,
+                "needDiv": "0",
+                "origPage": "Software-" + appIdentifier,
+                "origPageLocation": "Buy",
+                "price": "0",
+                "pricingParameters": "STDQ",
+                "productType": "C",
+                "salableAdamId": appIdentifier
             ])
         }
     }
