@@ -11,6 +11,7 @@ import Networking
 enum StoreEndpoint {
     case authenticate(prefix: String, guid: String)
     case download(guid: String)
+    case buy
 }
 
 extension StoreEndpoint: HTTPEndpoint {
@@ -27,6 +28,8 @@ extension StoreEndpoint: HTTPEndpoint {
             return "\(prefix)-buy.itunes.apple.com"
         case .download:
             return "p25-buy.itunes.apple.com"
+        case .buy:
+            return "buy.itunes.apple.com"
         }
     }
     
@@ -36,6 +39,8 @@ extension StoreEndpoint: HTTPEndpoint {
             return "/WebObjects/MZFinance.woa/wa/authenticate?guid=\(guid)"
         case let .download(guid):
             return "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct?guid=\(guid)"
+        case .buy:
+            return "/WebObjects/MZBuy.woa/wa/buyProduct"
         }
     }
 }
