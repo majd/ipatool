@@ -17,7 +17,7 @@ jobs:
       version: ${{ steps.set_output.outputs.version }}
   test:
     name: Run tests
-    runs-on: macos-11
+    runs-on: macos-12
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -29,7 +29,7 @@ jobs:
         run: swift test
   build:
     name: Build
-    runs-on: macos-11
+    runs-on: macos-12
     needs: [get_version, test]
     steps:
       - name: Checkout
