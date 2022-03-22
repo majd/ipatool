@@ -34,6 +34,9 @@ struct Download: AsyncParsableCommand {
     @Option(name: [.long], help: "The log level.")
     private var logLevel: LogLevel = .info
 
+    @Flag(name: .long, help: "Obtain a license for the app if needed.")
+    private var purchase: Bool = false
+
     lazy var logger = ConsoleLogger(level: logLevel)
 }
 
@@ -66,7 +69,47 @@ extension Download {
         }
     }
 
-    private mutating func item(from app: iTunesResponse.Result, account: Account) async -> StoreResponse.Item {
+
+    private mutating func purchase(app: iTunesResponse.Result, account: Account) async {
+        logger.log("Creating HTTP client...", level: .debug)
+        let httpClient = HTTPClient(session: URLSession.shared)
+
+        logger.log("Creating App Store client...", level: .debug)
+        let storeClient = StoreClient(httpClient: httpClient)
+
+        do {
+            logger.log("Obtaining a license for '\(app.identifier)' from the App Store...", level: .info)
+            try await storeClient.purchase(
+                identifier: "\(app.identifier)",
+                directoryServicesIdentifier: account.directoryServicesIdentifier,
+                passwordToken: account.passwordToken,
+                countryCode: countryCode
+            )
+        } catch {
+            logger.log("\(error)", level: .debug)
+
+            switch error {
+            case StoreClient.Error.purchaseFailed:
+                logger.log("Purchase failed.", level: .error)
+            case StoreClient.Error.duplicateLicense:
+                logger.log("A license already exists for this item.", level: .error)
+            case StoreResponse.Error.invalidCountry:
+                logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
+            case StoreResponse.Error.passwordTokenExpired:
+                logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
+            default:
+                logger.log("An unknown error has occurred.", level: .error)
+            }
+
+            _exit(1)
+        }
+    }
+
+    private mutating func item(
+        from app: iTunesResponse.Result,
+        account: Account,
+        purchaseAttempted: Bool = false
+    ) async -> StoreResponse.Item {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -88,7 +131,16 @@ extension Download {
             case StoreResponse.Error.invalidItem:
                 logger.log("Received invalid store item.", level: .error)
             case StoreResponse.Error.invalidLicense:
-                logger.log("Your Apple ID does not have a license for this app. Use the \"purchase\" command to obtain a license.", level: .error)
+                if !purchaseAttempted, purchase {
+                    logger.log("License is missing.", level: .info)
+
+                    await purchase(app: app, account: account)
+                    logger.log("Obtained a license for '\(app.identifier)'.", level: .debug)
+
+                    return await item(from: app, account: account, purchaseAttempted: true)
+                } else {
+                    logger.log("Your Apple ID does not have a license for this app. Use the \"purchase\" command or the \"--purchase\" to obtain a license.", level: .error)
+                }
             case StoreResponse.Error.invalidCountry:
                 logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
             case StoreResponse.Error.passwordTokenExpired:
