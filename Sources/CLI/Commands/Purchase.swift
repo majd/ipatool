@@ -96,7 +96,6 @@ extension Purchase {
 
             _exit(1)
         }
-
     }
 
     mutating func run() async throws {

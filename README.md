@@ -107,7 +107,7 @@ To download a copy of the ipa file, use the `download` command.
 ```
 OVERVIEW: Download (encrypted) iOS app packages from the App Store.
 
-USAGE: ipatool download --bundle-identifier <bundle-identifier> [--country <country>] [--device-family <device-family>] [--output <output>] [--log-level <log-level>]
+USAGE: ipatool download --bundle-identifier <bundle-identifier> [--country <country>] [--device-family <device-family>] [--output <output>] [--log-level <log-level>] [--purchase]
 
 OPTIONS:
   -b, --bundle-identifier <bundle-identifier>
@@ -119,6 +119,7 @@ OPTIONS:
                           (default: iPhone)
   -o, --output <output>   The destination path of the downloaded app package.
   --log-level <log-level> The log level. (default: info)
+  --purchase              Obtain a license for the app if needed.
   --version               Show the version.
   -h, --help              Show help information.
 ```
