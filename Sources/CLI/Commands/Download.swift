@@ -71,6 +71,11 @@ extension Download {
 
 
     private mutating func purchase(app: iTunesResponse.Result, account: Account) async {
+        guard app.price == 0 else {
+            logger.log("It is only possible to obtain a license for free apps. Purchase the app manually and run the \"download\" command again.", level: .error)
+            _exit(1)
+        }
+
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -93,6 +98,8 @@ extension Download {
                 logger.log("Purchase failed.", level: .error)
             case StoreClient.Error.duplicateLicense:
                 logger.log("A license already exists for this item.", level: .error)
+            case StoreResponse.Error.priceMismatch:
+                logger.log("Pirce mismatch. It is only possible to obtain a license for free apps.", level: .error)
             case StoreResponse.Error.invalidCountry:
                 logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
             case StoreResponse.Error.passwordTokenExpired:

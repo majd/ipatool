@@ -24,6 +24,7 @@ public enum StoreResponse {
         case lockedAccount = -10001
         case invalidCountry = -128
         case passwordTokenExpired = 2034
+        case priceMismatch = 2019
     }
 }
 
