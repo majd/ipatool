@@ -21,8 +21,11 @@ struct Search: AsyncParsableCommand {
     @Option(name: [.short, .long], help: "The maximum amount of search results to retrieve.")
     private var limit: Int = 5
 
-    @Option(name: [.short, .long], help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store.")
-    private var country: String = "US"
+    @Option(
+        name: [.customShort("c"), .customLong("country")],
+        help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store."
+    )
+    private var countryCode: String = "US"
 
     @Option(name: [.short, .long], help: "The device family to limit the search query to.")
     private var deviceFamily: DeviceFamily = .phone
@@ -34,20 +37,20 @@ struct Search: AsyncParsableCommand {
 }
 
 extension Search {
-    mutating func results(with term: String, country: String) async -> [iTunesResponse.Result] {
+    mutating func results(with term: String) async -> [iTunesResponse.Result] {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
         logger.log("Creating iTunes client...", level: .debug)
         let itunesClient = iTunesClient(httpClient: httpClient)
 
-        logger.log("Searching for '\(term)' using the '\(country)' store front...", level: .info)
+        logger.log("Searching for '\(term)' using the '\(countryCode)' store front...", level: .info)
 
         do {
             let results = try await itunesClient.search(
                 term: term,
                 limit: limit,
-                country: country,
+                countryCode: countryCode,
                 deviceFamily: deviceFamily
             )
 
@@ -66,7 +69,7 @@ extension Search {
     
     mutating func run() async throws {
         // Search the iTunes store
-        let results = await results(with: term, country: country)
+        let results = await results(with: term)
 
         // Compile output
         let output = results

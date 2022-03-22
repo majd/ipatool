@@ -11,14 +11,14 @@ import Networking
 public protocol iTunesClientInterface {
     func lookup(
         bundleIdentifier: String,
-        country: String,
+        countryCode: String,
         deviceFamily: DeviceFamily
     ) async throws -> iTunesResponse.Result
 
     func search(
         term: String,
         limit: Int,
-        country: String,
+        countryCode: String,
         deviceFamily: DeviceFamily
     ) async throws -> [iTunesResponse.Result]
 }
@@ -32,12 +32,12 @@ public final class iTunesClient: iTunesClientInterface {
     
     public func lookup(
         bundleIdentifier: String,
-        country: String,
+        countryCode: String,
         deviceFamily: DeviceFamily
     ) async throws -> iTunesResponse.Result {
         let request = iTunesRequest.lookup(
             bundleIdentifier: bundleIdentifier,
-            country: country,
+            countryCode: countryCode,
             deviceFamily: deviceFamily
         )
         let response = try await httpClient.send(request)
@@ -49,10 +49,15 @@ public final class iTunesClient: iTunesClientInterface {
     public func search(
         term: String,
         limit: Int,
-        country: String,
+        countryCode: String,
         deviceFamily: DeviceFamily
     ) async throws -> [iTunesResponse.Result] {
-        let request = iTunesRequest.search(term: term, limit: limit, country: country, deviceFamily: deviceFamily)
+        let request = iTunesRequest.search(
+            term: term,
+            limit: limit,
+            countryCode: countryCode,
+            deviceFamily: deviceFamily
+        )
         let response = try await httpClient.send(request)
         let decoded = try response.decode(iTunesResponse.self, as: .json)
         return decoded.results

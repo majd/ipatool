@@ -82,6 +82,26 @@ OPTIONS:
   -h, --help              Show help information.
 ```
 
+To obtain a license for an app, use the `purchase` command.
+
+```
+OVERVIEW: Obtain a license for the app from the App Store.
+
+USAGE: ipatool purchase --bundle-identifier <bundle-identifier> [--country <country>] [--device-family <device-family>] [--log-level <log-level>]
+
+OPTIONS:
+  -b, --bundle-identifier <bundle-identifier>
+                          The bundle identifier of the target iOS app.
+  -c, --country <country> The two-letter (ISO 3166-1 alpha-2) country code for
+                          the iTunes Store. (default: US)
+  -d, --device-family <device-family>
+                          The device family to limit the search query to.
+                          (default: iPhone)
+  --log-level <log-level> The log level. (default: info)
+  --version               Show the version.
+  -h, --help              Show help information.
+```
+
 To download a copy of the ipa file, use the `download` command.
 
 ```
