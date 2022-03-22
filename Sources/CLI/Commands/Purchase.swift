@@ -94,7 +94,7 @@ extension Purchase {
             case StoreClient.Error.duplicateLicense:
                 logger.log("A license already exists for this item.", level: .error)
             case StoreResponse.Error.priceMismatch:
-                logger.log("Pirce mismatch. It is only possible to obtain a license for free apps.", level: .error)
+                logger.log("Price mismatch. It is only possible to obtain a license for free apps.", level: .error)
             case StoreResponse.Error.invalidCountry:
                 logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
             case StoreResponse.Error.passwordTokenExpired:
