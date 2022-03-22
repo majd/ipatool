@@ -11,7 +11,12 @@ import Networking
 enum StoreRequest {
     case authenticate(email: String, password: String, code: String? = nil)
     case download(appIdentifier: String, directoryServicesIdentifier: String)
-    case buy(appIdentifier: String, directoryServicesIdentifier: String, passwordToken: String, country: String)
+    case purchase(
+        appIdentifier: String,
+        directoryServicesIdentifier: String,
+        passwordToken: String,
+        countryCode: String
+    )
 }
 
 extension StoreRequest: HTTPRequest {
@@ -21,8 +26,8 @@ extension StoreRequest: HTTPRequest {
             return StoreEndpoint.authenticate(prefix: (code == nil) ? "p25" : "p71", guid: guid)
         case .download:
             return StoreEndpoint.download(guid: guid)
-        case .buy:
-            return StoreEndpoint.buy
+        case .purchase:
+            return StoreEndpoint.purchase
         }
     }
     
@@ -42,11 +47,11 @@ extension StoreRequest: HTTPRequest {
         case let .download(_, directoryServicesIdentifier):
             headers["X-Dsid"] = directoryServicesIdentifier
             headers["iCloud-DSID"] = directoryServicesIdentifier
-        case let .buy(_, directoryServicesIdentifier, passwordToken, country):
+        case let .purchase(_, directoryServicesIdentifier, passwordToken, countryCode):
             headers["X-Dsid"] = directoryServicesIdentifier
             headers["iCloud-DSID"] = directoryServicesIdentifier
             headers["Content-Type"] = "application/x-apple-plist"
-            headers["X-Apple-Store-Front"] = Storefront.forCountry(country)?.rawValue
+            headers["X-Apple-Store-Front"] = Storefront(countryCode: countryCode)?.rawValue
             headers["X-Token"] = passwordToken
         }
         
@@ -71,7 +76,7 @@ extension StoreRequest: HTTPRequest {
                 "guid": guid,
                 "salableAdamId": "\(appIdentifier)"
             ])
-        case let .buy(appIdentifier, _, _, _):
+        case let .purchase(appIdentifier, _, _, _):
             return .xml([
                 "appExtVrsId": "0",
                 "hasAskedToFulfillPreorder": "true",

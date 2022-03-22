@@ -1,13 +1,13 @@
 //
 //  Storefront.swift
-//  
+//  StoreAPI
 //
 //  Created by Benjamin Altpeter on 20.03.22.
 //
 
 import Foundation
 
-// List from: https://web.archive.org/web/20191206001952/https://affiliate.itunes.apple.com/resources/documentation/linking-to-the-itunes-music-store/#appendix
+// https://web.archive.org/web/20191206001952/https://affiliate.itunes.apple.com/resources/documentation/linking-to-the-itunes-music-store
 public enum Storefront: String, CaseIterable {
     case AE = "143481"
     case AG = "143540"
@@ -139,9 +139,12 @@ public enum Storefront: String, CaseIterable {
     case VN = "143471"
     case YE = "143571"
     case ZA = "143472"
-    
-    // Adapted after: https://stackoverflow.com/a/52148845
-    static func forCountry(_ country: String) -> Self? {
-        return self.allCases.first{ "\($0)" == country.uppercased() }
+
+    init?(countryCode: String) {
+        guard let value = Storefront.allCases.first(where: { "\($0)" == countryCode }) else {
+            return nil
+        }
+
+        self = value
     }
 }

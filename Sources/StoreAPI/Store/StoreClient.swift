@@ -10,7 +10,13 @@ import Networking
 
 public protocol StoreClientInterface {
     func authenticate(email: String, password: String, code: String?) async throws -> StoreResponse.Account
-    func item(identifier: String, directoryServicesIdentifier: String, passwordToken: String, country: String) async throws -> StoreResponse.Item
+    func item(identifier: String, directoryServicesIdentifier: String) async throws -> StoreResponse.Item
+    func purchase(
+        identifier: String,
+        directoryServicesIdentifier: String,
+        passwordToken: String,
+        countryCode: String
+    ) async throws
 }
 
 public final class StoreClient: StoreClientInterface {
@@ -24,23 +30,49 @@ public final class StoreClient: StoreClientInterface {
         try await authenticate(email: email, password: password, code: code, isFirstAttempt: true)
     }
     
-    public func item(identifier: String, directoryServicesIdentifier: String, passwordToken: String, country: String) async throws -> StoreResponse.Item {
-        // Try to buy the app first…
-        let buyRequest = StoreRequest.buy(
+    public func item(identifier: String, directoryServicesIdentifier: String) async throws -> StoreResponse.Item {
+        let request = StoreRequest.download(
+            appIdentifier: identifier,
+            directoryServicesIdentifier: directoryServicesIdentifier
+        )
+        let response = try await httpClient.send(request)
+        let storeResponse = try response.decode(StoreResponse.self, as: .xml)
+
+        switch storeResponse {
+        case let .item(item):
+            return item
+        case let .failure(error):
+            throw error
+        default:
+            throw Error.invalidResponse
+        }
+    }
+
+    public func purchase(
+        identifier: String,
+        directoryServicesIdentifier: String,
+        passwordToken: String,
+        countryCode: String
+    ) async throws {
+        let request = StoreRequest.purchase(
             appIdentifier: identifier,
             directoryServicesIdentifier: directoryServicesIdentifier,
             passwordToken: passwordToken,
-            country: country
+            countryCode: countryCode
         )
-        let buyResponse = try await httpClient.send(buyRequest)
-        
-        // If the Apple ID already owns the app, the endpoint will return a 500 error. We can ignore that here, since we'll then be able to just download the app in the next step without buying it again.
-        if buyResponse.statusCode != 500 {
-            let buyDecoded = try buyResponse.decode(StoreResponse.self, as: .xml)
-            
-            switch buyDecoded {
-            case let .buyReceipt(receipt):
-                if receipt.statusCode != 0 || receipt.statusType != "purchaseSuccess" {
+
+        let response = try await httpClient.send(request)
+
+        // Returns status code 500 if the Apple ID already contains a license
+        switch response.statusCode {
+        case 500:
+            throw Error.duplicateLicense
+        default:
+            let response = try response.decode(StoreResponse.self, as: .xml)
+
+            switch response {
+            case let .purchase(receipt):
+                guard receipt.statusCode == 0, receipt.status == .success else {
                     throw Error.purchaseFailed
                 }
             case let .failure(error):
@@ -48,23 +80,6 @@ public final class StoreClient: StoreClientInterface {
             default:
                 throw Error.invalidResponse
             }
-        }
-
-        // …then download it.
-        let downloadRequest = StoreRequest.download(
-            appIdentifier: identifier,
-            directoryServicesIdentifier: directoryServicesIdentifier
-        )
-        let downloadResponse = try await httpClient.send(downloadRequest)
-        let downloadDecoded = try downloadResponse.decode(StoreResponse.self, as: .xml)
-
-        switch downloadDecoded {
-        case let .item(item):
-            return item
-        case let .failure(error):
-            throw error
-        default:
-            throw Error.invalidResponse
         }
     }
     
@@ -101,5 +116,6 @@ extension StoreClient {
         case timeout
         case invalidResponse
         case purchaseFailed
+        case duplicateLicense
     }
 }

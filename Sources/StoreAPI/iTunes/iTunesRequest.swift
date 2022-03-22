@@ -9,8 +9,8 @@ import ArgumentParser
 import Networking
 
 enum iTunesRequest {
-    case search(term: String, limit: Int, country: String, deviceFamily: DeviceFamily = .phone)
-    case lookup(bundleIdentifier: String, country: String, deviceFamily: DeviceFamily = .phone)
+    case search(term: String, limit: Int, countryCode: String, deviceFamily: DeviceFamily = .phone)
+    case lookup(bundleIdentifier: String, countryCode: String, deviceFamily: DeviceFamily = .phone)
 }
 
 extension iTunesRequest: HTTPRequest {
@@ -29,20 +29,20 @@ extension iTunesRequest: HTTPRequest {
 
     var payload: HTTPPayload? {
         switch self {
-        case let .lookup(bundleIdentifier, country, deviceFamily):
+        case let .lookup(bundleIdentifier, countryCode, deviceFamily):
             return .urlEncoding([
                 "media": "software",
                 "bundleId": bundleIdentifier,
                 "limit": "1",
-                "country": country,
+                "country": countryCode,
                 "entity": deviceFamily.entity
             ])
-        case let .search(term, limit, country, deviceFamily):
+        case let .search(term, limit, countryCode, deviceFamily):
             return .urlEncoding([
                 "media": "software",
                 "term": term,
                 "limit": "\(limit)",
-                "country": country,
+                "country": countryCode,
                 "entity": deviceFamily.entity
             ])
         }

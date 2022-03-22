@@ -9,7 +9,7 @@ import Foundation
 
 public struct HTTPResponse {
     public let statusCode: Int
-    let data: Data?
+    public let data: Data?
 }
 
 extension HTTPResponse {
