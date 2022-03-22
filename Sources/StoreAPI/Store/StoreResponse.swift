@@ -11,28 +11,7 @@ public enum StoreResponse {
     case failure(error: Swift.Error)
     case account(Account)
     case item(Item)
-    case buyReceipt(BuyReceipt)
-}
-
-extension StoreResponse {
-    public struct Account {
-        public let firstName: String
-        public let lastName: String
-        public let directoryServicesIdentifier: String
-        public let passwordToken: String
-    }
-    
-    public struct Item {
-        public let url: URL
-        public let md5: String
-        public let signatures: [Signature]
-        public let metadata: [String: Any]
-    }
-    
-    public struct BuyReceipt {
-        public let statusCode: Int
-        public let statusType: String
-    }
+    case purchase(Receipt)
 
     public enum Error: Int, Swift.Error {
         case unknownError = 0
@@ -43,7 +22,8 @@ extension StoreResponse {
         case invalidAccount = 5001
         case invalidItem = -10000
         case lockedAccount = -10001
-        case wrongCountry = -128
+        case invalidCountry = -128
+        case passwordTokenExpired = 2034
     }
 }
 
@@ -62,14 +42,21 @@ extension StoreResponse: Decodable {
             let firstName = try addressContainer.decode(String.self, forKey: .firstName)
             let lastName = try addressContainer.decode(String.self, forKey: .lastName)
             
-            self = .account(.init(firstName: firstName, lastName: lastName, directoryServicesIdentifier: directoryServicesIdentifier, passwordToken: passwordToken))
+            self = .account(
+                Account(
+                    firstName: firstName,
+                    lastName: lastName,
+                    directoryServicesIdentifier: directoryServicesIdentifier,
+                    passwordToken: passwordToken
+                )
+            )
         } else if let items = try container.decodeIfPresent([Item].self, forKey: .items), let item = items.first {
             self = .item(item)
         } else if container.contains(.statusCode) {
             let statusCode = try container.decode(Int.self, forKey: .statusCode)
             let statusType = try container.decode(String.self, forKey: .statusType)
             
-            self = .buyReceipt(.init(statusCode: statusCode, statusType: statusType))
+            self = .purchase(Receipt(statusCode: statusCode, status: Receipt.Status(rawValue: statusType)))
         } else if let error = error, !error.isEmpty {
             self = .failure(error: Error(rawValue: Int(error) ?? 0) ?? .unknownError)
         } else {
@@ -109,42 +96,83 @@ extension StoreResponse: Decodable {
     }
 }
 
-extension StoreResponse.Item: Decodable {
-    public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let md5 = try container.decode(String.self, forKey: .md5)
+// MARK: - Account
 
-        guard let key = CodingUserInfoKey(rawValue: "data"),
-              let data = decoder.userInfo[key] as? Data,
-              let json = try PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
-              let items = json["songList"] as? [[String: Any]],
-              let item = items.first(where: { $0["md5"] as? String == md5 }),
-              let metadata = item["metadata"] as? [String: Any]
-        else { throw StoreResponse.Error.invalidItem }
+extension StoreResponse {
+    public struct Account {
+        public let firstName: String
+        public let lastName: String
+        public let directoryServicesIdentifier: String
+        public let passwordToken: String
+    }
+}
 
-        let absoluteUrl = try container.decode(String.self, forKey: .url)
+// MARK: - Item
 
-        self.md5 = md5
-        self.metadata = metadata
-        self.signatures = try container.decode([Signature].self, forKey: .signatures)
+extension StoreResponse {
+    public struct Item: Decodable {
+        public let url: URL
+        public let md5: String
+        public let signatures: [Signature]
+        public let metadata: [String: Any]
 
-        if let url = URL(string: absoluteUrl) {
-            self.url = url
-        } else {
-            let context = DecodingError.Context(codingPath: [CodingKeys.url], debugDescription: "URL contains illegal characters: \(absoluteUrl).")
-            throw DecodingError.keyNotFound(CodingKeys.url, context)
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let md5 = try container.decode(String.self, forKey: .md5)
+
+            guard let key = CodingUserInfoKey(rawValue: "data"),
+                  let data = decoder.userInfo[key] as? Data,
+                  let json = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
+                  let items = json["songList"] as? [[String: Any]],
+                  let item = items.first(where: { $0["md5"] as? String == md5 }),
+                  let metadata = item["metadata"] as? [String: Any]
+            else { throw StoreResponse.Error.invalidItem }
+
+            let absoluteUrl = try container.decode(String.self, forKey: .url)
+
+            self.md5 = md5
+            self.metadata = metadata
+            self.signatures = try container.decode([Signature].self, forKey: .signatures)
+
+            if let url = URL(string: absoluteUrl) {
+                self.url = url
+            } else {
+                let context = DecodingError.Context(
+                    codingPath: [CodingKeys.url],
+                    debugDescription: "URL contains illegal characters: \(absoluteUrl)."
+                )
+                throw DecodingError.keyNotFound(CodingKeys.url, context)
+            }
+        }
+
+        public struct Signature: Decodable {
+            public let id: Int
+            public let sinf: Data
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case url = "URL"
+            case metadata
+            case md5
+            case signatures = "sinfs"
         }
     }
-    
-    public struct Signature: Decodable {
-        public let id: Int
-        public let sinf: Data
-    }
-    
-    enum CodingKeys: String, CodingKey {
-        case url = "URL"
-        case metadata
-        case md5
-        case signatures = "sinfs"
+}
+
+// MARK: - Receipt
+
+extension StoreResponse {
+    public struct Receipt {
+        public let statusCode: Int
+        public let status: Status
+
+        public enum Status {
+            case success
+            case failure
+
+            init(rawValue: String) {
+                self = rawValue == "purchaseSuccess" ? .success : .failure
+            }
+        }
     }
 }

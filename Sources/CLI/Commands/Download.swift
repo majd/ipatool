@@ -19,8 +19,11 @@ struct Download: AsyncParsableCommand {
     @Option(name: [.short, .long], help: "The bundle identifier of the target iOS app.")
     private var bundleIdentifier: String
 
-    @Option(name: [.short, .long], help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store.")
-    private var country: String = "US"
+    @Option(
+        name: [.customShort("c"), .customLong("country")],
+        help: "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store."
+    )
+    private var countryCode: String = "US"
 
     @Option(name: [.short, .long], help: "The device family to limit the search query to.")
     private var deviceFamily: DeviceFamily = .phone
@@ -35,7 +38,7 @@ struct Download: AsyncParsableCommand {
 }
 
 extension Download {
-    private mutating func app(with bundleIdentifier: String, country: String) async -> iTunesResponse.Result {
+    private mutating func app(with bundleIdentifier: String, countryCode: String) async -> iTunesResponse.Result {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -43,10 +46,10 @@ extension Download {
         let itunesClient = iTunesClient(httpClient: httpClient)
 
         do {
-            logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(country)'...", level: .info)
+            logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(countryCode)'...", level: .info)
             return try await itunesClient.lookup(
                 bundleIdentifier: bundleIdentifier,
-                country: country,
+                countryCode: countryCode,
                 deviceFamily: deviceFamily
             )
         } catch {
@@ -74,9 +77,7 @@ extension Download {
             logger.log("Requesting a signed copy of '\(app.identifier)' from the App Store...", level: .info)
             return try await storeClient.item(
                 identifier: "\(app.identifier)",
-                directoryServicesIdentifier: account.directoryServicesIdentifier,
-                passwordToken: account.passwordToken,
-                country: country
+                directoryServicesIdentifier: account.directoryServicesIdentifier
             )
         } catch {
             logger.log("\(error)", level: .debug)
@@ -84,14 +85,14 @@ extension Download {
             switch error {
             case StoreClient.Error.invalidResponse:
                 logger.log("Received invalid response.", level: .error)
-            case StoreClient.Error.purchaseFailed:
-                logger.log("Buying the app failed.", level: .error)
             case StoreResponse.Error.invalidItem:
                 logger.log("Received invalid store item.", level: .error)
             case StoreResponse.Error.invalidLicense:
-                logger.log("Your Apple ID does not have a license for this app. Download the app on an iOS device to obtain a license.", level: .error)
-            case StoreResponse.Error.wrongCountry:
-                logger.log("Your Apple ID is not valid for the country you specified.", level: .error)
+                logger.log("Your Apple ID does not have a license for this app. Use the \"purchase\" command to obtain a license.", level: .error)
+            case StoreResponse.Error.invalidCountry:
+                logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
+            case StoreResponse.Error.passwordTokenExpired:
+                logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
             default:
                 logger.log("An unknown error has occurred.", level: .error)
             }
@@ -167,7 +168,7 @@ extension Download {
         logger.log("Authenticated as '\(account.name)'.", level: .info)
 
         // Query for app
-        let app: iTunesResponse.Result = await app(with: bundleIdentifier, country: country)
+        let app: iTunesResponse.Result = await app(with: bundleIdentifier, countryCode: countryCode)
         logger.log("Found app: \(app.name) (\(app.version)).", level: .debug)
 
         // Query for store item
