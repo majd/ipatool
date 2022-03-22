@@ -44,11 +44,18 @@ extension Purchase {
 
         do {
             logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(countryCode)'...", level: .info)
-            return try await itunesClient.lookup(
+            let app = try await itunesClient.lookup(
                 bundleIdentifier: bundleIdentifier,
                 countryCode: countryCode,
                 deviceFamily: deviceFamily
             )
+
+            guard app.price == 0 else {
+                logger.log("Only free apps are supported.", level: .error)
+                _exit(1)
+            }
+
+            return app
         } catch {
             logger.log("\(error)", level: .debug)
 
@@ -86,6 +93,8 @@ extension Purchase {
                 logger.log("Purchase failed.", level: .error)
             case StoreClient.Error.duplicateLicense:
                 logger.log("A license already exists for this item.", level: .error)
+            case StoreResponse.Error.priceMismatch:
+                logger.log("Pirce mismatch. It is only possible to obtain a license for free apps.", level: .error)
             case StoreResponse.Error.invalidCountry:
                 logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
             case StoreResponse.Error.passwordTokenExpired:
