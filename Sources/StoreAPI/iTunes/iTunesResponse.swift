@@ -18,6 +18,7 @@ extension iTunesResponse {
         public let version: String
         public let identifier: Int
         public let name: String
+        public let price: Float
     }
 }
 
@@ -34,5 +35,6 @@ extension iTunesResponse.Result: Codable {
         case name = "trackName"
         case bundleIdentifier = "bundleId"
         case version
+        case price
     }
 }
