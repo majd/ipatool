@@ -1,6 +1,7 @@
 // swift-tools-version:5.5
 
 import PackageDescription
+import Foundation
 
 let package = Package(
     name: "IPATool",
@@ -41,3 +42,7 @@ let package = Package(
         ]),
     ]
 )
+
+if !ProcessInfo.processInfo.environment.values.contains("/usr/bin/swift") {
+	package.targets.first?.linkerSettings = [LinkerSetting.unsafeFlags(["-rpath", "/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift-5.5/macosx"])]
+}
