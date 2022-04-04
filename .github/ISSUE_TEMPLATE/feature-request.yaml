@@ -1,0 +1,12 @@
+name: Feature Request
+description: Submit a feature request
+labels:
+  - feature request
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Please provide details about the desired feature.
+    validations:
+      required: true
