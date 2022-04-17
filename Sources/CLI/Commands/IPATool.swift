@@ -7,7 +7,8 @@
 
 import ArgumentParser
 
-struct IPATool: ParsableCommand {
+@main
+struct IPATool: AsyncParsableCommand {
     static var configuration: CommandConfiguration {
         return CommandConfiguration(
             commandName: "ipatool",
@@ -16,8 +17,4 @@ struct IPATool: ParsableCommand {
             subcommands: [Auth.self, Download.self, Purchase.self, Search.self]
         )
     }
-}
-
-@main enum Main: AsyncMain {
-  typealias Command = IPATool
 }

@@ -2,13 +2,11 @@ prefix ?= /usr/local
 bindir = $(prefix)/bin
 
 build:
-	swift build --product ipatool --configuration release --triple arm64-apple-macosx
-	swift build --product ipatool --configuration release --triple x86_64-apple-macosx
-	lipo -create -output .build/ipatool .build/arm64-apple-macosx/release/ipatool .build/x86_64-apple-macosx/release/ipatool
+	xcrun swift build -c release --arch arm64 --arch x86_64
 
 install: build
 	install -d "$(bindir)"
-	install ".build/ipatool" "$(bindir)"
+	install ".build/apple/Products/Release/ipatool" "$(bindir)"
 
 uninstall:
 	rm -rf "$(bindir)/ipatool"
