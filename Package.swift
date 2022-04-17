@@ -12,7 +12,7 @@ let package = Package(
         .library(name: "Persistence", targets: ["Persistence"])
     ],
     dependencies: [
-        .package(url: "https://github.com/apple/swift-argument-parser", revision: "1.0.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser", revision: "1.1.2"),
         .package(url: "https://github.com/weichsel/ZIPFoundation", revision: "0.9.14"),
         .package(url: "https://github.com/kishikawakatsumi/KeychainAccess", revision: "v4.2.2")
     ],
