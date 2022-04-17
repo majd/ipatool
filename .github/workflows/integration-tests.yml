@@ -20,7 +20,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: ipatool
-          path: .build/ipatool
+          path: .build/apple/Products/Release/ipatool
           if-no-files-found: error
   test:
     name: Test
