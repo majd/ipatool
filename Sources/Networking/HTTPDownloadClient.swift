@@ -8,32 +8,40 @@
 import Foundation
 
 public protocol HTTPDownloadClientInterface {
-    func download(from source: URL, to target: URL, progress: @escaping (Float) -> Void) async throws
+    func download(from source: URL, to target: URL, progress: @escaping (Float) -> Void) throws
 }
 
 public final class HTTPDownloadClient: NSObject, HTTPDownloadClientInterface {
     private var session: URLSession!
     private var progressHandler: ((Float) -> Void)?
-    private var continuation: CheckedContinuation<Void, Swift.Error>?
+    private var semaphore: DispatchSemaphore?
     private var targetURL: URL?
+    private var result: Result<Void, Swift.Error>?
 
     public override init() {
         super.init()
         self.session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
     }
     
-    public func download(from source: URL, to target: URL, progress: @escaping (Float) -> Void) async throws {
+    public func download(from source: URL, to target: URL, progress: @escaping (Float) -> Void) throws {
         assert(progressHandler == nil)
-        assert(continuation == nil)
+        assert(semaphore == nil)
         assert(targetURL == nil)
 
         progressHandler = progress
         targetURL = target
 
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Swift.Error>) in
-            self.continuation = continuation
-            let task = session.downloadTask(with: source)
-            task.resume()
+        semaphore = DispatchSemaphore(value: 0)
+        session.downloadTask(with: source).resume()
+        semaphore?.wait()
+
+        switch result {
+        case let .failure(error):
+            throw error
+        case .success:
+            break
+        case .none:
+            preconditionFailure()
         }
     }
 }
@@ -45,12 +53,13 @@ extension HTTPDownloadClient: URLSessionDownloadDelegate {
         }
 
         defer {
+            semaphore?.signal()
             progressHandler = nil
-            continuation = nil
+            semaphore = nil
             targetURL = nil
         }
 
-        continuation?.resume(throwing: error)
+        result = .failure(error)
     }
     
     public func urlSession(
@@ -69,20 +78,22 @@ extension HTTPDownloadClient: URLSessionDownloadDelegate {
         didFinishDownloadingTo location: URL
     ) {
         defer {
+            semaphore?.signal()
             progressHandler = nil
-            continuation = nil
+            semaphore = nil
             targetURL = nil
         }
         
         guard let target = targetURL else {
-            return continuation?.resume(throwing: Error.invalidTarget) ?? ()
+            result = .failure(Error.invalidTarget)
+            return
         }
         
         do {
             try FileManager.default.moveItem(at: location, to: target)
-            continuation?.resume()
+            result = .success(())
         } catch {
-            continuation?.resume(throwing: error)
+            result = .failure(error)
         }
     }
 }

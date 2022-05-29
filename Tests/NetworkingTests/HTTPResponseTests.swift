@@ -9,7 +9,7 @@ import XCTest
 @testable import Networking
 
 final class HTTPResponseTests: XCTestCase {
-    func test_decode_jsonData_returnsObject() async throws {
+    func test_decode_jsonData_returnsObject() throws {
         let data = try JSONEncoder().encode(["foo": "bar"])
         let response = HTTPResponse(statusCode: 200, data: data)
         
@@ -17,7 +17,7 @@ final class HTTPResponseTests: XCTestCase {
         XCTAssertEqual(object["foo"], "bar")
     }
 
-    func test_decode_xmlData_returnsObject() async throws {
+    func test_decode_xmlData_returnsObject() throws {
         let data = try PropertyListEncoder().encode(["foo": "bar"])
         let response = HTTPResponse(statusCode: 200, data: data)
         
@@ -25,12 +25,12 @@ final class HTTPResponseTests: XCTestCase {
         XCTAssertEqual(object["foo"], "bar")
     }
 
-    func test_decode_noData_returnsObject() async throws {
+    func test_decode_noData_returnsObject() throws {
         let response = HTTPResponse(statusCode: 200, data: nil)
         XCTAssertThrowsError(try response.decode([String: String].self, as: .xml))
     }
 
-    func test_decode_invalidData_returnsObject() async throws {
+    func test_decode_invalidData_returnsObject() throws {
         let data = try PropertyListEncoder().encode(["foo": "bar"])
         let response = HTTPResponse(statusCode: 200, data: data)
 

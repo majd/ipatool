@@ -11,7 +11,7 @@ import Networking
 import StoreAPI
 import Persistence
 
-struct Auth: AsyncParsableCommand {
+struct Auth: ParsableCommand {
     static var configuration: CommandConfiguration {
         return .init(
             commandName: "auth",
@@ -23,7 +23,7 @@ struct Auth: AsyncParsableCommand {
 }
 
 extension Auth {
-    struct Login: AsyncParsableCommand {
+    struct Login: ParsableCommand {
         static var configuration: CommandConfiguration {
             return .init(abstract: "Login to the App Store.")
         }
@@ -43,7 +43,7 @@ extension Auth {
         lazy var logger = ConsoleLogger(level: logLevel)
     }
 
-    struct Revoke: AsyncParsableCommand {
+    struct Revoke: ParsableCommand {
         static var configuration: CommandConfiguration {
             return .init(abstract: "Revoke your App Store credentials.")
         }
@@ -95,7 +95,7 @@ extension Auth.Login {
         }
     }
 
-    private mutating func authenticate(email: String, password: String) async -> Account {
+    private mutating func authenticate(email: String, password: String) -> Account {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -104,7 +104,7 @@ extension Auth.Login {
 
         do {
             logger.log("Authenticating with the App Store...", level: .info)
-            let account = try await storeClient.authenticate(email: email, password: password, code: nil)
+            let account = try storeClient.authenticate(email: email, password: password, code: nil)
             return Account(
                 name: "\(account.firstName) \(account.lastName)",
                 email: email,
@@ -115,7 +115,7 @@ extension Auth.Login {
             switch error {
             case StoreResponse.Error.codeRequired:
                 do {
-                    let account = try await storeClient.authenticate(email: email, password: password, code: authCode())
+                    let account = try storeClient.authenticate(email: email, password: password, code: authCode())
                     return Account(
                         name: "\(account.firstName) \(account.lastName)",
                         email: email,
@@ -161,7 +161,7 @@ extension Auth.Login {
         }
     }
 
-    mutating func run() async throws {
+    mutating func run() throws {
         // Get Apple ID email
         let email: String = email()
 
@@ -169,7 +169,7 @@ extension Auth.Login {
         let password: String = password()
 
         // Authenticate with the App Store
-        let account: Account = await authenticate(email: email, password: password)
+        let account: Account = authenticate(email: email, password: password)
 
         // Store data in keychain
         do {
@@ -187,7 +187,7 @@ extension Auth.Login {
 }
 
 extension Auth.Revoke {
-    mutating func run() async throws {
+    mutating func run() throws {
         let keychainStore = KeychainStore(service: "ipatool.service")
 
         guard let account: Account = try keychainStore.value(forKey: "account") else {
