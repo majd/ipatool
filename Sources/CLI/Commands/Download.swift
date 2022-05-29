@@ -153,7 +153,7 @@ extension Download {
             case StoreResponse.Error.passwordTokenExpired:
                 logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
             default:
-                logger.log("An unknown error has occurred.", level: .error)
+                logger.log("An unknown error has occurred. The token may have already expired - try loggin in again using the \"auth\" command.", level: .error)
             }
             
             _exit(1)
