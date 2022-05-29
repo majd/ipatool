@@ -8,7 +8,7 @@
 import ArgumentParser
 
 @main
-struct IPATool: AsyncParsableCommand {
+struct IPATool: ParsableCommand {
     static var configuration: CommandConfiguration {
         return CommandConfiguration(
             commandName: "ipatool",

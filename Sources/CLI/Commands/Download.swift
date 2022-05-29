@@ -11,7 +11,7 @@ import Networking
 import StoreAPI
 import Persistence
 
-struct Download: AsyncParsableCommand {
+struct Download: ParsableCommand {
     static var configuration: CommandConfiguration {
         return .init(abstract: "Download (encrypted) iOS app packages from the App Store.")
     }
@@ -41,7 +41,7 @@ struct Download: AsyncParsableCommand {
 }
 
 extension Download {
-    private mutating func app(with bundleIdentifier: String, countryCode: String) async -> iTunesResponse.Result {
+    private mutating func app(with bundleIdentifier: String, countryCode: String) -> iTunesResponse.Result {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -50,7 +50,7 @@ extension Download {
 
         do {
             logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(countryCode)'...", level: .info)
-            return try await itunesClient.lookup(
+            return try itunesClient.lookup(
                 bundleIdentifier: bundleIdentifier,
                 countryCode: countryCode,
                 deviceFamily: deviceFamily
@@ -70,7 +70,7 @@ extension Download {
     }
 
 
-    private mutating func purchase(app: iTunesResponse.Result, account: Account) async {
+    private mutating func purchase(app: iTunesResponse.Result, account: Account) {
         guard app.price == 0 else {
             logger.log("It is only possible to obtain a license for free apps. Purchase the app manually and run the \"download\" command again.", level: .error)
             _exit(1)
@@ -84,7 +84,7 @@ extension Download {
 
         do {
             logger.log("Obtaining a license for '\(app.identifier)' from the App Store...", level: .info)
-            try await storeClient.purchase(
+            try storeClient.purchase(
                 identifier: "\(app.identifier)",
                 directoryServicesIdentifier: account.directoryServicesIdentifier,
                 passwordToken: account.passwordToken,
@@ -116,7 +116,7 @@ extension Download {
         from app: iTunesResponse.Result,
         account: Account,
         purchaseAttempted: Bool = false
-    ) async -> StoreResponse.Item {
+    ) -> StoreResponse.Item {
         logger.log("Creating HTTP client...", level: .debug)
         let httpClient = HTTPClient(session: URLSession.shared)
 
@@ -125,7 +125,7 @@ extension Download {
 
         do {
             logger.log("Requesting a signed copy of '\(app.identifier)' from the App Store...", level: .info)
-            return try await storeClient.item(
+            return try storeClient.item(
                 identifier: "\(app.identifier)",
                 directoryServicesIdentifier: account.directoryServicesIdentifier
             )
@@ -141,10 +141,10 @@ extension Download {
                 if !purchaseAttempted, purchase {
                     logger.log("License is missing.", level: .info)
 
-                    await purchase(app: app, account: account)
+                    purchase(app: app, account: account)
                     logger.log("Obtained a license for '\(app.identifier)'.", level: .debug)
 
-                    return await item(from: app, account: account, purchaseAttempted: true)
+                    return item(from: app, account: account, purchaseAttempted: true)
                 } else {
                     logger.log("Your Apple ID does not have a license for this app. Use the \"purchase\" command or the \"--purchase\" to obtain a license.", level: .error)
                 }
@@ -160,13 +160,13 @@ extension Download {
         }
     }
     
-    private mutating func download(item: StoreResponse.Item, to targetURL: URL) async {
+    private mutating func download(item: StoreResponse.Item, to targetURL: URL) {
         logger.log("Creating download client...", level: .debug)
         let downloadClient = HTTPDownloadClient()
 
         do {
             logger.log("Downloading app package...", level: .info)
-            try await downloadClient.download(from: item.url, to: targetURL) { [logger] progress in
+            try downloadClient.download(from: item.url, to: targetURL) { [logger] progress in
                 logger.log("Downloading app package... [\(Int((progress * 100).rounded()))%]",
                            prefix: "\u{1B}[1A\u{1B}[K",
                            level: .info)
@@ -216,7 +216,7 @@ extension Download {
         }
     }
     
-    mutating func run() async throws {
+    mutating func run() throws {
         // Authenticate with the App Store
         let keychainStore = KeychainStore(service: "ipatool.service")
 
@@ -227,11 +227,11 @@ extension Download {
         logger.log("Authenticated as '\(account.name)'.", level: .info)
 
         // Query for app
-        let app: iTunesResponse.Result = await app(with: bundleIdentifier, countryCode: countryCode)
+        let app: iTunesResponse.Result = app(with: bundleIdentifier, countryCode: countryCode)
         logger.log("Found app: \(app.name) (\(app.version)).", level: .debug)
 
         // Query for store item
-        let item: StoreResponse.Item = await item(from: app, account: account)
+        let item: StoreResponse.Item = item(from: app, account: account)
         logger.log("Received a response of the signed copy: \(item.md5).", level: .debug)
 
         // Generate file name
@@ -239,7 +239,7 @@ extension Download {
         logger.log("Output path: \(path).", level: .debug)
 
         // Download app package
-        await download(item: item, to: URL(fileURLWithPath: path))
+        download(item: item, to: URL(fileURLWithPath: path))
         logger.log("Saved app package to \(URL(fileURLWithPath: path).lastPathComponent).", level: .info)
 
         // Apply patches

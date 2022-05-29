@@ -9,14 +9,14 @@ import Foundation
 import Networking
 
 public protocol StoreClientInterface {
-    func authenticate(email: String, password: String, code: String?) async throws -> StoreResponse.Account
-    func item(identifier: String, directoryServicesIdentifier: String) async throws -> StoreResponse.Item
+    func authenticate(email: String, password: String, code: String?) throws -> StoreResponse.Account
+    func item(identifier: String, directoryServicesIdentifier: String) throws -> StoreResponse.Item
     func purchase(
         identifier: String,
         directoryServicesIdentifier: String,
         passwordToken: String,
         countryCode: String
-    ) async throws
+    ) throws
 }
 
 public final class StoreClient: StoreClientInterface {
@@ -26,16 +26,16 @@ public final class StoreClient: StoreClientInterface {
         self.httpClient = httpClient
     }
     
-    public func authenticate(email: String, password: String, code: String?) async throws -> StoreResponse.Account {
-        try await authenticate(email: email, password: password, code: code, isFirstAttempt: true)
+    public func authenticate(email: String, password: String, code: String?) throws -> StoreResponse.Account {
+        try authenticate(email: email, password: password, code: code, isFirstAttempt: true)
     }
     
-    public func item(identifier: String, directoryServicesIdentifier: String) async throws -> StoreResponse.Item {
+    public func item(identifier: String, directoryServicesIdentifier: String) throws -> StoreResponse.Item {
         let request = StoreRequest.download(
             appIdentifier: identifier,
             directoryServicesIdentifier: directoryServicesIdentifier
         )
-        let response = try await httpClient.send(request)
+        let response = try httpClient.send(request)
         let storeResponse = try response.decode(StoreResponse.self, as: .xml)
 
         switch storeResponse {
@@ -53,7 +53,7 @@ public final class StoreClient: StoreClientInterface {
         directoryServicesIdentifier: String,
         passwordToken: String,
         countryCode: String
-    ) async throws {
+    ) throws {
         let request = StoreRequest.purchase(
             appIdentifier: identifier,
             directoryServicesIdentifier: directoryServicesIdentifier,
@@ -61,7 +61,7 @@ public final class StoreClient: StoreClientInterface {
             countryCode: countryCode
         )
 
-        let response = try await httpClient.send(request)
+        let response = try httpClient.send(request)
 
         // Returns status code 500 if the Apple ID already contains a license
         switch response.statusCode {
@@ -86,9 +86,9 @@ public final class StoreClient: StoreClientInterface {
     private func authenticate(email: String,
                               password: String,
                               code: String?,
-                              isFirstAttempt: Bool) async throws -> StoreResponse.Account {
+                              isFirstAttempt: Bool) throws -> StoreResponse.Account {
         let request = StoreRequest.authenticate(email: email, password: password, code: code)
-        let response = try await httpClient.send(request)
+        let response = try httpClient.send(request)
         let decoded = try response.decode(StoreResponse.self, as: .xml)
 
         switch decoded {
@@ -98,7 +98,7 @@ public final class StoreClient: StoreClientInterface {
             switch error {
             case StoreResponse.Error.invalidCredentials:
                 if isFirstAttempt {
-                    return try await authenticate(email: email, password: password, code: code, isFirstAttempt: false)
+                    return try authenticate(email: email, password: password, code: code, isFirstAttempt: false)
                 }
 
                 throw error

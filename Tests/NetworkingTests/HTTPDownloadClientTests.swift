@@ -15,12 +15,12 @@ final class HTTPDownloadClientTests: XCTestCase {
         sut = HTTPDownloadClient()
     }
     
-    func test_download_success_returnsValidResponse() async throws {
+    func test_download_success_returnsValidResponse() throws {
         let source = try XCTUnwrap(URL(string: "https://proof.ovh.net/files/1Mb.dat"))
         let target = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
         var lastValue: Float = 0
 
-        try await sut.download(from: source, to: target) { value in
+        try sut.download(from: source, to: target) { value in
             XCTAssertGreaterThanOrEqual(value, lastValue)
             lastValue = value
         }
@@ -28,12 +28,12 @@ final class HTTPDownloadClientTests: XCTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: target.path))
     }
     
-    func test_download_failure_throwsError() async throws {
+    func test_download_failure_throwsError() throws {
         let source = try XCTUnwrap(URL(string: "https://\(UUID().uuidString).test"))
         let target = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
 
         do {
-            try await sut.download(from: source, to: target) { _ in }
+            try sut.download(from: source, to: target) { _ in }
         } catch {
             XCTAssertNotNil(error)
         }

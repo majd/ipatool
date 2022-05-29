@@ -7,23 +7,25 @@
 
 import Foundation
 
-public protocol URLSessionInterface {
-    func data(for request: URLRequest) async throws -> (Data, URLResponse)
+public protocol URLSessionDataTaskInterface {
+    func resume()
 }
 
+public protocol URLSessionInterface {
+    func dataTask(
+        with request: URLRequest,
+        completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void
+    ) -> URLSessionDataTaskInterface
+}
+
+extension URLSessionDataTask: URLSessionDataTaskInterface {}
+
 extension URLSession: URLSessionInterface {
-    public func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        try await withCheckedThrowingContinuation { continuation in
-            let task = dataTask(with: request) { data, response, error in
-                guard let data = data, let response = response else {
-                    let error = error ?? URLError(.badServerResponse)
-                    return continuation.resume(throwing: error)
-                }
-
-                continuation.resume(returning: (data, response))
-            }
-
-            task.resume()
-        }
+    public func dataTask(
+        with request: URLRequest,
+        completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void
+    ) -> URLSessionDataTaskInterface {
+        let task: URLSessionDataTask = dataTask(with: request, completionHandler: completionHandler)
+        return task
     }
 }

@@ -9,13 +9,27 @@ import Foundation
 import Networking
 
 final class URLSessionMock: URLSessionInterface {
-    var onData: ((_ request: URLRequest) async throws -> (Data, URLResponse))?
+    var onDataTask: ((URLRequest) throws -> (data: Data?, response: URLResponse?))?
 
-    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
-        guard let onData = onData else {
-            fatalError("Override implementation using `onData`.")
+    func dataTask(
+        with request: URLRequest,
+        completionHandler: @escaping (Data?, URLResponse?, Error?) -> Void
+    ) -> URLSessionDataTaskInterface {
+        guard let onDataTask = onDataTask else {
+            fatalError("Override implementation using `onDataTask`.")
         }
-        
-        return try await onData(request)
+
+        let dataTask = URLSessionDataTaskMock()
+
+        dataTask.onResume = {
+            do {
+                let result = try onDataTask(request)
+                completionHandler(result.data, result.response, nil)
+            } catch {
+                completionHandler(nil, nil, error)
+            }
+        }
+
+        return dataTask
     }
 }

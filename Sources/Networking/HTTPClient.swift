@@ -8,7 +8,7 @@
 import Foundation
 
 public protocol HTTPClientInterface {
-    func send(_ request: HTTPRequest) async throws -> HTTPResponse
+    func send(_ request: HTTPRequest) throws -> HTTPResponse
 }
 
 public final class HTTPClient: HTTPClientInterface {
@@ -18,15 +18,27 @@ public final class HTTPClient: HTTPClientInterface {
         self.session = session
     }
 
-    public func send(_ request: HTTPRequest) async throws -> HTTPResponse {
+    public func send(_ request: HTTPRequest) throws -> HTTPResponse {
         let request = try makeURLRequest(from: request)
-        let (data, response) = try await session.data(for: request)
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: (data: Data?, response: URLResponse?, error: Swift.Error?)
 
-        guard let response = response as? HTTPURLResponse else {
-            throw Error.invalidResponse(response)
+        session.dataTask(with: request) { (data, response, error) in
+            result = (data, response, error)
+            semaphore.signal()
+        }.resume()
+
+        semaphore.wait()
+
+        if let error = result.error {
+            throw error
         }
 
-        return HTTPResponse(statusCode: response.statusCode, data: data)
+        guard let response = result.response as? HTTPURLResponse else {
+            throw Error.invalidResponse(result.response)
+        }
+
+        return HTTPResponse(statusCode: response.statusCode, data: result.data)
     }
     
     private func makeURLRequest(from request: HTTPRequest) throws -> URLRequest {

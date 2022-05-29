@@ -17,8 +17,8 @@ final class HTTPClientTests: XCTestCase {
         sut = HTTPClient(session: session)
     }
     
-    func test_GET_success_returnsValidResposne() async throws {
-        session.onData = { request in
+    func test_GET_success_returnsValidResposne() throws {
+        session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
             XCTAssertTrue(url.hasPrefix("https://api.example.com"))
             XCTAssertEqual(request.httpMethod, "GET")
@@ -33,13 +33,13 @@ final class HTTPClientTests: XCTestCase {
             return (data, response)
         }
         
-        let response = try await sut.send(TestRequest.get(nil))
+        let response = try sut.send(TestRequest.get(nil))
         let data = try XCTUnwrap(response.data)
         XCTAssertEqual(String(data: data, encoding: .utf8), "foo")
     }
 
-    func test_GET_failure_returnsInvalidResposne() async throws {
-        session.onData = { request in
+    func test_GET_failure_returnsInvalidResposne() throws {
+        session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
             XCTAssertTrue(url.hasPrefix("https://api.example.com"))
             XCTAssertEqual(request.httpMethod, "GET")
@@ -56,15 +56,15 @@ final class HTTPClientTests: XCTestCase {
         }
 
         do {
-            _ = try await sut.send(TestRequest.get(nil))
+            _ = try sut.send(TestRequest.get(nil))
             XCTFail()
         } catch {
             XCTAssertNotNil(error)
         }
     }
     
-    func test_POST_xmlEncoding_returnsValidResponse() async throws {
-        session.onData = { request in
+    func test_POST_xmlEncoding_returnsValidResponse() throws {
+        session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
             XCTAssertTrue(url.hasPrefix("https://api.example.com"))
             XCTAssertEqual(request.httpMethod, "POST")
@@ -87,11 +87,11 @@ final class HTTPClientTests: XCTestCase {
             return (data, response)
         }
         
-        _ = try await sut.send(TestRequest.post(.xml(["foo": "bar"])))
+        _ = try sut.send(TestRequest.post(.xml(["foo": "bar"])))
     }
     
-    func test_GET_urlEncoding_returnsValidResponse() async throws {
-        session.onData = { request in
+    func test_GET_urlEncoding_returnsValidResponse() throws {
+        session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
             XCTAssertTrue(url.hasPrefix("https://api.example.com"))
             XCTAssertTrue(url.hasSuffix("?foo=bar"))
@@ -106,11 +106,11 @@ final class HTTPClientTests: XCTestCase {
             return (Data(), response)
         }
         
-        _ = try await sut.send(TestRequest.get(.urlEncoding(["foo": "bar"])))
+        _ = try sut.send(TestRequest.get(.urlEncoding(["foo": "bar"])))
     }
     
-    func test_POST_urlEncoding_returnsValidResponse() async throws {
-        session.onData = { request in
+    func test_POST_urlEncoding_returnsValidResponse() throws {
+        session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
             let data = try XCTUnwrap(request.httpBody)
             let decoded = String(data: data, encoding: .utf8)
@@ -130,7 +130,7 @@ final class HTTPClientTests: XCTestCase {
             return (Data(), response)
         }
         
-        _ = try await sut.send(TestRequest.post(.urlEncoding(["foo": "bar"])))
+        _ = try sut.send(TestRequest.post(.urlEncoding(["foo": "bar"])))
     }
 }
 
