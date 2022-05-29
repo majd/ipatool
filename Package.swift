@@ -4,7 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "IPATool",
-    platforms: [.macOS(.v10_15)],
+    platforms: [.macOS(.v10_11)],
     products: [
         .executable(name: "ipatool", targets: ["CLI"]),
         .library(name: "StoreAPI", targets: ["StoreAPI"]),
