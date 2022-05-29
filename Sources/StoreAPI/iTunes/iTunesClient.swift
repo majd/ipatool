@@ -13,14 +13,14 @@ public protocol iTunesClientInterface {
         bundleIdentifier: String,
         countryCode: String,
         deviceFamily: DeviceFamily
-    ) async throws -> iTunesResponse.Result
+    ) throws -> iTunesResponse.Result
 
     func search(
         term: String,
         limit: Int,
         countryCode: String,
         deviceFamily: DeviceFamily
-    ) async throws -> [iTunesResponse.Result]
+    ) throws -> [iTunesResponse.Result]
 }
 
 public final class iTunesClient: iTunesClientInterface {
@@ -34,13 +34,13 @@ public final class iTunesClient: iTunesClientInterface {
         bundleIdentifier: String,
         countryCode: String,
         deviceFamily: DeviceFamily
-    ) async throws -> iTunesResponse.Result {
+    ) throws -> iTunesResponse.Result {
         let request = iTunesRequest.lookup(
             bundleIdentifier: bundleIdentifier,
             countryCode: countryCode,
             deviceFamily: deviceFamily
         )
-        let response = try await httpClient.send(request)
+        let response = try httpClient.send(request)
         let decoded = try response.decode(iTunesResponse.self, as: .json)
         guard let result = decoded.results.first else { throw Error.appNotFound }
         return result
@@ -51,14 +51,14 @@ public final class iTunesClient: iTunesClientInterface {
         limit: Int,
         countryCode: String,
         deviceFamily: DeviceFamily
-    ) async throws -> [iTunesResponse.Result] {
+    ) throws -> [iTunesResponse.Result] {
         let request = iTunesRequest.search(
             term: term,
             limit: limit,
             countryCode: countryCode,
             deviceFamily: deviceFamily
         )
-        let response = try await httpClient.send(request)
+        let response = try httpClient.send(request)
         let decoded = try response.decode(iTunesResponse.self, as: .json)
         return decoded.results
     }
