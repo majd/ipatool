@@ -27,6 +27,7 @@ jobs:
           path: ~/Library/Developer/Xcode/DerivedData/ipatool*/SourcePackages/
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
           restore-keys: |
+            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
             ${{ runner.os }}-spm-
       - name: Inject version
         run: ./Scripts/version
@@ -47,6 +48,7 @@ jobs:
           path: ~/Library/Developer/Xcode/DerivedData/ipatool*/SourcePackages/
           key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
           restore-keys: |
+            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
             ${{ runner.os }}-spm-
       - name: Inject version
         run: ./Scripts/version
