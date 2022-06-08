@@ -56,6 +56,8 @@ private extension DeviceFamily {
             return "software"
         case .pad:
             return "iPadSoftware"
+        case .tv:
+            return "tvSoftware"
         }
     }
 }

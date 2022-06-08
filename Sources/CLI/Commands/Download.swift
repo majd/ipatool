@@ -32,7 +32,7 @@ struct Download: ParsableCommand {
     private var output: String?
 
     @Option(name: [.long], help: "The log level.")
-    private var logLevel: LogLevel = .info
+    private var logLevel: LogLevel = .debug
 
     @Flag(name: .long, help: "Obtain a license for the app if needed.")
     private var purchase: Bool = false
@@ -165,7 +165,7 @@ extension Download {
         let downloadClient = HTTPDownloadClient()
 
         do {
-            logger.log("Downloading app package...", level: .info)
+            logger.log("Downloading app package... from '\(item.url)' to '\(targetURL)'", level: .info)
             try downloadClient.download(from: item.url, to: targetURL) { [logger] progress in
                 logger.log("Downloading app package... [\(Int((progress * 100).rounded()))%]",
                            prefix: "\u{1B}[1A\u{1B}[K",
