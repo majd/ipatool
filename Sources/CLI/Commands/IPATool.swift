@@ -7,7 +7,6 @@
 
 import ArgumentParser
 
-@main
 struct IPATool: ParsableCommand {
     static var configuration: CommandConfiguration {
         return CommandConfiguration(
