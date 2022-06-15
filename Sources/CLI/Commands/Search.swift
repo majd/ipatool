@@ -32,7 +32,7 @@ struct Search: ParsableCommand {
 
     @Option(name: [.long], help: "The log level.")
     private var logLevel: LogLevel = .info
-    
+
     lazy var logger = ConsoleLogger(level: logLevel)
 }
 
@@ -66,7 +66,7 @@ extension Search {
             _exit(1)
         }
     }
-    
+
     mutating func run() throws {
         // Search the iTunes store
         let results = results(with: term)

@@ -49,7 +49,10 @@ extension Download {
         let itunesClient = iTunesClient(httpClient: httpClient)
 
         do {
-            logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(countryCode)'...", level: .info)
+            logger.log(
+                "Querying the iTunes Store for '\(bundleIdentifier)' in country '\(countryCode)'...",
+                level: .info
+            )
             return try itunesClient.lookup(
                 bundleIdentifier: bundleIdentifier,
                 countryCode: countryCode,
@@ -69,10 +72,12 @@ extension Download {
         }
     }
 
-
     private mutating func purchase(app: iTunesResponse.Result, account: Account) {
         guard app.price == 0 else {
-            logger.log("It is only possible to obtain a license for free apps. Purchase the app manually and run the \"download\" command again.", level: .error)
+            logger.log([
+                "It is only possible to obtain a license for free apps.",
+                "Purchase the app manually and run the \"download\" command again."
+            ].joined(separator: " "), level: .error)
             _exit(1)
         }
 
@@ -101,7 +106,10 @@ extension Download {
             case StoreResponse.Error.priceMismatch:
                 logger.log("Price mismatch. It is only possible to obtain a license for free apps.", level: .error)
             case StoreResponse.Error.invalidCountry:
-                logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
+                logger.log([
+                    "The country provided does not match with the account you are using.",
+                    "Supply a valid country using the \"--country\" flag."
+                ].joined(separator: " "), level: .error)
             case StoreResponse.Error.passwordTokenExpired:
                 logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
             default:
@@ -131,7 +139,7 @@ extension Download {
             )
         } catch {
             logger.log("\(error)", level: .debug)
-            
+
             switch error {
             case StoreClient.Error.invalidResponse:
                 logger.log("Received invalid response.", level: .error)
@@ -146,20 +154,29 @@ extension Download {
 
                     return item(from: app, account: account, purchaseAttempted: true)
                 } else {
-                    logger.log("Your Apple ID does not have a license for this app. Use the \"purchase\" command or the \"--purchase\" to obtain a license.", level: .error)
+                    logger.log([
+                        "Your Apple ID does not have a license for this app.",
+                        "Use the \"purchase\" command or the \"--purchase\" to obtain a license."
+                    ].joined(separator: " "), level: .error)
                 }
             case StoreResponse.Error.invalidCountry:
-                logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
+                logger.log([
+                    "The country provided does not match with the account you are using.",
+                    "Supply a valid country using the \"--country\" flag."
+                ].joined(separator: " "), level: .error)
             case StoreResponse.Error.passwordTokenExpired:
                 logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
             default:
-                logger.log("An unknown error has occurred. The token may have already expired - try loggin in again using the \"auth\" command.", level: .error)
+                logger.log([
+                    "An unknown error has occurred.",
+                    "The token may have already expired - try loggin in again using the \"auth\" command."
+                ].joined(separator: " "), level: .error)
             }
-            
+
             _exit(1)
         }
     }
-    
+
     private mutating func download(item: StoreResponse.Item, to targetURL: URL) {
         logger.log("Creating download client...", level: .debug)
         let downloadClient = HTTPDownloadClient()
@@ -177,7 +194,7 @@ extension Download {
             _exit(1)
         }
     }
-    
+
     private mutating func applyPatches(item: StoreResponse.Item, email: String, path: String) {
         logger.log("Creating signature client...", level: .debug)
         let signatureClient = SignatureClient(fileManager: .default, filePath: path)
@@ -192,30 +209,30 @@ extension Download {
             _exit(1)
         }
     }
-    
+
     private mutating func makeOutputPath(app: iTunesResponse.Result) -> String {
         let fileName: String = "/\(bundleIdentifier)_\(app.identifier)_v\(app.version)_\(Int.random(in: 100...999)).ipa"
-        
+
         guard let output = output else {
             return FileManager.default.currentDirectoryPath.appending(fileName)
         }
-        
+
         var isDirectory: ObjCBool = false
         FileManager.default.fileExists(atPath: output, isDirectory: &isDirectory)
-        
+
         return isDirectory.boolValue ? output.appending(fileName) : output
     }
 
     mutating func validate() throws {
         guard let output = output else { return }
-        
+
         var isDirectory: ObjCBool = false
         guard !FileManager.default.fileExists(atPath: output, isDirectory: &isDirectory) || isDirectory.boolValue else {
             logger.log("A file already exists at \(output).", level: .error)
             _exit(1)
         }
     }
-    
+
     mutating func run() throws {
         // Authenticate with the App Store
         let keychainStore = KeychainStore(service: "ipatool.service")

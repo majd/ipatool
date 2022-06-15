@@ -21,7 +21,7 @@ extension StoreEndpoint: HTTPEndpoint {
         components.host = host
         return components.url!
     }
-    
+
     private var host: String {
         switch self {
         case let .authenticate(prefix, _):
@@ -32,7 +32,7 @@ extension StoreEndpoint: HTTPEndpoint {
             return "buy.itunes.apple.com"
         }
     }
-    
+
     private var path: String {
         switch self {
         case let .authenticate(_, guid):
