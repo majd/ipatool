@@ -25,11 +25,11 @@ public protocol iTunesClientInterface {
 
 public final class iTunesClient: iTunesClientInterface {
     private let httpClient: HTTPClient
-    
+
     public init(httpClient: HTTPClient) {
         self.httpClient = httpClient
     }
-    
+
     public func lookup(
         bundleIdentifier: String,
         countryCode: String,
@@ -45,7 +45,7 @@ public final class iTunesClient: iTunesClientInterface {
         guard let result = decoded.results.first else { throw Error.appNotFound }
         return result
     }
-    
+
     public func search(
         term: String,
         limit: Int,

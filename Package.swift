@@ -17,6 +17,7 @@ let package = Package(
         .package(url: "https://github.com/kishikawakatsumi/KeychainAccess", revision: "v4.2.2")
     ],
     targets: [
+        // IPATool CLI
         .executableTarget(
             name: "CLI",
             dependencies: [
@@ -24,20 +25,42 @@ let package = Package(
                 .byName(name: "Networking"),
                 .byName(name: "StoreAPI"),
                 .byName(name: "Persistence")
-            ]
+            ],
+            plugins: ["SwiftLint"]
         ),
+
+        // StoreAPI
         .target(
             name: "StoreAPI",
             dependencies: [
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
                 .product(name: "ZIPFoundation", package: "ZIPFoundation"),
                 .byName(name: "Networking"),
-            ]
+            ],
+            plugins: ["SwiftLint"]
         ),
-        .target(name: "Networking", dependencies: []),
-        .testTarget(name: "NetworkingTests", dependencies: ["Networking"]),
-        .target(name: "Persistence", dependencies: [
-            .byName(name: "KeychainAccess")
-        ]),
+
+        // Networking
+        .target(
+            name: "Networking",
+            plugins: ["SwiftLint"]
+        ),
+        .testTarget(
+            name: "NetworkingTests",
+            dependencies: ["Networking"],
+            plugins: ["SwiftLint"]
+        ),
+
+        // Persistence
+        .target(
+            name: "Persistence",
+            dependencies: [
+                .byName(name: "KeychainAccess")
+            ],
+            plugins: ["SwiftLint"]
+        ),
+
+        // SwiftLint
+        .plugin(name: "SwiftLint", capability: .buildTool())
     ]
 )

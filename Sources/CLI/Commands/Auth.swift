@@ -61,7 +61,9 @@ extension Auth.Login {
             return email
         } else if let email = ProcessInfo.processInfo.environment["IPATOOL_EMAIL"] {
             return email
-        } else if let email = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter Apple ID email: ", level: .warning)))) {
+        } else if let email = String(
+            validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter Apple ID email: ", level: .warning)))
+        ) {
             return email
         } else {
             logger.log("An Apple ID email address is required.", level: .error)
@@ -74,7 +76,9 @@ extension Auth.Login {
             return password
         } else if let password = ProcessInfo.processInfo.environment["IPATOOL_PASSWORD"] {
             return password
-        } else if let password = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter Apple ID password: ", level: .warning)))) {
+        } else if let password = String(
+            validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter Apple ID password: ", level: .warning)))
+        ) {
             return password
         } else {
             logger.log("An Apple ID password is required.", level: .error)
@@ -87,7 +91,9 @@ extension Auth.Login {
             return authCode
         } else if let authCode = ProcessInfo.processInfo.environment["IPATOOL_2FA_CODE"] {
             return authCode
-        } else if let authCode = String(validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter 2FA code: ", level: .warning)))) {
+        } else if let authCode = String(
+            validatingUTF8: UnsafePointer<CChar>(getpass(logger.compile("Enter 2FA code: ", level: .warning)))
+        ) {
             return authCode
         } else {
             logger.log("A 2FA auth-code is required.", level: .error)

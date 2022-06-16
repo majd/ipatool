@@ -39,10 +39,13 @@ extension StoreResponse: Decodable {
             let directoryServicesIdentifier = try container.decode(String.self, forKey: .directoryServicesIdentifier)
             let passwordToken = try container.decode(String.self, forKey: .passwordToken)
             let accountContainer = try container.nestedContainer(keyedBy: AccountInfoCodingKeys.self, forKey: .account)
-            let addressContainer = try accountContainer.nestedContainer(keyedBy: AddressCodingKeys.self, forKey: .address)
+            let addressContainer = try accountContainer.nestedContainer(
+                keyedBy: AddressCodingKeys.self,
+                forKey: .address
+            )
             let firstName = try addressContainer.decode(String.self, forKey: .firstName)
             let lastName = try addressContainer.decode(String.self, forKey: .lastName)
-            
+
             self = .account(
                 Account(
                     firstName: firstName,
@@ -56,7 +59,7 @@ extension StoreResponse: Decodable {
         } else if container.contains(.statusCode) {
             let statusCode = try container.decode(Int.self, forKey: .statusCode)
             let statusType = try container.decode(String.self, forKey: .statusType)
-            
+
             self = .purchase(Receipt(statusCode: statusCode, status: Receipt.Status(rawValue: statusType)))
         } else if let error = error, !error.isEmpty {
             self = .failure(error: Error(rawValue: Int(error) ?? 0) ?? .unknownError)
@@ -64,18 +67,24 @@ extension StoreResponse: Decodable {
             switch message {
             case "Your account information was entered incorrectly.":
                 self = .failure(error: Error.invalidCredentials)
-            case "An Apple ID verification code is required to sign in. Type your password followed by the verification code shown on your other devices.":
+            case [
+                "An Apple ID verification code is required to sign in.",
+                "Type your password followed by the verification code shown on your other devices."
+            ].joined(separator: " "):
                 self = .failure(error: Error.codeRequired)
             case "MZFinance.BadLogin.Configurator_message":
                 self = .failure(error: Error.codeRequired)
-            case "This Apple ID has been locked for security reasons. Visit iForgot to reset your account (https://iforgot.apple.com).":
+            case [
+                "This Apple ID has been locked for security reasons.",
+                "Visit iForgot to reset your account (https://iforgot.apple.com)."
+            ].joined(separator: " "):
                 self = .failure(error: Error.lockedAccount)
             default:
                 self = .failure(error: Error.unknownError)
             }
         }
     }
-    
+
     private enum CodingKeys: String, CodingKey {
         case directoryServicesIdentifier = "dsPersonId"
         case passwordToken = "passwordToken"
@@ -86,7 +95,7 @@ extension StoreResponse: Decodable {
         case statusCode = "status"
         case statusType = "jingleDocType"
     }
-    
+
     private enum AccountInfoCodingKeys: String, CodingKey {
         case address
     }

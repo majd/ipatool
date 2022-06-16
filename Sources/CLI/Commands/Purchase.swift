@@ -43,7 +43,10 @@ extension Purchase {
         let itunesClient = iTunesClient(httpClient: httpClient)
 
         do {
-            logger.log("Querying the iTunes Store for '\(bundleIdentifier)' in country '\(countryCode)'...", level: .info)
+            logger.log(
+                "Querying the iTunes Store for '\(bundleIdentifier)' in country '\(countryCode)'...",
+                level: .info
+            )
             let app = try itunesClient.lookup(
                 bundleIdentifier: bundleIdentifier,
                 countryCode: countryCode,
@@ -96,7 +99,10 @@ extension Purchase {
             case StoreResponse.Error.priceMismatch:
                 logger.log("Price mismatch. It is only possible to obtain a license for free apps.", level: .error)
             case StoreResponse.Error.invalidCountry:
-                logger.log("The country provided does not match with the account you are using. Supply a valid country using the \"--country\" flag.", level: .error)
+                logger.log([
+                    "The country provided does not match with the account you are using.",
+                    "Supply a valid country using the \"--country\" flag."
+                ].joined(separator: " "), level: .error)
             case StoreResponse.Error.passwordTokenExpired:
                 logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
             default:

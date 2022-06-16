@@ -20,7 +20,7 @@ extension iTunesEndpoint: HTTPEndpoint {
         components.host = "itunes.apple.com"
         return components.url!
     }
-    
+
     private var path: String {
         switch self {
         case .search:

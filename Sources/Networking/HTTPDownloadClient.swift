@@ -22,7 +22,7 @@ public final class HTTPDownloadClient: NSObject, HTTPDownloadClientInterface {
         super.init()
         self.session = URLSession(configuration: .default, delegate: self, delegateQueue: nil)
     }
-    
+
     public func download(from source: URL, to target: URL, progress: @escaping (Float) -> Void) throws {
         assert(progressHandler == nil)
         assert(semaphore == nil)
@@ -61,7 +61,7 @@ extension HTTPDownloadClient: URLSessionDownloadDelegate {
 
         result = .failure(error)
     }
-    
+
     public func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
@@ -71,7 +71,7 @@ extension HTTPDownloadClient: URLSessionDownloadDelegate {
     ) {
         progressHandler?(Float(totalBytesWritten) / Float(totalBytesExpectedToWrite))
     }
-    
+
     public func urlSession(
         _ session: URLSession,
         downloadTask: URLSessionDownloadTask,
@@ -83,12 +83,12 @@ extension HTTPDownloadClient: URLSessionDownloadDelegate {
             semaphore = nil
             targetURL = nil
         }
-        
+
         guard let target = targetURL else {
             result = .failure(Error.invalidTarget)
             return
         }
-        
+
         do {
             try FileManager.default.moveItem(at: location, to: target)
             result = .success(())

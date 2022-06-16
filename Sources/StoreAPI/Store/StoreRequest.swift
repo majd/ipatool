@@ -30,17 +30,17 @@ extension StoreRequest: HTTPRequest {
             return StoreEndpoint.purchase
         }
     }
-    
+
     var method: HTTPMethod {
         return .post
     }
-    
+
     var headers: [String: String] {
         var headers: [String: String] = [
             "User-Agent": "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8",
             "Content-Type": "application/x-www-form-urlencoded"
         ]
-        
+
         switch self {
         case .authenticate:
             break
@@ -54,10 +54,10 @@ extension StoreRequest: HTTPRequest {
             headers["X-Apple-Store-Front"] = Storefront(countryCode: countryCode)?.rawValue
             headers["X-Token"] = passwordToken
         }
-        
+
         return headers
     }
-    
+
     var payload: HTTPPayload? {
         switch self {
         case let .authenticate(email, password, code):
@@ -104,8 +104,8 @@ extension StoreRequest {
         let bsds: [String] = ["en0", "en1"]
         var bsd: String = bsds[0]
 
-        var length : size_t = 0
-        var buffer : [CChar]
+        var length: size_t = 0
+        var buffer: [CChar]
 
         var bsdIndex = Int32(if_nametoindex(bsd))
         if bsdIndex == 0 {
@@ -113,7 +113,7 @@ extension StoreRequest {
             bsdIndex = Int32(if_nametoindex(bsd))
             guard bsdIndex != 0 else { fatalError("Could not read MAC address") }
         }
-        
+
         let bsdData = Data(bsd.utf8)
         var managementInfoBase = [CTL_NET, AF_ROUTE, 0, AF_LINK, NET_RT_IFLIST, bsdIndex]
 
@@ -136,7 +136,7 @@ extension StoreRequest {
         let lower = rangeOfToken.upperBound
         let upper = lower + MAC_ADDRESS_LENGTH
         let macAddressData = infoData[lower..<upper]
-        let addressBytes = macAddressData.map{ String(format:"%02x", $0) }
+        let addressBytes = macAddressData.map { String(format: "%02x", $0) }
         return addressBytes.joined().uppercased()
     }
 }

@@ -11,18 +11,20 @@ import XCTest
 final class HTTPClientTests: XCTestCase {
     private var sut: HTTPClient!
     private var session: URLSessionMock!
-    
+
     override func setUp() {
+        super.setUp()
+
         session = URLSessionMock()
         sut = HTTPClient(session: session)
     }
-    
+
     func test_GET_success_returnsValidResposne() throws {
         session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
             XCTAssertTrue(url.hasPrefix("https://api.example.com"))
             XCTAssertEqual(request.httpMethod, "GET")
-            
+
             let data = try XCTUnwrap("foo".data(using: .utf8))
             let response = HTTPURLResponse(
                 url: URL(string: "https://example.com")!,
@@ -32,7 +34,7 @@ final class HTTPClientTests: XCTestCase {
             )
             return (data, response)
         }
-        
+
         let response = try sut.send(TestRequest.get(nil))
         let data = try XCTUnwrap(response.data)
         XCTAssertEqual(String(data: data, encoding: .utf8), "foo")
@@ -43,9 +45,9 @@ final class HTTPClientTests: XCTestCase {
             let url = try XCTUnwrap(request.url?.absoluteString)
             XCTAssertTrue(url.hasPrefix("https://api.example.com"))
             XCTAssertEqual(request.httpMethod, "GET")
-            
+
             let data = try XCTUnwrap("foo".data(using: .utf8))
-            
+
             let response = URLResponse(
                 url: URL(string: "https://example.com")!,
                 mimeType: nil,
@@ -57,12 +59,12 @@ final class HTTPClientTests: XCTestCase {
 
         do {
             _ = try sut.send(TestRequest.get(nil))
-            XCTFail()
+            XCTFail("Call succeeded while expecting a failure.")
         } catch {
             XCTAssertNotNil(error)
         }
     }
-    
+
     func test_POST_xmlEncoding_returnsValidResponse() throws {
         session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
@@ -70,12 +72,14 @@ final class HTTPClientTests: XCTestCase {
             XCTAssertEqual(request.httpMethod, "POST")
 
             let data = try XCTUnwrap(request.httpBody)
-            let decoded = try PropertyListSerialization.propertyList(
-                from: data,
-                options: [],
-                format: nil
-            ) as! [String: String]
-            
+            let decoded = try XCTUnwrap(
+                PropertyListSerialization.propertyList(
+                    from: data,
+                    options: [],
+                    format: nil
+                ) as? [String: String]
+            )
+
             XCTAssertEqual(decoded["foo"], "bar")
 
             let response = HTTPURLResponse(
@@ -86,10 +90,10 @@ final class HTTPClientTests: XCTestCase {
             )
             return (data, response)
         }
-        
+
         _ = try sut.send(TestRequest.post(.xml(["foo": "bar"])))
     }
-    
+
     func test_GET_urlEncoding_returnsValidResponse() throws {
         session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
@@ -105,17 +109,17 @@ final class HTTPClientTests: XCTestCase {
             )
             return (Data(), response)
         }
-        
+
         _ = try sut.send(TestRequest.get(.urlEncoding(["foo": "bar"])))
     }
-    
+
     func test_POST_urlEncoding_returnsValidResponse() throws {
         session.onDataTask = { request in
             let url = try XCTUnwrap(request.url?.absoluteString)
             let data = try XCTUnwrap(request.httpBody)
             let decoded = String(data: data, encoding: .utf8)
             let headerValue = try XCTUnwrap(request.allHTTPHeaderFields?["X-Test"])
-            
+
             XCTAssertTrue(url.hasPrefix("https://api.example.com"))
             XCTAssertEqual(decoded, "foo=bar")
             XCTAssertEqual(request.httpMethod, "POST")
@@ -129,7 +133,7 @@ final class HTTPClientTests: XCTestCase {
             )
             return (Data(), response)
         }
-        
+
         _ = try sut.send(TestRequest.post(.urlEncoding(["foo": "bar"])))
     }
 }
@@ -137,7 +141,7 @@ final class HTTPClientTests: XCTestCase {
 private enum TestRequest: HTTPRequest {
     case get(HTTPPayload?)
     case post(HTTPPayload)
-    
+
     var method: HTTPMethod {
         switch self {
         case .get:
@@ -146,14 +150,14 @@ private enum TestRequest: HTTPRequest {
             return .post
         }
     }
-    
+
     var endpoint: HTTPEndpoint {
         switch self {
         case .get, .post:
             return TestEndpoint.generic
         }
     }
-    
+
     var payload: HTTPPayload? {
         switch self {
         case let .get(payload):
@@ -162,7 +166,7 @@ private enum TestRequest: HTTPRequest {
             return payload
         }
     }
-    
+
     var headers: [String: String] {
         switch self {
         case .get, .post:
@@ -173,7 +177,7 @@ private enum TestRequest: HTTPRequest {
 
 private enum TestEndpoint: HTTPEndpoint {
     case generic
-    
+
     var url: URL {
         switch self {
         case .generic:
