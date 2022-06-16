@@ -28,7 +28,7 @@ extension LogLevel {
             return "🛠\t[Debug] "
         }
     }
-    
+
     var priority: Int {
         switch self {
         case .error:

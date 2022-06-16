@@ -10,11 +10,11 @@ import Darwin
 
 final class ConsoleLogger: Logging {
     private let level: LogLevel
-    
+
     init(level: LogLevel) {
         self.level = level
     }
-    
+
     func log(_ message: String, level: LogLevel) {
         guard level <= self.level else { return }
 
@@ -25,7 +25,7 @@ final class ConsoleLogger: Logging {
             print(compile(message, level: level))
         }
     }
-    
+
     func log(_ message: String, prefix: String, level: LogLevel) {
         guard level <= self.level else { return }
         switch level {
