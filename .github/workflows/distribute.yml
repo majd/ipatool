@@ -58,7 +58,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: ipatool-v${{ needs.get_version.outputs.version }}
-          path: .build/apple/Products/Release/ipatool
+          path: .build/ipatool
           if-no-files-found: error
   distribute:
     name: Distribute
