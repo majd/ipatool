@@ -116,21 +116,40 @@ jobs:
     runs-on: ubuntu-20.04
     needs: [get_version, build_ios, build_macos]
     steps:
-      - name: Download binary
+      - name: Download binary (macOS)
         uses: actions/download-artifact@v2
         with:
           name: ipatool-macos-v${{ needs.get_version.outputs.version }}
           path: ipatool-macos-v${{ needs.get_version.outputs.version }}
-      - name: Archive binary
+      - name: Archive binary (macOS)
         run: |
           mv ipatool-macos-v${{ needs.get_version.outputs.version }}/ipatool ipatool
           zip ipatool-macos-v${{ needs.get_version.outputs.version }}.zip ipatool
-      - name: Upload binary to release
+          rm ipatool
+      - name: Upload release (macOS)
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ipatool-macos-v${{ needs.get_version.outputs.version }}.zip
           asset_name: ipatool-macos-v${{ needs.get_version.outputs.version }}.zip
+          tag: ${{ github.ref }}
+          overwrite: false
+      - name: Download binary (iOS)
+        uses: actions/download-artifact@v2
+        with:
+          name: ipatool-ios-v${{ needs.get_version.outputs.version }}
+          path: ipatool-ios-v${{ needs.get_version.outputs.version }}
+      - name: Archive binary (iOS)
+        run: |
+          mv ipatool-ios-v${{ needs.get_version.outputs.version }}/ipatool ipatool
+          zip ipatool-ios-v${{ needs.get_version.outputs.version }}.zip ipatool
+          rm ipatool
+      - name: Upload release (iOS)
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ipatool-ios-v${{ needs.get_version.outputs.version }}.zip
+          asset_name: ipatool-ios-v${{ needs.get_version.outputs.version }}.zip
           tag: ${{ github.ref }}
           overwrite: false
       - name: Checkout homebrew repo
