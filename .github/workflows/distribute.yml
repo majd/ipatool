@@ -31,12 +31,10 @@ jobs:
             ${{ runner.os }}-spm-
       - name: Inject version
         run: ./Scripts/version
-      - name: Build
-        run: swift build
       - name: Run tests
         run: swift test
-  build:
-    name: Build
+  build_macos:
+    name: Build (macOS)
     runs-on: macos-12
     needs: [get_version, test]
     steps:
@@ -57,29 +55,82 @@ jobs:
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
-          name: ipatool-v${{ needs.get_version.outputs.version }}
+          name: ipatool-macos-v${{ needs.get_version.outputs.version }}
+          path: .build/ipatool
+          if-no-files-found: error
+  build_ios:
+    name: Build (iOS)
+    runs-on: macos-12
+    needs: [get_version, test]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Cache SwiftPM packages
+        uses: actions/cache@v3
+        with:
+          path: .build/checkouts
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+            ${{ runner.os }}-spm-
+      - name: Inject version
+        run: ./Scripts/version
+      - name: Install dependencies
+        run: brew install xcodegen ldid
+      - name: Generate Xcode project
+        run: xcodegen -s ios-project.yml
+      - name: Build archive
+        run: |
+          xcodebuild archive -scheme CLI \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath .build \
+            -archivePath .build/ipatool.xcarchive \
+            CODE_SIGN_IDENTITY='' \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS='' \
+            CODE_SIGNING_ALLOWED=NO
+          cp .build/ipatool.xcarchive/Products/Applications/CLI.app/CLI .build/ipatool
+      - name: Fakesign executable
+        run: |
+          cat <<EOF >"$PWD/.build/entitlements.xml"
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+            <dict>
+              <key>platform-application</key>
+              <true />
+              <key>com.apple.private.security.container-required</key>
+              <false />
+            </dict>
+          </plist>
+          EOF
+          ldid -S.build/entitlements.xml ./.build/ipatool
+      - name: Upload binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: ipatool-ios-v${{ needs.get_version.outputs.version }}
           path: .build/ipatool
           if-no-files-found: error
   distribute:
     name: Distribute
     runs-on: ubuntu-20.04
-    needs: [get_version, build]
+    needs: [get_version, build_ios, build_macos]
     steps:
       - name: Download binary
         uses: actions/download-artifact@v2
         with:
-          name: ipatool-v${{ needs.get_version.outputs.version }}
-          path: ipatool-v${{ needs.get_version.outputs.version }}
+          name: ipatool-macos-v${{ needs.get_version.outputs.version }}
+          path: ipatool-macos-v${{ needs.get_version.outputs.version }}
       - name: Archive binary
         run: |
-          mv ipatool-v${{ needs.get_version.outputs.version }}/ipatool ipatool
-          zip ipatool-v${{ needs.get_version.outputs.version }}.zip ipatool
+          mv ipatool-macos-v${{ needs.get_version.outputs.version }}/ipatool ipatool
+          zip ipatool-macos-v${{ needs.get_version.outputs.version }}.zip ipatool
       - name: Upload binary to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ipatool-v${{ needs.get_version.outputs.version }}.zip
-          asset_name: ipatool-v${{ needs.get_version.outputs.version }}.zip
+          file: ipatool-macos-v${{ needs.get_version.outputs.version }}.zip
+          asset_name: ipatool-macos-v${{ needs.get_version.outputs.version }}.zip
           tag: ${{ github.ref }}
           overwrite: false
       - name: Checkout homebrew repo
@@ -91,10 +142,11 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
       - name: Update homebrew repo
         run: |
-          SHA256=$(sha256sum ipatool-v${{ needs.get_version.outputs.version }}.zip | awk '{print $1}')
+          SHA256=$(sha256sum ipatool-macos-v${{ needs.get_version.outputs.version }}.zip | awk '{print $1}')
           cd repo
           sed -i "3s/.*/  sha256 \"$SHA256\"/" Casks/ipatool.rb
           sed -i "2s/.*/  version \"${{ needs.get_version.outputs.version }}\"/" Casks/ipatool.rb
+          sed -i "5s/.*/  url \"https:\/\/github.com\/majd\/ipatool\/releases\/download\/v${{ needs.get_version.outputs.version }}\/ipatool-macos-v${{ needs.get_version.outputs.version }}.zip\"/" Casks/ipatool.rb
           git config --local user.name ${{ secrets.GH_NAME }}
           git config --local user.email ${{ secrets.GH_EMAIL }}
           git add Casks/ipatool.rb
