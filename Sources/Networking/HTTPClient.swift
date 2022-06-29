@@ -13,7 +13,7 @@ public protocol HTTPClientInterface {
 
 public final class HTTPClient: HTTPClientInterface {
     private let session: URLSessionInterface
-    
+
     public init(session: URLSessionInterface) {
         self.session = session
     }
@@ -23,10 +23,12 @@ public final class HTTPClient: HTTPClientInterface {
         let semaphore = DispatchSemaphore(value: 0)
         var result: (data: Data?, response: URLResponse?, error: Swift.Error?)
 
-        session.dataTask(with: request) { (data, response, error) in
-            result = (data, response, error)
-            semaphore.signal()
-        }.resume()
+        session
+            .dataTask(with: request) { (data, response, error) in
+                result = (data, response, error)
+                semaphore.signal()
+            }
+            .resume()
 
         semaphore.wait()
 
@@ -40,7 +42,7 @@ public final class HTTPClient: HTTPClientInterface {
 
         return HTTPResponse(statusCode: response.statusCode, data: result.data)
     }
-    
+
     private func makeURLRequest(from request: HTTPRequest) throws -> URLRequest {
         var urlRequest = URLRequest(url: request.endpoint.url)
         urlRequest.httpMethod = request.method.rawValue
@@ -69,7 +71,7 @@ public final class HTTPClient: HTTPClientInterface {
             urlRequest.setValue("application/xml", forHTTPHeaderField: "Content-Type")
             urlRequest.httpBody = try PropertyListSerialization.data(fromPropertyList: value, format: .xml, options: 0)
         }
-        
+
         request.headers.forEach { urlRequest.setValue($0.value, forHTTPHeaderField: $0.key) }
 
         return urlRequest

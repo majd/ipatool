@@ -16,14 +16,14 @@ public protocol SignatureClientInterface {
 public final class SignatureClient: SignatureClientInterface {
     private let fileManager: FileManager
     private let filePath: String
-    
+
     public init(fileManager: FileManager, filePath: String) {
         self.fileManager = fileManager
         self.filePath = filePath
     }
-    
+
     public func appendMetadata(item: StoreResponse.Item, email: String) throws {
-        guard let archive = Archive(url: URL(fileURLWithPath: filePath), accessMode: .update) else  {
+        guard let archive = Archive(url: URL(fileURLWithPath: filePath), accessMode: .update) else {
             throw Error.invalidArchive
         }
 
@@ -31,31 +31,44 @@ public final class SignatureClient: SignatureClientInterface {
         metadata["apple-id"] = email
         metadata["userName"] = email
 
-        let metadataUrl = URL(fileURLWithPath: NSTemporaryDirectory().appending("\(UUID().uuidString)/iTunesMetadata.plist"))
+        let metadataPath = NSTemporaryDirectory().appending("\(UUID().uuidString)/iTunesMetadata.plist")
+        let metadataUrl = URL(fileURLWithPath: metadataPath)
 
         try fileManager.createDirectory(at: metadataUrl.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try PropertyListSerialization.data(fromPropertyList: metadata, format: .xml, options: .zero).write(to: metadataUrl)
+        try PropertyListSerialization
+            .data(
+                fromPropertyList: metadata,
+                format: .xml,
+                options: .zero
+            )
+            .write(to: metadataUrl)
         try archive.addEntry(with: metadataUrl.lastPathComponent, relativeTo: metadataUrl.deletingLastPathComponent())
         try fileManager.removeItem(at: metadataUrl)
     }
-    
+
     public func appendSignature(item: StoreResponse.Item) throws {
-        guard let archive = Archive(url: URL(fileURLWithPath: filePath), accessMode: .update) else  {
+        guard let archive = Archive(url: URL(fileURLWithPath: filePath), accessMode: .update) else {
             throw Error.invalidArchive
         }
 
-        let manifest = try readPlist(archive: archive, matchingSuffix: ".app/SC_Info/Manifest.plist", type: Manifest.self)
+        let manifest = try readPlist(
+            archive: archive,
+            matchingSuffix: ".app/SC_Info/Manifest.plist",
+            type: Manifest.self
+        )
 
         guard let infoEntry = archive.first(where: { $0.path.hasSuffix(".app/Info.plist") }) else {
             throw Error.invalidAppBundle
         }
-        
+
         let appBundleName = URL(fileURLWithPath: infoEntry.path)
             .deletingLastPathComponent()
             .deletingPathExtension()
             .lastPathComponent
 
-        guard let signatureItem = item.signatures.first(where: { $0.id == 0 }), let signatureTargetPath = manifest.paths.first else {
+        guard let signatureItem = item.signatures.first(where: {
+            return $0.id == 0
+        }), let signatureTargetPath = manifest.paths.first else {
             throw Error.invalidSignature
         }
 
@@ -65,7 +78,7 @@ public final class SignatureClient: SignatureClientInterface {
             .appendingPathComponent(appBundleName)
             .appendingPathExtension("app")
             .appendingPathComponent(signatureTargetPath)
-        
+
         let signatureRelativePath = signatureUrl.path.replacingOccurrences(of: "\(signatureBaseUrl.path)/", with: "")
 
         try fileManager.createDirectory(at: signatureUrl.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -73,13 +86,15 @@ public final class SignatureClient: SignatureClientInterface {
         try archive.addEntry(with: signatureRelativePath, relativeTo: signatureBaseUrl)
         try fileManager.removeItem(at: signatureBaseUrl)
     }
-    
+
     private func readPlist<T: Decodable>(archive: Archive, matchingSuffix: String, type: T.Type) throws -> T {
         guard let entry = archive.first(where: { $0.path.hasSuffix(matchingSuffix) }) else {
             throw Error.fileNotFound(matchingSuffix)
         }
-        
-        let url = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(UUID().uuidString).appendingPathExtension("plist")
+
+        let url = URL(fileURLWithPath: NSHomeDirectory())
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("plist")
         _ = try archive.extract(entry, to: url)
 
         let data = try Data(contentsOf: url)
@@ -94,7 +109,7 @@ public final class SignatureClient: SignatureClientInterface {
 extension SignatureClient {
     struct Manifest: Codable {
         let paths: [String]
-        
+
         enum CodingKeys: String, CodingKey {
             case paths = "SinfPaths"
         }

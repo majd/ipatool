@@ -7,7 +7,8 @@
 
 import Foundation
 
-// https://web.archive.org/web/20191206001952/https://affiliate.itunes.apple.com/resources/documentation/linking-to-the-itunes-music-store
+// https://web.archive.org/web/20191206001952/
+// https://affiliate.itunes.apple.com/resources/documentation/linking-to-the-itunes-music-store
 public enum Storefront: String, CaseIterable {
     case AE = "143481"
     case AG = "143540"

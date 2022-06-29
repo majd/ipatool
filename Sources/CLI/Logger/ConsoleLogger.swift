@@ -6,22 +6,34 @@
 //
 
 import Foundation
+import Darwin
 
 final class ConsoleLogger: Logging {
     private let level: LogLevel
-    
+
     init(level: LogLevel) {
         self.level = level
     }
-    
+
     func log(_ message: String, level: LogLevel) {
         guard level <= self.level else { return }
-        print(compile(message, level: level))
+
+        switch level {
+        case .error:
+            fputs("\(compile(message, level: level))\n", stderr)
+        default:
+            print(compile(message, level: level))
+        }
     }
-    
+
     func log(_ message: String, prefix: String, level: LogLevel) {
         guard level <= self.level else { return }
-        print("\(prefix)\(compile(message, level: level))")
+        switch level {
+        case .error:
+            fputs("\(prefix)\(compile(message, level: level))\n", stderr)
+        default:
+            print("\(prefix)\(compile(message, level: level))")
+        }
     }
 
     func compile(_ message: String, level: LogLevel) -> String {

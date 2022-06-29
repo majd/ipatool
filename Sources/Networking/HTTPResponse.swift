@@ -17,7 +17,7 @@ extension HTTPResponse {
         guard let data = data else {
             throw Error.noData
         }
-        
+
         switch decoder {
         case .json:
             let decoder = JSONDecoder()
@@ -36,7 +36,7 @@ extension HTTPResponse {
         case json
         case xml
     }
-    
+
     public enum Error: Swift.Error {
         case noData
     }

@@ -1,0 +1,75 @@
+name: Dry Builds
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_ios:
+    name: Dry build (iOS)
+    runs-on: macos-12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Cache SwiftPM packages
+        uses: actions/cache@v3
+        with:
+          path: .build/checkouts
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+            ${{ runner.os }}-spm-
+      - name: Inject version
+        run: ./Scripts/version
+      - name: Install dependencies
+        run: brew install xcodegen ldid
+      - name: Generate Xcode project
+        run: xcodegen -s ios-project.yml
+      - name: Build archive
+        run: |
+          xcodebuild archive -scheme CLI \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath .build \
+            -archivePath .build/ipatool.xcarchive \
+            CODE_SIGN_IDENTITY='' \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS='' \
+            CODE_SIGNING_ALLOWED=NO
+          cp .build/ipatool.xcarchive/Products/Applications/CLI.app/CLI .build/ipatool
+          file .build/ipatool
+      - name: Fakesign executable
+        run: |
+          cat <<EOF >"$PWD/.build/entitlements.xml"
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+            <dict>
+              <key>platform-application</key>
+              <true />
+              <key>com.apple.private.security.container-required</key>
+              <false />
+            </dict>
+          </plist>
+          EOF
+          ldid -S.build/entitlements.xml ./.build/ipatool
+  build_macos:
+    name: Dry build (macOS)
+    runs-on: macos-12
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Cache SwiftPM packages
+        uses: actions/cache@v3
+        with:
+          path: .build/checkouts
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+            ${{ runner.os }}-spm-
+      - name: Inject version
+        run: ./Scripts/version
+      - name: Build
+        run: |
+          make build
+          file .build/ipatool

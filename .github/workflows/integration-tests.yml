@@ -1,6 +1,9 @@
 name: Integration Tests
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -28,7 +31,7 @@ jobs:
         uses: actions/upload-artifact@v2
         with:
           name: ipatool
-          path: .build/apple/Products/Release/ipatool
+          path: .build/ipatool
           if-no-files-found: error
   test:
     name: Test

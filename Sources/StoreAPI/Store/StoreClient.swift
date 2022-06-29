@@ -21,15 +21,15 @@ public protocol StoreClientInterface {
 
 public final class StoreClient: StoreClientInterface {
     private let httpClient: HTTPClient
-    
+
     public init(httpClient: HTTPClient) {
         self.httpClient = httpClient
     }
-    
+
     public func authenticate(email: String, password: String, code: String?) throws -> StoreResponse.Account {
         try authenticate(email: email, password: password, code: code, isFirstAttempt: true)
     }
-    
+
     public func item(identifier: String, directoryServicesIdentifier: String) throws -> StoreResponse.Item {
         let request = StoreRequest.download(
             appIdentifier: identifier,
@@ -82,7 +82,7 @@ public final class StoreClient: StoreClientInterface {
             }
         }
     }
-    
+
     private func authenticate(email: String,
                               password: String,
                               code: String?,
