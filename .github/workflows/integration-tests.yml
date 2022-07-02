@@ -26,7 +26,7 @@ jobs:
       - name: Inject version
         run: ./Scripts/version
       - name: Build
-        run: make build
+        run: make build-macos
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
