@@ -15,6 +15,7 @@ public enum StoreResponse {
 
     public enum Error: Int, Swift.Error {
         case unknownError = 0
+        case passwordChanged = 2002
         case genericError = 5002
         case codeRequired = 1
         case invalidLicense = 9610

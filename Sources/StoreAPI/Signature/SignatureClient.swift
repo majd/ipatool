@@ -51,6 +51,18 @@ public final class SignatureClient: SignatureClientInterface {
             throw Error.invalidArchive
         }
 
+        try appendSignatureFromManfiest(forItem: item, inArchive: archive)
+    }
+
+    public func appendOldSignature(item: StoreResponse.Item) throws {
+        guard let archive = Archive(url: URL(fileURLWithPath: filePath), accessMode: .update) else {
+            throw Error.invalidArchive
+        }
+
+        try appendOldSignature(forItem: item, inArchive: archive)
+    }
+
+    private func appendSignatureFromManfiest(forItem item: StoreResponse.Item, inArchive archive: Archive) throws {
         let manifest = try readPlist(
             archive: archive,
             matchingSuffix: ".app/SC_Info/Manifest.plist",
@@ -78,6 +90,52 @@ public final class SignatureClient: SignatureClientInterface {
             .appendingPathComponent(appBundleName)
             .appendingPathExtension("app")
             .appendingPathComponent(signatureTargetPath)
+
+        let signatureRelativePath = signatureUrl.path.replacingOccurrences(of: "\(signatureBaseUrl.path)/", with: "")
+
+        try fileManager.createDirectory(at: signatureUrl.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try signatureItem.sinf.write(to: signatureUrl)
+        try archive.addEntry(with: signatureRelativePath, relativeTo: signatureBaseUrl)
+        try fileManager.removeItem(at: signatureBaseUrl)
+    }
+
+    private func appendOldSignature(forItem item: StoreResponse.Item, inArchive archive: Archive) throws {
+        guard let infoEntry = archive.first(where: { $0.path.hasSuffix(".app/Info.plist") }) else {
+            throw Error.invalidAppBundle
+        }
+
+        let temporaryInfoURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        _ = try archive.extract(infoEntry, to: temporaryInfoURL, skipCRC32: true)
+        let infoData = try Data(contentsOf: temporaryInfoURL)
+
+        guard let infoPlist = try PropertyListSerialization.propertyList(
+            from: infoData,
+            format: nil
+        ) as? [String: Any] else {
+            throw Error.invalidAppBundle
+        }
+
+        guard let executableName = infoPlist["CFBundleExecutable"] as? String else {
+            throw Error.invalidAppBundle
+        }
+
+        let appBundleName = URL(fileURLWithPath: infoEntry.path)
+            .deletingLastPathComponent()
+            .deletingPathExtension()
+            .lastPathComponent
+
+        guard let signatureItem = item.signatures.first(where: { $0.id == 0 }) else {
+            throw Error.invalidSignature
+        }
+
+        let signatureBaseUrl = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent(UUID().uuidString)
+        let signatureUrl = signatureBaseUrl
+            .appendingPathComponent("Payload")
+            .appendingPathComponent(appBundleName)
+            .appendingPathExtension("app")
+            .appendingPathComponent("SC_Info")
+            .appendingPathComponent(executableName)
+            .appendingPathExtension("sinf")
 
         let signatureRelativePath = signatureUrl.path.replacingOccurrences(of: "\(signatureBaseUrl.path)/", with: "")
 
@@ -115,7 +173,7 @@ extension SignatureClient {
         }
     }
 
-    enum Error: Swift.Error {
+    public enum Error: Swift.Error {
         case invalidArchive
         case invalidAppBundle
         case invalidSignature
