@@ -103,7 +103,7 @@ extension Purchase {
                     "The country provided does not match with the account you are using.",
                     "Supply a valid country using the \"--country\" flag."
                 ].joined(separator: " "), level: .error)
-            case StoreResponse.Error.passwordTokenExpired:
+            case StoreResponse.Error.passwordTokenExpired, StoreResponse.Error.passwordChanged:
                 logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
             default:
                 logger.log("An unknown error has occurred.", level: .error)

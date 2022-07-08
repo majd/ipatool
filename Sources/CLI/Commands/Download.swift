@@ -110,7 +110,7 @@ extension Download {
                     "The country provided does not match with the account you are using.",
                     "Supply a valid country using the \"--country\" flag."
                 ].joined(separator: " "), level: .error)
-            case StoreResponse.Error.passwordTokenExpired:
+            case StoreResponse.Error.passwordTokenExpired, StoreResponse.Error.passwordChanged:
                 logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
             default:
                 logger.log("An unknown error has occurred.", level: .error)
@@ -164,7 +164,7 @@ extension Download {
                     "The country provided does not match with the account you are using.",
                     "Supply a valid country using the \"--country\" flag."
                 ].joined(separator: " "), level: .error)
-            case StoreResponse.Error.passwordTokenExpired:
+            case StoreResponse.Error.passwordTokenExpired, StoreResponse.Error.passwordChanged:
                 logger.log("Token expired. Login again using the \"auth\" command.", level: .error)
             default:
                 logger.log([
@@ -203,6 +203,30 @@ extension Download {
             logger.log("Applying patches...", level: .info)
             try signatureClient.appendMetadata(item: item, email: email)
             try signatureClient.appendSignature(item: item)
+        } catch {
+            switch error {
+            case SignatureClient.Error.fileNotFound:
+                logger.log(
+                    "App uses old code signature version, falling back to alternative patching mechanism.",
+                    level: .debug
+                )
+                logger.log("The produced app package may not be compatible with modern iOS releases.", level: .info)
+                applyOldPatches(item: item, email: email, path: path)
+            default:
+                logger.log("\(error)", level: .debug)
+                logger.log("Failed to apply patches. The ipa file will be left incomplete.", level: .error)
+                _exit(1)
+            }
+        }
+    }
+
+    private mutating func applyOldPatches(item: StoreResponse.Item, email: String, path: String) {
+        logger.log("Creating signature client...", level: .debug)
+        let signatureClient = SignatureClient(fileManager: .default, filePath: path)
+
+        do {
+            logger.log("Applying fallback patches...", level: .info)
+            try signatureClient.appendOldSignature(item: item)
         } catch {
             logger.log("\(error)", level: .debug)
             logger.log("Failed to apply patches. The ipa file will be left incomplete.", level: .error)
