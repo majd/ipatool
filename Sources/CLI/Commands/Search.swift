@@ -67,6 +67,12 @@ extension Search {
         }
     }
 
+    mutating func validate() throws {
+        guard !Storefront.allCases.contains(where: { "\($0)" == countryCode }) else {
+            throw ValidationError("The country code is not valid")
+        }
+    }
+
     mutating func run() throws {
         // Search the iTunes store
         let results = results(with: term)

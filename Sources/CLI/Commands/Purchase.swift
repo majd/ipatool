@@ -113,6 +113,12 @@ extension Purchase {
         }
     }
 
+    mutating func validate() throws {
+        guard !Storefront.allCases.contains(where: { "\($0)" == countryCode }) else {
+            throw ValidationError("The country code is not valid")
+        }
+    }
+
     mutating func run() throws {
         // Authenticate with the App Store
         let keychainStore = KeychainStore(service: "ipatool.service")
