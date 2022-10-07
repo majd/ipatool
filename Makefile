@@ -20,7 +20,7 @@ define ios_entitlements
 endef
 
 lint:
-	swiftlint lint --config .swiftlint.yml --path Sources/ Tests/m Plugins/
+	swiftlint lint --config .swiftlint.yml Sources/ Tests/m Plugins/
 
 build-macos: lint
 	swift build -c release --arch arm64

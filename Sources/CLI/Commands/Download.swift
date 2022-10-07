@@ -248,6 +248,10 @@ extension Download {
     }
 
     mutating func validate() throws {
+        guard !Storefront.allCases.contains(where: { "\($0)" == countryCode }) else {
+            throw ValidationError("The country code is not valid")
+        }
+
         guard let output = output else { return }
 
         var isDirectory: ObjCBool = false
