@@ -6,37 +6,35 @@ import (
 	"os"
 )
 
-type Writer struct {
+//go:generate mockgen -source=writer.go -destination=../../mocks/writer_mock.go -package=mocks Writer
+type Writer interface {
+	Write(p []byte) (n int, err error)
+	WriteLevel(level zerolog.Level, p []byte) (n int, err error)
+}
+
+type writer struct {
 	stdOutWriter io.Writer
 	stdErrWriter io.Writer
 }
 
-func NewWriter() *Writer {
-	stdOutWriter := zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
-		w.Out = os.Stdout
-	})
-	stdErrWriter := zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
-		w.Out = os.Stderr
-	})
-
-	return &Writer{
-		stdOutWriter: stdOutWriter,
-		stdErrWriter: stdErrWriter,
+func NewWriter() Writer {
+	return &writer{
+		stdOutWriter: zerolog.ConsoleWriter{Out: os.Stdout},
+		stdErrWriter: zerolog.ConsoleWriter{Out: os.Stderr},
 	}
 }
 
-func (l *Writer) Write(p []byte) (n int, err error) {
+func (l *writer) Write(p []byte) (n int, err error) {
 	return l.stdOutWriter.Write(p)
 }
 
-func (l *Writer) WriteLevel(level zerolog.Level, p []byte) (n int, err error) {
+func (l *writer) WriteLevel(level zerolog.Level, p []byte) (n int, err error) {
 	switch level {
 	case zerolog.DebugLevel, zerolog.InfoLevel, zerolog.WarnLevel:
 		return l.stdOutWriter.Write(p)
 	case zerolog.ErrorLevel:
 		return l.stdErrWriter.Write(p)
 	default:
-		// return less than len(p) so that zerolog treats that as io.ErrShortWrite
 		return len(p), nil
 	}
 }
