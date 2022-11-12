@@ -12,7 +12,6 @@ import (
 	"time"
 )
 
-//go:generate mockgen -source=client.go -destination=../../mocks/http_client_mock.go -package=mocks HTTPClient
 type Client[R interface{}] interface {
 	Send(r Request) (Result[R], error)
 }
