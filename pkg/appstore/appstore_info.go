@@ -6,22 +6,31 @@ import (
 )
 
 func (a *appstore) Info() error {
-	data, err := a.keychain.Get("account")
+	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, "account was not found")
-	}
-
-	var account Account
-	err = json.Unmarshal(data, &account)
-	if err != nil {
-		return errors.Wrap(err, "failed to unmarshall account data")
+		return errors.Wrap(err, ErrorReadAccount.Error())
 	}
 
 	a.logger.Info().
-		Str("name", account.Name).
-		Str("email", account.Email).
+		Str("name", acc.Name).
+		Str("email", acc.Email).
 		Bool("succes", true).
 		Send()
 
 	return nil
+}
+
+func (a *appstore) account() (Account, error) {
+	data, err := a.keychain.Get("account")
+	if err != nil {
+		return Account{}, errors.Wrap(err, ErrorKeychainGet.Error())
+	}
+
+	var acc Account
+	err = json.Unmarshal(data, &acc)
+	if err != nil {
+		return Account{}, errors.Wrap(err, ErrorUnmarshal.Error())
+	}
+
+	return acc, err
 }

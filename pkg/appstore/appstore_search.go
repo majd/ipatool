@@ -14,40 +14,33 @@ type SearchResult struct {
 }
 
 func (a *appstore) Search(term, countryCode, deviceFamily string, limit int64) error {
-	if StoreFront[countryCode] == "" {
-		return errors.New("invalid country code")
+	if StoreFronts[countryCode] == "" {
+		return ErrorInvalidCountryCode
 	}
 
 	request, err := a.searchRequest(term, countryCode, deviceFamily, limit)
 	if err != nil {
-		return errors.Wrap(err, "failed to get search request")
+		return errors.Wrap(err, ErrorCreateRequest.Error())
 	}
 
 	res, err := a.searchClient.Send(request)
 	if err != nil {
-		return errors.Wrap(err, "search request failed")
+		return errors.Wrap(err, ErrorRequest.Error())
 	}
 
 	if res.StatusCode != 200 {
-		a.logger.Debug().
-			Interface("data", res.Data).
-			Int("status", res.StatusCode).
-			Send()
-		return errors.Errorf("search request failed with status %d", res.StatusCode)
+		a.logger.Debug().Interface("data", res.Data).Int("status", res.StatusCode).Send()
+		return ErrorRequest
 	}
 
-	a.logger.Info().
-		Int("count", res.Data.Count).
-		Array("apps", Apps(res.Data.Results)).
-		Send()
-
+	a.logger.Info().Int("count", res.Data.Count).Array("apps", Apps(res.Data.Results)).Send()
 	return nil
 }
 
 func (a *appstore) searchRequest(term, countryCode, deviceFamily string, limit int64) (http.Request, error) {
 	searchURL, err := a.searchURL(term, countryCode, deviceFamily, limit)
 	if err != nil {
-		return http.Request{}, errors.Wrap(err, "failed to get search URL")
+		return http.Request{}, errors.Wrap(err, ErrorURL.Error())
 	}
 
 	return http.Request{
@@ -66,7 +59,7 @@ func (a *appstore) searchURL(term, countryCode, deviceFamily string, limit int64
 	case DeviceFamilyPad:
 		entity = "iPadSoftware"
 	default:
-		return "", errors.Errorf("device family is not supported: %s", deviceFamily)
+		return "", ErrorInvalidDeviceFamily
 	}
 
 	params := url.Values{}

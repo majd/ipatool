@@ -43,7 +43,7 @@ var _ = Describe("AppStore (Info)", func() {
 		It("returns wrapped error", func() {
 			err := appstore.Info()
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring("account was not found")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorReadAccount.Error())))
 		})
 	})
 
@@ -56,7 +56,7 @@ var _ = Describe("AppStore (Info)", func() {
 
 		It("fails to unmarshall JSON data", func() {
 			err := appstore.Info()
-			Expect(err).To(MatchError(ContainSubstring("failed to unmarshall account data")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorUnmarshal.Error())))
 		})
 	})
 

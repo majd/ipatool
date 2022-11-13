@@ -43,7 +43,7 @@ var _ = Describe("AppStore (Revoke)", func() {
 		It("returns wrapped error", func() {
 			err := appstore.Revoke()
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring("failed to revoke auth credentials")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorKeychainRemove.Error())))
 		})
 	})
 
