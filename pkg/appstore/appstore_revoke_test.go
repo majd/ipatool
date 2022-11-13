@@ -7,25 +7,23 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 )
 
-var _ = Describe("AppStore (Revoke)", Ordered, func() {
+var _ = Describe("AppStore (Revoke)", func() {
 	var (
 		ctrl         *gomock.Controller
 		appstore     AppStore
 		mockKeychain *keychain.MockKeychain
+		mockLogger   *log.MockLogger
 	)
-
-	BeforeAll(func() {
-		log.Logger = log.Output(log.NewWriter()).Level(zerolog.Disabled)
-	})
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
+		mockLogger = log.NewMockLogger(ctrl)
 		appstore = NewAppStore(&Args{
 			Keychain: mockKeychain,
+			Logger:   mockLogger,
 		})
 	})
 
@@ -51,6 +49,10 @@ var _ = Describe("AppStore (Revoke)", Ordered, func() {
 
 	When("keychain removes item", func() {
 		BeforeEach(func() {
+			mockLogger.EXPECT().
+				Info().
+				Return(nil)
+
 			mockKeychain.EXPECT().
 				Remove("account").
 				Return(nil)

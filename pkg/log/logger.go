@@ -14,29 +14,52 @@ const (
 	ErrorLevel = "error"
 )
 
-var Logger = log.Logger
+//go:generate mockgen -source=logger.go -destination=logger_mock.go -package log
+type Logger interface {
+	Output(w io.Writer) zerolog.Logger
+	Update(l zerolog.Logger)
+	Debug() *zerolog.Event
+	Info() *zerolog.Event
+	Warn() *zerolog.Event
+	Error() *zerolog.Event
+	LevelFromString(val string) (zerolog.Level, error)
+}
 
-func Output(w io.Writer) zerolog.Logger {
+type logger struct {
+	internalLogger zerolog.Logger
+}
+
+func NewLogger() Logger {
+	return &logger{
+		internalLogger: log.Logger,
+	}
+}
+
+func (l *logger) Output(w io.Writer) zerolog.Logger {
 	return log.Output(w)
 }
 
-func Debug() *zerolog.Event {
-	return Logger.Debug()
+func (l *logger) Update(logger zerolog.Logger) {
+	l.internalLogger = logger
 }
 
-func Info() *zerolog.Event {
-	return Logger.Info()
+func (l *logger) Debug() *zerolog.Event {
+	return l.internalLogger.Debug()
 }
 
-func Warn() *zerolog.Event {
-	return Logger.Warn()
+func (l *logger) Info() *zerolog.Event {
+	return l.internalLogger.Info()
 }
 
-func Error() *zerolog.Event {
-	return Logger.Error()
+func (l *logger) Warn() *zerolog.Event {
+	return l.internalLogger.Warn()
 }
 
-func LevelFromString(val string) (zerolog.Level, error) {
+func (l *logger) Error() *zerolog.Event {
+	return l.internalLogger.Error()
+}
+
+func (*logger) LevelFromString(val string) (zerolog.Level, error) {
 	switch val {
 	case DebugLevel:
 		return zerolog.DebugLevel, nil

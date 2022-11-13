@@ -1,7 +1,6 @@
 package appstore
 
 import (
-	"github.com/majd/ipatool/pkg/log"
 	"github.com/pkg/errors"
 )
 
@@ -11,7 +10,7 @@ func (a *appstore) Revoke() error {
 		return errors.Wrap(err, "failed to revoke auth credentials")
 	}
 
-	log.Info().
+	a.logger.Info().
 		Bool("success", false).
 		Send()
 
