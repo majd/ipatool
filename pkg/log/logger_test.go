@@ -5,7 +5,6 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/golang/mock/gomock"
-	"github.com/majd/ipatool/mocks"
 	"github.com/rs/zerolog"
 	"os"
 )
@@ -13,12 +12,12 @@ import (
 var _ = Describe("Logger", func() {
 	var (
 		ctrl       *gomock.Controller
-		mockWriter *mocks.MockWriter
+		mockWriter *MockWriter
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
-		mockWriter = mocks.NewMockWriter(ctrl)
+		mockWriter = NewMockWriter(ctrl)
 		Logger = Output(mockWriter)
 	})
 

@@ -6,6 +6,7 @@ import (
 	"os"
 )
 
+//go:generate mockgen -source=writer.go -destination=writer_mock.go -package log
 type Writer interface {
 	Write(p []byte) (n int, err error)
 	WriteLevel(level zerolog.Level, p []byte) (n int, err error)

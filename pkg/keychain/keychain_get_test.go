@@ -3,7 +3,6 @@ package keychain
 import (
 	"github.com/99designs/keyring"
 	"github.com/golang/mock/gomock"
-	"github.com/majd/ipatool/mocks"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -13,12 +12,12 @@ var _ = Describe("Keychain (Get)", func() {
 	var (
 		ctrl        *gomock.Controller
 		keychain    Keychain
-		mockKeyring *mocks.MockKeyring
+		mockKeyring *MockKeyring
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
-		mockKeyring = mocks.NewMockKeyring(ctrl)
+		mockKeyring = NewMockKeyring(ctrl)
 		keychain = NewKeychain(&Args{
 			Keyring: mockKeyring,
 		})

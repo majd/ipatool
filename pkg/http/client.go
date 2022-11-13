@@ -3,7 +3,6 @@ package http
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/juju/persistent-cookiejar"
 	"github.com/pkg/errors"
 	"howett.net/plist"
 	"io"
@@ -18,19 +17,20 @@ type Client[R interface{}] interface {
 
 type client[R interface{}] struct {
 	internalClient http.Client
+	cookieJar      CookieJar
 }
 
-func NewClient[R interface{}](cookiejar *cookiejar.Jar) Client[R] {
-	var jar http.CookieJar
-	if cookiejar != nil {
-		jar = cookiejar
-	}
+type Args struct {
+	CookieJar CookieJar
+}
 
+func NewClient[R interface{}](args *Args) Client[R] {
 	return &client[R]{
 		internalClient: http.Client{
 			Timeout: time.Second * 15,
-			Jar:     jar,
+			Jar:     args.CookieJar,
 		},
+		cookieJar: args.CookieJar,
 	}
 }
 
@@ -57,6 +57,11 @@ func (c *client[R]) Send(r Request) (Result[R], error) {
 	res, err := c.internalClient.Do(request)
 	if err != nil {
 		return Result[R]{}, errors.Wrap(err, "request failed")
+	}
+
+	err = c.cookieJar.Save()
+	if err != nil {
+		return Result[R]{}, errors.Wrap(err, "failed to save cookies")
 	}
 
 	ct := res.Header.Get("Content-Type")
