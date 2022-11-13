@@ -1,15 +1,6 @@
 package keychain
 
-import "github.com/99designs/keyring"
-
-//go:generate mockgen -source=keychain.go -destination=../../mocks/keychain_mock.go -package=mocks
-
-type Keyring interface {
-	Get(key string) (keyring.Item, error)
-	Set(item keyring.Item) error
-	Remove(key string) error
-}
-
+//go:generate mockgen -source=keychain.go -destination=keychain_mock.go -package keychain
 type Keychain interface {
 	Get(key string) ([]byte, error)
 	Set(key string, data []byte) error
