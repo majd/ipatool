@@ -31,15 +31,11 @@ type LoginResult struct {
 func (a *appstore) Login(email, password, authCode string) error {
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
-		return errors.Wrap(err, "failed to read MAC address")
+		return errors.Wrap(err, ErrorReadMAC.Error())
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
-	a.logger.Debug().
-		Str("mac", macAddr).
-		Str("guid", guid).
-		Send()
-
+	a.logger.Debug().Str("mac", macAddr).Str("guid", guid).Send()
 	return a.login(email, password, authCode, guid, 0)
 }
 
@@ -54,7 +50,7 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int) er
 	request := a.loginRequest(email, password, authCode, guid)
 	res, err := a.loginClient.Send(request)
 	if err != nil {
-		return errors.Wrap(err, "request failed")
+		return errors.Wrap(err, ErrorRequest.Error())
 	}
 
 	if attempt == 0 && res.Data.FailureType == FailureTypeInvalidCredentials {
@@ -62,25 +58,20 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int) er
 	}
 
 	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		a.logger.Debug().
-			Interface("response", res).
-			Send()
+		a.logger.Debug().Interface("response", res).Send()
 		return errors.New(res.Data.CustomerMessage)
 	}
 
 	if res.Data.FailureType != "" {
-		a.logger.Debug().
-			Interface("response", res).
-			Send()
-		return errors.New("unknown error occurred")
+		a.logger.Debug().Interface("response", res).Send()
+		return ErrorGeneric
 	}
 
 	if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
-		a.logger.Warn().
-			Msg("enter 2FA code:")
+		a.logger.Warn().Msg("enter 2FA code:")
 		authCode, err = a.promptForAuthCode()
 		if err != nil {
-			return errors.Wrap(err, "failed to prompt for 2FA code")
+			return errors.Wrap(err, ErrorReadData.Error())
 		}
 
 		return a.login(email, password, authCode, guid, 0)
@@ -96,12 +87,12 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int) er
 		DirectoryServicesID: res.Data.DirectoryServicesID,
 	})
 	if err != nil {
-		return errors.Wrap(err, "failed to marshall account data")
+		return errors.Wrap(err, ErrorMarshal.Error())
 	}
 
 	err = a.keychain.Set("account", data)
 	if err != nil {
-		return errors.Wrap(err, "failed to save account data in keychain")
+		return errors.Wrap(err, ErrorKeychainSet.Error())
 	}
 
 	a.logger.Info().
@@ -145,7 +136,7 @@ func (a *appstore) promptForAuthCode() (string, error) {
 	reader := bufio.NewReader(a.ioReader)
 	authCode, err := reader.ReadString('\n')
 	if err != nil {
-		return "", errors.Wrap(err, "failed to read string from stdin")
+		return "", errors.Wrap(err, ErrorReadData.Error())
 	}
 
 	return strings.Trim(authCode, "\n"), nil

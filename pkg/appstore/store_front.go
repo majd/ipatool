@@ -1,6 +1,6 @@
 package appstore
 
-var StoreFront = map[string]string{
+var StoreFronts = map[string]string{
 	"AE": "143481",
 	"AG": "143540",
 	"AI": "143538",

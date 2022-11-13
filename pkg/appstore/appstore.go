@@ -14,15 +14,17 @@ type AppStore interface {
 	Info() error
 	Revoke() error
 	Search(term, countryCode, deviceFamily string, limit int64) error
+	Purchase(bundleID, countryCode, deviceFamily string) error
 }
 
 type appstore struct {
-	keychain     keychain.Keychain
-	loginClient  http.Client[LoginResult]
-	searchClient http.Client[SearchResult]
-	ioReader     io.Reader
-	machine      util.Machine
-	logger       log.Logger
+	keychain       keychain.Keychain
+	loginClient    http.Client[LoginResult]
+	searchClient   http.Client[SearchResult]
+	purchaseClient http.Client[PurchaseResult]
+	ioReader       io.Reader
+	machine        util.Machine
+	logger         log.Logger
 }
 
 type Args struct {
@@ -37,11 +39,12 @@ func NewAppStore(args *Args) AppStore {
 	}
 
 	return &appstore{
-		keychain:     args.Keychain,
-		loginClient:  http.NewClient[LoginResult](clientArgs),
-		searchClient: http.NewClient[SearchResult](clientArgs),
-		ioReader:     os.Stdin,
-		machine:      util.NewMachine(),
-		logger:       args.Logger,
+		keychain:       args.Keychain,
+		loginClient:    http.NewClient[LoginResult](clientArgs),
+		searchClient:   http.NewClient[SearchResult](clientArgs),
+		purchaseClient: http.NewClient[PurchaseResult](clientArgs),
+		ioReader:       os.Stdin,
+		machine:        util.NewMachine(),
+		logger:         args.Logger,
 	}
 }

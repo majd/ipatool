@@ -61,7 +61,7 @@ var _ = Describe("AppStore (Login)", func() {
 		It("returns error", func() {
 			err := as.Login("", "", "")
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring("failed to read MAC address")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorReadMAC.Error())))
 		})
 	})
 
@@ -121,7 +121,7 @@ var _ = Describe("AppStore (Login)", func() {
 
 			It("returns error", func() {
 				err := as.Login("", "", "")
-				Expect(err).To(MatchError(ContainSubstring("unknown error occurred")))
+				Expect(err).To(MatchError(ContainSubstring(ErrorGeneric.Error())))
 			})
 		})
 
@@ -180,7 +180,7 @@ var _ = Describe("AppStore (Login)", func() {
 
 				It("prompts user for 2FA code", func() {
 					err := as.Login("", "", "")
-					Expect(err).To(MatchError(ContainSubstring("failed to read string from stdin")))
+					Expect(err).To(MatchError(ContainSubstring(ErrorReadData.Error())))
 				})
 			})
 		})
@@ -237,7 +237,7 @@ var _ = Describe("AppStore (Login)", func() {
 				It("returns error", func() {
 					err := as.Login("", "", "")
 					Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-					Expect(err).To(MatchError(ContainSubstring("failed to save account data in keychain")))
+					Expect(err).To(MatchError(ContainSubstring(ErrorKeychainSet.Error())))
 				})
 			})
 
