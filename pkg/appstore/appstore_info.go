@@ -2,7 +2,6 @@ package appstore
 
 import (
 	"encoding/json"
-	"github.com/majd/ipatool/pkg/log"
 	"github.com/pkg/errors"
 )
 
@@ -18,7 +17,7 @@ func (a *appstore) Info() error {
 		return errors.Wrap(err, "failed to unmarshall account data")
 	}
 
-	log.Info().
+	a.logger.Info().
 		Str("name", account.Name).
 		Str("email", account.Email).
 		Bool("succes", true).

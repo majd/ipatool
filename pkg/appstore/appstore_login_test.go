@@ -11,35 +11,38 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog"
 	"os"
 	"strings"
 )
 
-var _ = Describe("AppStore (Login)", Ordered, func() {
+var _ = Describe("AppStore (Login)", func() {
 	var (
 		ctrl         *gomock.Controller
 		as           AppStore
 		mockKeychain *keychain.MockKeychain
 		mockClient   *http.MockClient[LoginResult]
 		mockMachine  *util.MockMachine
+		mockLogger   *log.MockLogger
 	)
-
-	BeforeAll(func() {
-		log.Logger = log.Output(log.NewWriter()).Level(zerolog.Disabled)
-	})
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
 		mockClient = http.NewMockClient[LoginResult](ctrl)
 		mockMachine = util.NewMockMachine(ctrl)
+		mockLogger = log.NewMockLogger(ctrl)
 		as = &appstore{
 			keychain:    mockKeychain,
 			loginClient: mockClient,
 			ioReader:    os.Stdin,
 			machine:     mockMachine,
+			logger:      mockLogger,
 		}
+
+		mockLogger.EXPECT().
+			Debug().
+			Return(nil).
+			MaxTimes(4)
 	})
 
 	AfterEach(func() {
@@ -125,6 +128,14 @@ var _ = Describe("AppStore (Login)", Ordered, func() {
 		When("store API requires 2FA code", func() {
 			When("user enters 2FA code", func() {
 				BeforeEach(func() {
+					mockLogger.EXPECT().
+						Warn().
+						Return(nil)
+
+					mockLogger.EXPECT().
+						Info().
+						Return(nil)
+
 					mockKeychain.EXPECT().
 						Set("account", gomock.Any()).
 						Return(nil)
@@ -150,6 +161,11 @@ var _ = Describe("AppStore (Login)", Ordered, func() {
 
 			When("fails to read 2FA code from stdin", func() {
 				BeforeEach(func() {
+
+					mockLogger.EXPECT().
+						Warn().
+						Return(nil)
+
 					mockClient.EXPECT().
 						Send(gomock.Any()).
 						Return(http.Result[LoginResult]{
@@ -227,6 +243,10 @@ var _ = Describe("AppStore (Login)", Ordered, func() {
 
 			When("sucessfully saves account in keychain", func() {
 				BeforeEach(func() {
+					mockLogger.EXPECT().
+						Info().
+						Return(nil)
+
 					mockKeychain.EXPECT().
 						Set("account", gomock.Any()).
 						Do(func(key string, data []byte) {
@@ -245,7 +265,7 @@ var _ = Describe("AppStore (Login)", Ordered, func() {
 						Return(nil)
 				})
 
-				It("returns error", func() {
+				It("returns nil", func() {
 					err := as.Login("", "", "")
 					Expect(err).ToNot(HaveOccurred())
 				})

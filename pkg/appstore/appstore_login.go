@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/majd/ipatool/pkg/http"
-	"github.com/majd/ipatool/pkg/log"
 	"github.com/majd/ipatool/pkg/util"
 	"github.com/pkg/errors"
 	"strings"
@@ -36,7 +35,7 @@ func (a *appstore) Login(email, password, authCode string) error {
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
-	log.Debug().
+	a.logger.Debug().
 		Str("mac", macAddr).
 		Str("guid", guid).
 		Send()
@@ -45,7 +44,7 @@ func (a *appstore) Login(email, password, authCode string) error {
 }
 
 func (a *appstore) login(email, password, authCode, guid string, attempt int) error {
-	log.Debug().
+	a.logger.Debug().
 		Int("attempt", attempt).
 		Str("password", password).
 		Str("email", email).
@@ -63,21 +62,22 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int) er
 	}
 
 	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		log.Debug().
+		a.logger.Debug().
 			Interface("response", res).
 			Send()
 		return errors.New(res.Data.CustomerMessage)
 	}
 
 	if res.Data.FailureType != "" {
-		log.Debug().
+		a.logger.Debug().
 			Interface("response", res).
 			Send()
 		return errors.New("unknown error occurred")
 	}
 
 	if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
-		log.Warn().Msg("enter 2FA code:")
+		a.logger.Warn().
+			Msg("enter 2FA code:")
 		authCode, err = a.promptForAuthCode()
 		if err != nil {
 			return errors.Wrap(err, "failed to prompt for 2FA code")
@@ -104,7 +104,7 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int) er
 		return errors.Wrap(err, "failed to save account data in keychain")
 	}
 
-	log.Info().
+	a.logger.Info().
 		Str("name", name).
 		Str("email", res.Data.Account.Email).
 		Bool("success", true).
@@ -120,8 +120,9 @@ func (a *appstore) loginRequest(email, password, authCode, guid string) http.Req
 	}
 
 	return http.Request{
-		Method: http.MethodPOST,
-		URL:    a.authDomain(authCode, guid),
+		Method:         http.MethodPOST,
+		URL:            a.authDomain(authCode, guid),
+		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
 			"User-Agent":   "Configurator/2.15 (Macintosh; OS X 11.0.0; 16G29) AppleWebKit/2603.3.8",
 			"Content-Type": "application/x-www-form-urlencoded",
