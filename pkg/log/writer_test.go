@@ -2,7 +2,6 @@ package log
 
 import (
 	"github.com/golang/mock/gomock"
-	"github.com/majd/ipatool/mocks"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/rs/zerolog"
@@ -11,15 +10,15 @@ import (
 var _ = Describe("Writer", func() {
 	var (
 		ctrl             *gomock.Controller
-		mockStdoutWriter *mocks.MockWriter
-		mockStderrWriter *mocks.MockWriter
+		mockStdoutWriter *MockWriter
+		mockStderrWriter *MockWriter
 		sut              *writer
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
-		mockStdoutWriter = mocks.NewMockWriter(ctrl)
-		mockStderrWriter = mocks.NewMockWriter(ctrl)
+		mockStdoutWriter = NewMockWriter(ctrl)
+		mockStderrWriter = NewMockWriter(ctrl)
 		sut = &writer{
 			stdOutWriter: mockStdoutWriter,
 			stdErrWriter: mockStderrWriter,
