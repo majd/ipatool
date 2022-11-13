@@ -36,14 +36,14 @@ var _ = Describe("AppStore (Lookup)", func() {
 	When("country code is invalid", func() {
 		It("returns error", func() {
 			_, err := as.lookup("", "XYZ", "")
-			Expect(err).To(MatchError(ContainSubstring("invalid country code")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidCountryCode.Error())))
 		})
 	})
 
 	When("device family is invalid", func() {
 		It("returns error", func() {
 			_, err := as.lookup("", "US", "XYZ")
-			Expect(err).To(MatchError(ContainSubstring("device family is not supported: XYZ")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidDeviceFamily.Error())))
 		})
 	})
 
@@ -59,7 +59,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 		It("returns error", func() {
 			_, err := as.lookup("", "US", DeviceFamilyPhone)
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring("lookup request failed")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
 		})
 	})
 
@@ -78,7 +78,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 
 		It("returns error", func() {
 			_, err := as.lookup("", "US", DeviceFamilyPad)
-			Expect(err).To(MatchError(ContainSubstring("lookup request failed with status 400")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
 		})
 	})
 
@@ -98,7 +98,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 
 			It("returns error", func() {
 				_, err := as.lookup("", "US", DeviceFamilyPad)
-				Expect(err).To(MatchError(ContainSubstring("app not found")))
+				Expect(err).To(MatchError(ContainSubstring(ErrorAppNotFound.Error())))
 			})
 		})
 

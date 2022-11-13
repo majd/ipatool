@@ -4,7 +4,8 @@ const (
 	DeviceFamilyPhone = "iPhone"
 	DeviceFamilyPad   = "iPad"
 
-	FailureTypeInvalidCredentials = "-5000"
+	FailureTypeInvalidCredentials   = "-5000"
+	FailureTypePasswordTokenExpired = "2034"
 
 	CustomerMessageBadLogin = "MZFinance.BadLogin.Configurator_message"
 
@@ -16,4 +17,5 @@ const (
 	PriavteAppStoreAPIDomainPrefixWithAuthCode    = "p71"
 	PrivateAppStoreAPIDomain                      = "buy." + iTunesAPIDomain
 	PrivateAppStoreAPIPathAuthenticate            = "/WebObjects/MZFinance.woa/wa/authenticate"
+	PrivateAppStoreAPIPathPurchase                = "/WebObjects/MZBuy.woa/wa/buyProduct"
 )

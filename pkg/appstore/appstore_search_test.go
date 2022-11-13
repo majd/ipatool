@@ -36,14 +36,14 @@ var _ = Describe("AppStore (Search)", func() {
 	When("country code is invalid", func() {
 		It("returns error", func() {
 			err := as.Search("", "XYZ", "", 0)
-			Expect(err).To(MatchError(ContainSubstring("invalid country code")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidCountryCode.Error())))
 		})
 	})
 
 	When("device family is invalid", func() {
 		It("returns error", func() {
 			err := as.Search("", "US", "XYZ", 0)
-			Expect(err).To(MatchError(ContainSubstring("device family is not supported: XYZ")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidDeviceFamily.Error())))
 		})
 	})
 
@@ -59,7 +59,7 @@ var _ = Describe("AppStore (Search)", func() {
 		It("returns error", func() {
 			err := as.Search("", "US", DeviceFamilyPhone, 0)
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring("search request failed")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
 		})
 	})
 
@@ -78,7 +78,7 @@ var _ = Describe("AppStore (Search)", func() {
 
 		It("returns error", func() {
 			err := as.Search("", "US", DeviceFamilyPad, 0)
-			Expect(err).To(MatchError(ContainSubstring("search request failed with status 400")))
+			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
 		})
 	})
 
