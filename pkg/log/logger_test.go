@@ -13,16 +13,18 @@ var _ = Describe("Logger", func() {
 	var (
 		ctrl       *gomock.Controller
 		mockWriter *MockWriter
+		logger     Logger
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockWriter = NewMockWriter(ctrl)
-		Logger = Output(mockWriter)
+		logger = NewLogger()
+		logger.Update(NewLogger().Output(mockWriter))
 	})
 
 	It("returns a copy of the logger", func() {
-		out := Output(os.Stdout)
+		out := logger.Output(os.Stdout)
 		Expect(out).ToNot(BeNil())
 	})
 
@@ -35,7 +37,7 @@ var _ = Describe("Logger", func() {
 				}).
 				Return(0, nil)
 
-			Debug().Msg("debug")
+			logger.Debug().Msg("debug")
 		})
 
 		It("logs info level", func() {
@@ -46,7 +48,7 @@ var _ = Describe("Logger", func() {
 				}).
 				Return(0, nil)
 
-			Info().Msg("info")
+			logger.Info().Msg("info")
 		})
 
 		It("logs warn level", func() {
@@ -57,7 +59,7 @@ var _ = Describe("Logger", func() {
 				}).
 				Return(0, nil)
 
-			Warn().Msg("warn")
+			logger.Warn().Msg("warn")
 		})
 
 		It("logs error level", func() {
@@ -68,13 +70,13 @@ var _ = Describe("Logger", func() {
 				}).
 				Return(0, nil)
 
-			Error().Msg("error")
+			logger.Error().Msg("error")
 		})
 	})
 
 	When("passing info log level", func() {
 		It("returns correct mapping", func() {
-			out, err := LevelFromString(InfoLevel)
+			out, err := logger.LevelFromString(InfoLevel)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out).To(Equal(zerolog.InfoLevel))
 		})
@@ -82,7 +84,7 @@ var _ = Describe("Logger", func() {
 
 	When("passing info debug level", func() {
 		It("returns correct mapping", func() {
-			out, err := LevelFromString(DebugLevel)
+			out, err := logger.LevelFromString(DebugLevel)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out).To(Equal(zerolog.DebugLevel))
 		})
@@ -90,7 +92,7 @@ var _ = Describe("Logger", func() {
 
 	When("passing warn log level", func() {
 		It("returns correct mapping", func() {
-			out, err := LevelFromString(WarnLevel)
+			out, err := logger.LevelFromString(WarnLevel)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out).To(Equal(zerolog.WarnLevel))
 		})
@@ -98,7 +100,7 @@ var _ = Describe("Logger", func() {
 
 	When("passing error log level", func() {
 		It("returns correct mapping", func() {
-			out, err := LevelFromString(ErrorLevel)
+			out, err := logger.LevelFromString(ErrorLevel)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out).To(Equal(zerolog.ErrorLevel))
 		})
@@ -106,7 +108,7 @@ var _ = Describe("Logger", func() {
 
 	When("passing invalid log level", func() {
 		It("returns correct mapping", func() {
-			_, err := LevelFromString("?")
+			_, err := logger.LevelFromString("?")
 			Expect(err).To(MatchError("invalid log level"))
 		})
 	})

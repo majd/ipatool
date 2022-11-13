@@ -64,15 +64,14 @@ func (c *client[R]) Send(r Request) (Result[R], error) {
 		return Result[R]{}, errors.Wrap(err, "failed to save cookies")
 	}
 
-	ct := res.Header.Get("Content-Type")
-	if strings.Contains(ct, "application/json") {
+	if r.ResponseFormat == ResponseFormatJSON {
 		return c.handleJSONResponse(res)
 	}
-	if strings.Contains(ct, "application/xml") || strings.Contains(ct, "text/xml") {
+	if r.ResponseFormat == ResponseFormatXML {
 		return c.handleXMLResponse(res)
 	}
 
-	return Result[R]{}, errors.Errorf("unsupported response body content type: %s", ct)
+	return Result[R]{}, errors.Errorf("unsupported response body content type: %s", r.ResponseFormat)
 }
 
 func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {

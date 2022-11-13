@@ -106,8 +106,9 @@ var _ = Describe("Client", Ordered, func() {
 					CookieJar: mockCookieJar,
 				})
 				res, err := sut.Send(Request{
-					URL:    fmt.Sprintf("http://localhost:%d/json", port),
-					Method: MethodGET,
+					URL:            fmt.Sprintf("http://localhost:%d/json", port),
+					Method:         MethodGET,
+					ResponseFormat: ResponseFormatJSON,
 					Headers: map[string]string{
 						"foo": "bar",
 					},
@@ -127,8 +128,9 @@ var _ = Describe("Client", Ordered, func() {
 					CookieJar: mockCookieJar,
 				})
 				res, err := sut.Send(Request{
-					URL:    fmt.Sprintf("http://localhost:%d/xml", port),
-					Method: MethodPOST,
+					URL:            fmt.Sprintf("http://localhost:%d/xml", port),
+					Method:         MethodPOST,
+					ResponseFormat: ResponseFormatXML,
 				})
 
 				Expect(err).ToNot(HaveOccurred())
@@ -140,11 +142,12 @@ var _ = Describe("Client", Ordered, func() {
 					CookieJar: mockCookieJar,
 				})
 				_, err := sut.Send(Request{
-					URL:    fmt.Sprintf("http://localhost:%d/error", port),
-					Method: MethodPOST,
+					URL:            fmt.Sprintf("http://localhost:%d/error", port),
+					Method:         MethodPOST,
+					ResponseFormat: "random",
 				})
 
-				Expect(err).To(MatchError(ContainSubstring("unsupported response body content type: application/random-type")))
+				Expect(err).To(MatchError(ContainSubstring("unsupported response body content type: random")))
 			})
 		})
 	})
@@ -155,8 +158,9 @@ var _ = Describe("Client", Ordered, func() {
 				CookieJar: mockCookieJar,
 			})
 			_, err := sut.Send(Request{
-				URL:    fmt.Sprintf("http://localhost:%d/error", port),
-				Method: MethodPOST,
+				URL:            fmt.Sprintf("http://localhost:%d/error", port),
+				Method:         MethodPOST,
+				ResponseFormat: ResponseFormatXML,
 				Payload: &URLPayload{
 					Content: map[string]interface{}{
 						"data": func() {},
