@@ -10,62 +10,100 @@ import (
 type PurchaseResult struct {
 	FailureType     string `plist:"failureType,omitempty"`
 	CustomerMessage string `plist:"customerMessage,omitempty"`
+	JingleDocType   string `plist:"jingleDocType,omitempty"`
+	Status          int    `plist:"status,omitempty"`
 }
 
-func (a *appstore) Purchase(bundleID, countryCode, deviceFamily string) error {
-	acc, err := a.account()
+func (a *appstore) Purchase(bundleID, deviceFamily string) error {
+	macAddr, err := a.machine.MacAddress()
 	if err != nil {
-		return errors.Wrap(err, ErrorReadAccount.Error())
+		return errors.Wrap(err, ErrReadMAC.Error())
 	}
 
-	storeFront := StoreFronts[countryCode]
-	if storeFront == "" {
-		return ErrorInvalidCountryCode
+	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
+	a.logger.Verbose().Str("mac", macAddr).Str("guid", guid).Send()
+
+	err = a.purchase(bundleID, deviceFamily, guid, true)
+	if err != nil {
+		return errors.Wrap(err, ErrPurchase.Error())
+	}
+
+	a.logger.Log().Bool("success", true).Send()
+	return nil
+}
+
+func (a *appstore) purchase(bundleID, deviceFamily, guid string, attemptToRenewCredentials bool) error {
+	acc, err := a.account()
+	if err != nil {
+		return errors.Wrap(err, ErrReadAccount.Error())
+	}
+
+	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
+	if err != nil {
+		return errors.Wrap(err, ErrInvalidCountryCode.Error())
 	}
 
 	app, err := a.lookup(bundleID, countryCode, deviceFamily)
 	if err != nil {
-		return errors.Wrap(err, ErrorReadApp.Error())
+		return errors.Wrap(err, ErrReadApp.Error())
 	}
 
 	if app.Price > 0 {
-		return ErrorAppPaid
+		return ErrAppPaid
 	}
 
-	macAddr, err := a.machine.MacAddress()
-	if err != nil {
-		return errors.Wrap(err, ErrorReadMAC.Error())
-	}
-
-	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
-	a.logger.Debug().Str("mac", macAddr).Str("guid", guid).Send()
-
-	req := a.purchaseRequest(acc, app, storeFront, guid)
+	req := a.purchaseRequest(acc, app, acc.StoreFront, guid)
 	res, err := a.purchaseClient.Send(req)
 	if err != nil {
-		return errors.Wrap(err, ErrorRequest.Error())
+		return errors.Wrap(err, ErrRequest.Error())
 	}
 
 	if res.Data.FailureType == FailureTypePasswordTokenExpired {
-		return ErrorPasswordTokenExpired
+		if attemptToRenewCredentials {
+			a.logger.Verbose().Msg("retrieving new password token")
+			acc, err = a.login(acc.Email, acc.Password, "", guid, 0, true)
+			if err != nil {
+				return errors.Wrap(err, ErrPasswordTokenExpired.Error())
+			}
+
+			return a.purchase(bundleID, deviceFamily, guid, false)
+		}
+
+		return ErrPasswordTokenExpired
 	}
 
 	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		a.logger.Debug().Interface("response", res).Send()
+		a.logger.Verbose().Interface("response", res).Send()
 		return errors.New(res.Data.CustomerMessage)
 	}
 
 	if res.Data.FailureType != "" {
-		a.logger.Debug().Interface("response", res).Send()
-		return ErrorGeneric
+		a.logger.Verbose().Interface("response", res).Send()
+		return ErrGeneric
 	}
 
 	if res.StatusCode == 500 {
-		return ErrorLicenseExists
+		return ErrLicenseExists
 	}
 
-	a.logger.Info().Bool("success", true).Send()
+	if res.Data.JingleDocType != "purchaseSuccess" || res.Data.Status != 0 {
+		a.logger.Verbose().Interface("response", res).Send()
+		return errors.New("failed to acquire license")
+	}
+
 	return nil
+}
+
+func (*appstore) countryCodeFromStoreFront(storeFront string) (string, error) {
+	for key, val := range StoreFronts {
+		parts := strings.Split(storeFront, "-")
+
+		if len(parts) >= 1 && parts[0] == val {
+			return key, nil
+		}
+	}
+
+	return "", errors.New("could not infer country code from store front")
 }
 
 func (a *appstore) purchaseRequest(acc Account, app App, storeFront, guid string) http.Request {

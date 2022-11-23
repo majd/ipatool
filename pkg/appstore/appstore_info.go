@@ -8,13 +8,13 @@ import (
 func (a *appstore) Info() error {
 	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, ErrorReadAccount.Error())
+		return errors.Wrap(err, ErrReadAccount.Error())
 	}
 
-	a.logger.Info().
+	a.logger.Log().
 		Str("name", acc.Name).
 		Str("email", acc.Email).
-		Bool("succes", true).
+		Bool("success", true).
 		Send()
 
 	return nil
@@ -23,13 +23,13 @@ func (a *appstore) Info() error {
 func (a *appstore) account() (Account, error) {
 	data, err := a.keychain.Get("account")
 	if err != nil {
-		return Account{}, errors.Wrap(err, ErrorKeychainGet.Error())
+		return Account{}, errors.Wrap(err, ErrKeychainGet.Error())
 	}
 
 	var acc Account
 	err = json.Unmarshal(data, &acc)
 	if err != nil {
-		return Account{}, errors.Wrap(err, ErrorUnmarshal.Error())
+		return Account{}, errors.Wrap(err, ErrUnmarshal.Error())
 	}
 
 	return acc, err
