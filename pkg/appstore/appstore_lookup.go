@@ -9,26 +9,26 @@ import (
 
 func (a *appstore) lookup(bundleID, countryCode, deviceFamily string) (App, error) {
 	if StoreFronts[countryCode] == "" {
-		return App{}, ErrorInvalidCountryCode
+		return App{}, ErrInvalidCountryCode
 	}
 
 	request, err := a.lookupRequest(bundleID, countryCode, deviceFamily)
 	if err != nil {
-		return App{}, errors.Wrap(err, ErrorCreateRequest.Error())
+		return App{}, errors.Wrap(err, ErrCreateRequest.Error())
 	}
 
 	res, err := a.searchClient.Send(request)
 	if err != nil {
-		return App{}, errors.Wrap(err, ErrorRequest.Error())
+		return App{}, errors.Wrap(err, ErrRequest.Error())
 	}
 
 	if res.StatusCode != 200 {
-		a.logger.Debug().Interface("data", res.Data).Int("status", res.StatusCode).Send()
-		return App{}, ErrorRequest
+		a.logger.Verbose().Interface("data", res.Data).Int("status", res.StatusCode).Send()
+		return App{}, ErrRequest
 	}
 
 	if len(res.Data.Results) == 0 {
-		return App{}, ErrorAppNotFound
+		return App{}, ErrAppNotFound
 	}
 
 	return res.Data.Results[0], nil
@@ -37,7 +37,7 @@ func (a *appstore) lookup(bundleID, countryCode, deviceFamily string) (App, erro
 func (a *appstore) lookupRequest(bundleID, countryCode, deviceFamily string) (http.Request, error) {
 	lookupURL, err := a.lookupURL(bundleID, countryCode, deviceFamily)
 	if err != nil {
-		return http.Request{}, errors.Wrap(err, ErrorURL.Error())
+		return http.Request{}, errors.Wrap(err, ErrURL.Error())
 	}
 
 	return http.Request{
@@ -56,7 +56,7 @@ func (a *appstore) lookupURL(bundleID, countryCode, deviceFamily string) (string
 	case DeviceFamilyPad:
 		entity = "iPadSoftware"
 	default:
-		return "", ErrorInvalidDeviceFamily
+		return "", ErrInvalidDeviceFamily
 	}
 
 	params := url.Values{}

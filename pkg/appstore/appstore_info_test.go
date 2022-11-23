@@ -43,7 +43,7 @@ var _ = Describe("AppStore (Info)", func() {
 		It("returns wrapped error", func() {
 			err := appstore.Info()
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrorReadAccount.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
 		})
 	})
 
@@ -56,14 +56,14 @@ var _ = Describe("AppStore (Info)", func() {
 
 		It("fails to unmarshall JSON data", func() {
 			err := appstore.Info()
-			Expect(err).To(MatchError(ContainSubstring(ErrorUnmarshal.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrUnmarshal.Error())))
 		})
 	})
 
 	When("keychain returns valid data", func() {
 		BeforeEach(func() {
 			mockLogger.EXPECT().
-				Info().
+				Log().
 				Return(nil)
 
 			mockKeychain.EXPECT().

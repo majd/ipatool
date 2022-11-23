@@ -36,14 +36,14 @@ var _ = Describe("AppStore (Search)", func() {
 	When("country code is invalid", func() {
 		It("returns error", func() {
 			err := as.Search("", "XYZ", "", 0)
-			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidCountryCode.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
 		})
 	})
 
 	When("device family is invalid", func() {
 		It("returns error", func() {
 			err := as.Search("", "US", "XYZ", 0)
-			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidDeviceFamily.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrInvalidDeviceFamily.Error())))
 		})
 	})
 
@@ -59,14 +59,14 @@ var _ = Describe("AppStore (Search)", func() {
 		It("returns error", func() {
 			err := as.Search("", "US", DeviceFamilyPhone, 0)
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
 
 	When("request returns bad status code", func() {
 		BeforeEach(func() {
 			mockLogger.EXPECT().
-				Debug().
+				Verbose().
 				Return(nil)
 
 			mockClient.EXPECT().
@@ -78,14 +78,14 @@ var _ = Describe("AppStore (Search)", func() {
 
 		It("returns error", func() {
 			err := as.Search("", "US", DeviceFamilyPad, 0)
-			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
 
 	When("request is successful", func() {
 		BeforeEach(func() {
 			mockLogger.EXPECT().
-				Info().
+				Log().
 				Return(nil)
 
 			mockClient.EXPECT().

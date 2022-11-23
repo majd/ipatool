@@ -7,9 +7,9 @@ import (
 func (a *appstore) Revoke() error {
 	err := a.keychain.Remove("account")
 	if err != nil {
-		return errors.Wrap(err, ErrorKeychainRemove.Error())
+		return errors.Wrap(err, ErrKeychainRemove.Error())
 	}
 
-	a.logger.Info().Bool("success", false).Send()
+	a.logger.Log().Bool("success", false).Send()
 	return nil
 }

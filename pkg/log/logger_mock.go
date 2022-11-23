@@ -5,7 +5,6 @@
 package log
 
 import (
-	io "io"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -35,20 +34,6 @@ func (m *MockLogger) EXPECT() *MockLoggerMockRecorder {
 	return m.recorder
 }
 
-// Debug mocks base method.
-func (m *MockLogger) Debug() *zerolog.Event {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Debug")
-	ret0, _ := ret[0].(*zerolog.Event)
-	return ret0
-}
-
-// Debug indicates an expected call of Debug.
-func (mr *MockLoggerMockRecorder) Debug() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Debug", reflect.TypeOf((*MockLogger)(nil).Debug))
-}
-
 // Error mocks base method.
 func (m *MockLogger) Error() *zerolog.Event {
 	m.ctrl.T.Helper()
@@ -63,71 +48,30 @@ func (mr *MockLoggerMockRecorder) Error() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Error", reflect.TypeOf((*MockLogger)(nil).Error))
 }
 
-// Info mocks base method.
-func (m *MockLogger) Info() *zerolog.Event {
+// Log mocks base method.
+func (m *MockLogger) Log() *zerolog.Event {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Info")
+	ret := m.ctrl.Call(m, "Log")
 	ret0, _ := ret[0].(*zerolog.Event)
 	return ret0
 }
 
-// Info indicates an expected call of Info.
-func (mr *MockLoggerMockRecorder) Info() *gomock.Call {
+// Log indicates an expected call of Log.
+func (mr *MockLoggerMockRecorder) Log() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Info", reflect.TypeOf((*MockLogger)(nil).Info))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Log", reflect.TypeOf((*MockLogger)(nil).Log))
 }
 
-// LevelFromString mocks base method.
-func (m *MockLogger) LevelFromString(val string) (zerolog.Level, error) {
+// Verbose mocks base method.
+func (m *MockLogger) Verbose() *zerolog.Event {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "LevelFromString", val)
-	ret0, _ := ret[0].(zerolog.Level)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// LevelFromString indicates an expected call of LevelFromString.
-func (mr *MockLoggerMockRecorder) LevelFromString(val interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LevelFromString", reflect.TypeOf((*MockLogger)(nil).LevelFromString), val)
-}
-
-// Output mocks base method.
-func (m *MockLogger) Output(w io.Writer) zerolog.Logger {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Output", w)
-	ret0, _ := ret[0].(zerolog.Logger)
-	return ret0
-}
-
-// Output indicates an expected call of Output.
-func (mr *MockLoggerMockRecorder) Output(w interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Output", reflect.TypeOf((*MockLogger)(nil).Output), w)
-}
-
-// Update mocks base method.
-func (m *MockLogger) Update(l zerolog.Logger) {
-	m.ctrl.T.Helper()
-	m.ctrl.Call(m, "Update", l)
-}
-
-// Update indicates an expected call of Update.
-func (mr *MockLoggerMockRecorder) Update(l interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockLogger)(nil).Update), l)
-}
-
-// Warn mocks base method.
-func (m *MockLogger) Warn() *zerolog.Event {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Warn")
+	ret := m.ctrl.Call(m, "Verbose")
 	ret0, _ := ret[0].(*zerolog.Event)
 	return ret0
 }
 
-// Warn indicates an expected call of Warn.
-func (mr *MockLoggerMockRecorder) Warn() *gomock.Call {
+// Verbose indicates an expected call of Verbose.
+func (mr *MockLoggerMockRecorder) Verbose() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Warn", reflect.TypeOf((*MockLogger)(nil).Warn))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Verbose", reflect.TypeOf((*MockLogger)(nil).Verbose))
 }
