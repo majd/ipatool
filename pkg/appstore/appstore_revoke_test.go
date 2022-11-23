@@ -43,14 +43,14 @@ var _ = Describe("AppStore (Revoke)", func() {
 		It("returns wrapped error", func() {
 			err := appstore.Revoke()
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrorKeychainRemove.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrKeychainRemove.Error())))
 		})
 	})
 
 	When("keychain removes item", func() {
 		BeforeEach(func() {
 			mockLogger.EXPECT().
-				Info().
+				Log().
 				Return(nil)
 
 			mockKeychain.EXPECT().

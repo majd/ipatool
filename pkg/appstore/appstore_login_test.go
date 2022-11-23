@@ -37,10 +37,11 @@ var _ = Describe("AppStore (Login)", func() {
 			ioReader:    os.Stdin,
 			machine:     mockMachine,
 			logger:      mockLogger,
+			interactive: true,
 		}
 
 		mockLogger.EXPECT().
-			Debug().
+			Verbose().
 			Return(nil).
 			MaxTimes(4)
 	})
@@ -61,7 +62,7 @@ var _ = Describe("AppStore (Login)", func() {
 		It("returns error", func() {
 			err := as.Login("", "", "")
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrorReadMAC.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrReadMAC.Error())))
 		})
 	})
 
@@ -121,20 +122,42 @@ var _ = Describe("AppStore (Login)", func() {
 
 			It("returns error", func() {
 				err := as.Login("", "", "")
-				Expect(err).To(MatchError(ContainSubstring(ErrorGeneric.Error())))
+				Expect(err).To(MatchError(ContainSubstring(ErrGeneric.Error())))
 			})
 		})
 
 		When("store API requires 2FA code", func() {
+			When("not running in interactive mode", func() {
+				BeforeEach(func() {
+					as.(*appstore).interactive = false
+
+					mockLogger.EXPECT().
+						Log().
+						Return(nil).
+						Times(2)
+
+					mockClient.EXPECT().
+						Send(gomock.Any()).
+						Return(http.Result[LoginResult]{
+							Data: LoginResult{
+								FailureType:     "",
+								CustomerMessage: CustomerMessageBadLogin,
+							},
+						}, nil)
+				})
+
+				It("prints message", func() {
+					err := as.Login("", "", "")
+					Expect(err).ToNot(HaveOccurred())
+				})
+			})
+
 			When("user enters 2FA code", func() {
 				BeforeEach(func() {
 					mockLogger.EXPECT().
-						Warn().
-						Return(nil)
-
-					mockLogger.EXPECT().
-						Info().
-						Return(nil)
+						Log().
+						Return(nil).
+						Times(2)
 
 					mockKeychain.EXPECT().
 						Set("account", gomock.Any()).
@@ -159,11 +182,11 @@ var _ = Describe("AppStore (Login)", func() {
 				})
 			})
 
-			When("fails to read 2FA code from stdin", func() {
+			When("prompts user for 2FA code", func() {
 				BeforeEach(func() {
 
 					mockLogger.EXPECT().
-						Warn().
+						Log().
 						Return(nil)
 
 					mockClient.EXPECT().
@@ -178,9 +201,9 @@ var _ = Describe("AppStore (Login)", func() {
 					as.(*appstore).ioReader = strings.NewReader("123456")
 				})
 
-				It("prompts user for 2FA code", func() {
+				It("fails to read 2FA code from stdin", func() {
 					err := as.Login("", "", "")
-					Expect(err).To(MatchError(ContainSubstring(ErrorReadData.Error())))
+					Expect(err).To(MatchError(ContainSubstring(ErrReadData.Error())))
 				})
 			})
 		})
@@ -237,14 +260,14 @@ var _ = Describe("AppStore (Login)", func() {
 				It("returns error", func() {
 					err := as.Login("", "", "")
 					Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-					Expect(err).To(MatchError(ContainSubstring(ErrorKeychainSet.Error())))
+					Expect(err).To(MatchError(ContainSubstring(ErrKeychainSet.Error())))
 				})
 			})
 
 			When("sucessfully saves account in keychain", func() {
 				BeforeEach(func() {
 					mockLogger.EXPECT().
-						Info().
+						Log().
 						Return(nil)
 
 					mockKeychain.EXPECT().

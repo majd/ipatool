@@ -31,16 +31,28 @@ type LoginResult struct {
 func (a *appstore) Login(email, password, authCode string) error {
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
-		return errors.Wrap(err, ErrorReadMAC.Error())
+		return errors.Wrap(err, ErrReadMAC.Error())
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
-	a.logger.Debug().Str("mac", macAddr).Str("guid", guid).Send()
-	return a.login(email, password, authCode, guid, 0)
+	a.logger.Verbose().Str("mac", macAddr).Str("guid", guid).Send()
+
+	acc, err := a.login(email, password, authCode, guid, 0, false)
+	if err != nil {
+		return errors.Wrap(err, "failed to log in")
+	}
+
+	a.logger.Log().
+		Str("name", acc.Name).
+		Str("email", acc.Email).
+		Bool("success", true).
+		Send()
+
+	return nil
 }
 
-func (a *appstore) login(email, password, authCode, guid string, attempt int) error {
-	a.logger.Debug().
+func (a *appstore) login(email, password, authCode, guid string, attempt int, failOnAuthCodeRequirement bool) (Account, error) {
+	a.logger.Verbose().
 		Int("attempt", attempt).
 		Str("password", password).
 		Str("email", email).
@@ -50,58 +62,63 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int) er
 	request := a.loginRequest(email, password, authCode, guid)
 	res, err := a.loginClient.Send(request)
 	if err != nil {
-		return errors.Wrap(err, ErrorRequest.Error())
+		return Account{}, errors.Wrap(err, ErrRequest.Error())
 	}
 
 	if attempt == 0 && res.Data.FailureType == FailureTypeInvalidCredentials {
-		return a.login(email, password, authCode, guid, 1)
+		return a.login(email, password, authCode, guid, 1, failOnAuthCodeRequirement)
 	}
 
 	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		a.logger.Debug().Interface("response", res).Send()
-		return errors.New(res.Data.CustomerMessage)
+		a.logger.Verbose().Interface("response", res).Send()
+		return Account{}, errors.New(res.Data.CustomerMessage)
 	}
 
 	if res.Data.FailureType != "" {
-		a.logger.Debug().Interface("response", res).Send()
-		return ErrorGeneric
+		a.logger.Verbose().Interface("response", res).Send()
+		return Account{}, ErrGeneric
 	}
 
 	if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
-		a.logger.Warn().Msg("enter 2FA code:")
-		authCode, err = a.promptForAuthCode()
-		if err != nil {
-			return errors.Wrap(err, ErrorReadData.Error())
+		if failOnAuthCodeRequirement {
+			return Account{}, ErrAuthCodeRequired
 		}
 
-		return a.login(email, password, authCode, guid, 0)
+		if a.interactive {
+			a.logger.Log().Msg("enter 2FA code:")
+			authCode, err = a.promptForAuthCode()
+			if err != nil {
+				return Account{}, errors.Wrap(err, ErrReadData.Error())
+			}
+
+			return a.login(email, password, authCode, guid, 0, failOnAuthCodeRequirement)
+		} else {
+			a.logger.Log().Msg("2FA code is required; run the command again and supply a code using the `--auth-code` flag")
+			return Account{}, nil
+		}
 	}
 
 	addr := res.Data.Account.Address
-	name := strings.Join([]string{addr.FirstName, addr.LastName}, " ")
-
-	data, err := json.Marshal(Account{
-		Name:                name,
+	acc := Account{
+		Name:                strings.Join([]string{addr.FirstName, addr.LastName}, " "),
 		Email:               res.Data.Account.Email,
 		PasswordToken:       res.Data.PasswordToken,
 		DirectoryServicesID: res.Data.DirectoryServicesID,
-	})
+		StoreFront:          res.Headers[HTTPHeaderStoreFront],
+		Password:            password,
+	}
+
+	data, err := json.Marshal(acc)
 	if err != nil {
-		return errors.Wrap(err, ErrorMarshal.Error())
+		return Account{}, errors.Wrap(err, ErrMarshal.Error())
 	}
 
 	err = a.keychain.Set("account", data)
 	if err != nil {
-		return errors.Wrap(err, ErrorKeychainSet.Error())
+		return Account{}, errors.Wrap(err, ErrKeychainSet.Error())
 	}
 
-	a.logger.Info().
-		Str("name", name).
-		Str("email", res.Data.Account.Email).
-		Bool("success", true).
-		Send()
-
-	return nil
+	return acc, nil
 }
 
 func (a *appstore) loginRequest(email, password, authCode, guid string) http.Request {
@@ -136,7 +153,7 @@ func (a *appstore) promptForAuthCode() (string, error) {
 	reader := bufio.NewReader(a.ioReader)
 	authCode, err := reader.ReadString('\n')
 	if err != nil {
-		return "", errors.Wrap(err, ErrorReadData.Error())
+		return "", errors.Wrap(err, ErrReadData.Error())
 	}
 
 	return strings.Trim(authCode, "\n"), nil

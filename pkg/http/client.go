@@ -12,7 +12,7 @@ import (
 )
 
 type Client[R interface{}] interface {
-	Send(r Request) (Result[R], error)
+	Send(request Request) (Result[R], error)
 }
 
 type client[R interface{}] struct {
@@ -34,23 +34,23 @@ func NewClient[R interface{}](args *Args) Client[R] {
 	}
 }
 
-func (c *client[R]) Send(r Request) (Result[R], error) {
+func (c *client[R]) Send(req Request) (Result[R], error) {
 	var data []byte
 	var err error
 
-	if r.Payload != nil {
-		data, err = r.Payload.data()
+	if req.Payload != nil {
+		data, err = req.Payload.data()
 		if err != nil {
 			return Result[R]{}, errors.Wrap(err, "failed to read payload data")
 		}
 	}
 
-	request, err := http.NewRequest(r.Method, r.URL, bytes.NewReader(data))
+	request, err := http.NewRequest(req.Method, req.URL, bytes.NewReader(data))
 	if err != nil {
 		return Result[R]{}, errors.Wrap(err, "failed to create HTTP request")
 	}
 
-	for key, val := range r.Headers {
+	for key, val := range req.Headers {
 		request.Header.Set(key, val)
 	}
 
@@ -64,14 +64,14 @@ func (c *client[R]) Send(r Request) (Result[R], error) {
 		return Result[R]{}, errors.Wrap(err, "failed to save cookies")
 	}
 
-	if r.ResponseFormat == ResponseFormatJSON {
+	if req.ResponseFormat == ResponseFormatJSON {
 		return c.handleJSONResponse(res)
 	}
-	if r.ResponseFormat == ResponseFormatXML {
+	if req.ResponseFormat == ResponseFormatXML {
 		return c.handleXMLResponse(res)
 	}
 
-	return Result[R]{}, errors.Errorf("unsupported response body content type: %s", r.ResponseFormat)
+	return Result[R]{}, errors.Errorf("unsupported response body content type: %s", req.ResponseFormat)
 }
 
 func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {

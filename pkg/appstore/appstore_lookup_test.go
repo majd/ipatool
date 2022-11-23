@@ -36,14 +36,14 @@ var _ = Describe("AppStore (Lookup)", func() {
 	When("country code is invalid", func() {
 		It("returns error", func() {
 			_, err := as.lookup("", "XYZ", "")
-			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidCountryCode.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
 		})
 	})
 
 	When("device family is invalid", func() {
 		It("returns error", func() {
 			_, err := as.lookup("", "US", "XYZ")
-			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidDeviceFamily.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrInvalidDeviceFamily.Error())))
 		})
 	})
 
@@ -59,14 +59,14 @@ var _ = Describe("AppStore (Lookup)", func() {
 		It("returns error", func() {
 			_, err := as.lookup("", "US", DeviceFamilyPhone)
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
 
 	When("request returns bad status code", func() {
 		BeforeEach(func() {
 			mockLogger.EXPECT().
-				Debug().
+				Verbose().
 				Return(nil)
 
 			mockClient.EXPECT().
@@ -78,7 +78,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 
 		It("returns error", func() {
 			_, err := as.lookup("", "US", DeviceFamilyPad)
-			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
 
@@ -98,7 +98,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 
 			It("returns error", func() {
 				_, err := as.lookup("", "US", DeviceFamilyPad)
-				Expect(err).To(MatchError(ContainSubstring(ErrorAppNotFound.Error())))
+				Expect(err).To(MatchError(ContainSubstring(ErrAppNotFound.Error())))
 			})
 		})
 

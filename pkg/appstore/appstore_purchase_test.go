@@ -18,6 +18,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		mockLogger         *log.MockLogger
 		mockPurchaseClient *http.MockClient[PurchaseResult]
 		mockSearchClient   *http.MockClient[SearchResult]
+		mockLoginClient    *http.MockClient[LoginResult]
 		as                 *appstore
 	)
 
@@ -26,12 +27,14 @@ var _ = Describe("AppStore (Purchase)", func() {
 		mockKeychain = keychain.NewMockKeychain(ctrl)
 		mockPurchaseClient = http.NewMockClient[PurchaseResult](ctrl)
 		mockSearchClient = http.NewMockClient[SearchResult](ctrl)
+		mockLoginClient = http.NewMockClient[LoginResult](ctrl)
 		mockMachine = util.NewMockMachine(ctrl)
 		mockLogger = log.NewMockLogger(ctrl)
 		as = &appstore{
 			keychain:       mockKeychain,
 			purchaseClient: mockPurchaseClient,
 			searchClient:   mockSearchClient,
+			loginClient:    mockLoginClient,
 			machine:        mockMachine,
 			logger:         mockLogger,
 		}
@@ -41,30 +44,59 @@ var _ = Describe("AppStore (Purchase)", func() {
 		ctrl.Finish()
 	})
 
-	When("not logged in", func() {
+	When("fails to read MAC address", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return(nil, ErrorKeychainGet)
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("", ErrReadMAC)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "", "")
-			Expect(err).To(MatchError(ContainSubstring(ErrorKeychainGet.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrorReadAccount.Error())))
+			err := as.Purchase("", DeviceFamilyPhone)
+			Expect(err).To(MatchError(ContainSubstring(ErrReadMAC.Error())))
+		})
+	})
+
+	When("not logged in", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
+			mockLogger.EXPECT().
+				Verbose().
+				Return(nil)
+
+			mockKeychain.EXPECT().
+				Get("account").
+				Return(nil, ErrKeychainGet)
+		})
+
+		It("returns error", func() {
+			err := as.Purchase("", "")
+			Expect(err).To(MatchError(ContainSubstring(ErrKeychainGet.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
 		})
 	})
 
 	When("country code is invalid", func() {
 		BeforeEach(func() {
+			mockLogger.EXPECT().
+				Verbose().
+				Return(nil)
+
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
 			mockKeychain.EXPECT().
 				Get("account").
 				Return([]byte("{}"), nil)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "XYZ", "")
-			Expect(err).To(MatchError(ContainSubstring(ErrorInvalidCountryCode.Error())))
+			err := as.Purchase("", "")
+			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
 		})
 	})
 
@@ -72,25 +104,41 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
-				Return([]byte("{}"), nil)
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 
 			mockSearchClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{}, ErrorRequest)
+				Return(http.Result[SearchResult]{}, ErrRequest)
+
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
+			mockLogger.EXPECT().
+				Verbose().
+				Return(nil)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
-			Expect(err).To(MatchError(ContainSubstring(ErrorReadApp.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
+			err := as.Purchase("", DeviceFamilyPhone)
+			Expect(err).To(MatchError(ContainSubstring(ErrReadApp.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
 
 	When("app is paid", func() {
 		BeforeEach(func() {
+			mockLogger.EXPECT().
+				Verbose().
+				Return(nil)
+
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
 			mockKeychain.EXPECT().
 				Get("account").
-				Return([]byte("{}"), nil)
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 
 			mockSearchClient.EXPECT().
 				Send(gomock.Any()).
@@ -108,37 +156,8 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
-			Expect(err).To(MatchError(ContainSubstring(ErrorAppPaid.Error())))
-		})
-	})
-
-	When("fails to read MAC address", func() {
-		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{},
-						},
-					},
-				}, nil)
-
-			mockMachine.EXPECT().
-				MacAddress().
-				Return("", ErrorReadMAC)
-		})
-
-		It("returns error", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
-			Expect(err).To(MatchError(ContainSubstring(ErrorReadMAC.Error())))
+			err := as.Purchase("", DeviceFamilyPhone)
+			Expect(err).To(MatchError(ContainSubstring(ErrAppPaid.Error())))
 		})
 	})
 
@@ -146,7 +165,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
-				Return([]byte("{}"), nil)
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 
 			mockSearchClient.EXPECT().
 				Send(gomock.Any()).
@@ -172,16 +191,16 @@ var _ = Describe("AppStore (Purchase)", func() {
 
 			mockPurchaseClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[PurchaseResult]{}, ErrorRequest)
+				Return(http.Result[PurchaseResult]{}, ErrRequest)
 
 			mockLogger.EXPECT().
-				Debug().
+				Verbose().
 				Return(nil)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
-			Expect(err).To(MatchError(ContainSubstring(ErrorRequest.Error())))
+			err := as.Purchase("", DeviceFamilyPhone)
+			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
 
@@ -189,7 +208,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
-				Return([]byte("{}"), nil)
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 
 			mockSearchClient.EXPECT().
 				Send(gomock.Any()).
@@ -222,13 +241,85 @@ var _ = Describe("AppStore (Purchase)", func() {
 				}, nil)
 
 			mockLogger.EXPECT().
-				Debug().
+				Verbose().
 				Return(nil)
 		})
 
-		It("returns error", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
-			Expect(err).To(MatchError(ContainSubstring(ErrorPasswordTokenExpired.Error())))
+		When("renewing credentials fails", func() {
+			BeforeEach(func() {
+				mockLoginClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[LoginResult]{
+						Data: LoginResult{
+							FailureType:     "",
+							CustomerMessage: CustomerMessageBadLogin,
+						},
+					}, nil)
+
+				mockLogger.EXPECT().
+					Verbose().
+					Return(nil).
+					Times(2)
+			})
+
+			It("returns error", func() {
+				err := as.Purchase("", DeviceFamilyPhone)
+				Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
+			})
+		})
+
+		When("renewing credentials succeeds", func() {
+			BeforeEach(func() {
+				mockLoginClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[LoginResult]{
+						Data: LoginResult{},
+					}, nil)
+
+				mockKeychain.EXPECT().
+					Get("account").
+					Return([]byte("{\"storeFront\":\"143441\"}"), nil)
+
+				mockSearchClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[SearchResult]{
+						StatusCode: 200,
+						Data: SearchResult{
+							Count: 1,
+							Results: []App{
+								{
+									ID:       0,
+									BundleID: "",
+									Name:     "",
+									Version:  "",
+									Price:    0,
+								},
+							},
+						},
+					}, nil)
+
+				mockLogger.EXPECT().
+					Verbose().
+					Return(nil).
+					Times(2)
+
+				mockKeychain.EXPECT().
+					Set("account", gomock.Any()).
+					Return(nil)
+
+				mockPurchaseClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[PurchaseResult]{
+						Data: PurchaseResult{
+							FailureType: FailureTypePasswordTokenExpired,
+						},
+					}, nil)
+			})
+
+			It("attempts to purcahse app", func() {
+				err := as.Purchase("", DeviceFamilyPhone)
+				Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
+			})
 		})
 	})
 
@@ -236,7 +327,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
-				Return([]byte("{}"), nil)
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 
 			mockSearchClient.EXPECT().
 				Send(gomock.Any()).
@@ -270,13 +361,13 @@ var _ = Describe("AppStore (Purchase)", func() {
 				}, nil)
 
 			mockLogger.EXPECT().
-				Debug().
+				Verbose().
 				Return(nil).
 				Times(2)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
+			err := as.Purchase("", DeviceFamilyPhone)
 			Expect(err).To(MatchError(ContainSubstring(CustomerMessageBadLogin)))
 		})
 	})
@@ -285,7 +376,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
-				Return([]byte("{}"), nil)
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 
 			mockSearchClient.EXPECT().
 				Send(gomock.Any()).
@@ -318,14 +409,14 @@ var _ = Describe("AppStore (Purchase)", func() {
 				}, nil)
 
 			mockLogger.EXPECT().
-				Debug().
+				Verbose().
 				Return(nil).
 				Times(2)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
-			Expect(err).To(MatchError(ContainSubstring(ErrorGeneric.Error())))
+			err := as.Purchase("", DeviceFamilyPhone)
+			Expect(err).To(MatchError(ContainSubstring(ErrGeneric.Error())))
 		})
 	})
 
@@ -333,7 +424,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
-				Return([]byte("{}"), nil)
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 
 			mockSearchClient.EXPECT().
 				Send(gomock.Any()).
@@ -365,13 +456,13 @@ var _ = Describe("AppStore (Purchase)", func() {
 				}, nil)
 
 			mockLogger.EXPECT().
-				Debug().
+				Verbose().
 				Return(nil)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
-			Expect(err).To(MatchError(ContainSubstring(ErrorLicenseExists.Error())))
+			err := as.Purchase("", DeviceFamilyPhone)
+			Expect(err).To(MatchError(ContainSubstring(ErrLicenseExists.Error())))
 		})
 	})
 
@@ -379,7 +470,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
-				Return([]byte("{}"), nil)
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 
 			mockSearchClient.EXPECT().
 				Send(gomock.Any()).
@@ -407,21 +498,74 @@ var _ = Describe("AppStore (Purchase)", func() {
 				Send(gomock.Any()).
 				Return(http.Result[PurchaseResult]{
 					StatusCode: 200,
-					Data:       PurchaseResult{},
+					Data: PurchaseResult{
+						JingleDocType: "purchaseSuccess",
+						Status:        0,
+					},
 				}, nil)
 
 			mockLogger.EXPECT().
-				Debug().
+				Verbose().
 				Return(nil)
 
 			mockLogger.EXPECT().
-				Info().
+				Log().
 				Return(nil)
 		})
 
 		It("returns nil", func() {
-			err := as.Purchase("", "US", DeviceFamilyPhone)
+			err := as.Purchase("", DeviceFamilyPhone)
 			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	When("purchasing the app fails", func() {
+		BeforeEach(func() {
+			mockKeychain.EXPECT().
+				Get("account").
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
+
+			mockSearchClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[SearchResult]{
+					StatusCode: 200,
+					Data: SearchResult{
+						Count: 1,
+						Results: []App{
+							{
+								ID:       0,
+								BundleID: "",
+								Name:     "",
+								Version:  "",
+								Price:    0,
+							},
+						},
+					},
+				}, nil)
+
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[PurchaseResult]{
+					StatusCode: 200,
+					Data: PurchaseResult{
+						JingleDocType: "failure",
+						Status:        -1,
+					},
+				}, nil)
+
+			mockLogger.EXPECT().
+				Verbose().
+				Return(nil).
+				Times(2)
+		})
+
+		It("returns nil", func() {
+			err := as.Purchase("", DeviceFamilyPhone)
+			Expect(err).To(MatchError(ContainSubstring("failed to acquire license")))
 		})
 	})
 })
