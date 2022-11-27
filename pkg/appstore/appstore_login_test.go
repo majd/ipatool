@@ -50,7 +50,7 @@ var _ = Describe("AppStore (Login)", func() {
 		ctrl.Finish()
 	})
 
-	When("fails to read machine's MAC address", func() {
+	When("fails to read Machine's MAC address", func() {
 		var testErr = errors.New("test")
 
 		BeforeEach(func() {
@@ -66,7 +66,7 @@ var _ = Describe("AppStore (Login)", func() {
 		})
 	})
 
-	When("sucessfully reads machine's MAC address", func() {
+	When("sucessfully reads Machine's MAC address", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
 				MacAddress().
