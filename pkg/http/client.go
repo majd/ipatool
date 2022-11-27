@@ -11,8 +11,11 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=client.go -destination=client_mock.go -package=http
 type Client[R interface{}] interface {
 	Send(request Request) (Result[R], error)
+	Do(req *http.Request) (*http.Response, error)
+	NewRequest(method, url string, body io.Reader) (*http.Request, error)
 }
 
 type client[R interface{}] struct {
@@ -72,6 +75,14 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 	}
 
 	return Result[R]{}, errors.Errorf("unsupported response body content type: %s", req.ResponseFormat)
+}
+
+func (c *client[R]) Do(req *http.Request) (*http.Response, error) {
+	return c.internalClient.Do(req)
+}
+
+func (*client[R]) NewRequest(method, url string, body io.Reader) (*http.Request, error) {
+	return http.NewRequest(method, url, body)
 }
 
 func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {

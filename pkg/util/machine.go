@@ -3,7 +3,6 @@ package util
 import (
 	"github.com/pkg/errors"
 	"net"
-	"os"
 	"path/filepath"
 	"runtime"
 )
@@ -14,10 +13,18 @@ type Machine interface {
 	HomeDirectory() string
 }
 
-type machine struct{}
+type machine struct {
+	os OperatingSystem
+}
 
-func NewMachine() Machine {
-	return &machine{}
+type MachineArgs struct {
+	OperatingSystem OperatingSystem
+}
+
+func NewMachine(args *MachineArgs) Machine {
+	return &machine{
+		os: args.OperatingSystem,
+	}
 }
 
 func (*machine) MacAddress() (string, error) {
@@ -40,10 +47,10 @@ func (*machine) MacAddress() (string, error) {
 	return "", errors.New("could not find a network interface with a MAC address")
 }
 
-func (*machine) HomeDirectory() string {
+func (m *machine) HomeDirectory() string {
 	if runtime.GOOS == "windows" {
-		return filepath.Join(os.Getenv("HOMEDRIVE"), os.Getenv("HOMEPATH"))
+		return filepath.Join(m.os.Getenv("HOMEDRIVE"), m.os.Getenv("HOMEPATH"))
 	}
 
-	return os.Getenv("HOME")
+	return m.os.Getenv("HOME")
 }

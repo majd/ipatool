@@ -1,38 +1,36 @@
 package util
 
 import (
+	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"os"
 )
 
 var _ = Describe("Machine", func() {
 	var (
+		ctrl    *gomock.Controller
 		machine Machine
+		mockOS  *MockOperatingSystem
 	)
 
 	BeforeEach(func() {
-		machine = NewMachine()
+		ctrl = gomock.NewController(GinkgoT())
+		mockOS = NewMockOperatingSystem(ctrl)
+		machine = NewMachine(&MachineArgs{
+			OperatingSystem: mockOS,
+		})
 	})
 
-	When("os is darwin", func() {
-		var originalHome string
-
+	When("OperatingSystem is darwin", func() {
 		BeforeEach(func() {
-			originalHome = os.Getenv("HOME")
-
-			err := os.Setenv("HOME", "/testval")
-			Expect(err).ToNot(HaveOccurred())
-		})
-
-		AfterEach(func() {
-			err := os.Setenv("HOME", originalHome)
-			Expect(err).ToNot(HaveOccurred())
+			mockOS.EXPECT().
+				Getenv("HOME").
+				Return("/home/test")
 		})
 
 		It("returns home directory from HOME", func() {
 			dir := machine.HomeDirectory()
-			Expect(dir).To(Equal("/testval"))
+			Expect(dir).To(Equal("/home/test"))
 		})
 	})
 

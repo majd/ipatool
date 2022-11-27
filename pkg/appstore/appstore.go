@@ -6,7 +6,6 @@ import (
 	"github.com/majd/ipatool/pkg/log"
 	"github.com/majd/ipatool/pkg/util"
 	"io"
-	gohttp "net/http"
 	"os"
 )
 
@@ -16,7 +15,7 @@ type AppStore interface {
 	Revoke() error
 	Search(term, countryCode, deviceFamily string, limit int64) error
 	Purchase(bundleID, deviceFamily string) error
-	Download(bundleID, deviceFamily, outputPath, logFormat string, acquireLicense bool) error
+	Download(bundleID, deviceFamily, outputPath string, acquireLicense bool) error
 }
 
 type appstore struct {
@@ -25,18 +24,21 @@ type appstore struct {
 	searchClient   http.Client[SearchResult]
 	purchaseClient http.Client[PurchaseResult]
 	downloadClient http.Client[DownloadResult]
-	httpClient     gohttp.Client
+	httpClient     http.Client[interface{}]
 	ioReader       io.Reader
 	machine        util.Machine
+	os             util.OperatingSystem
 	logger         log.Logger
 	interactive    bool
 }
 
 type Args struct {
-	Keychain    keychain.Keychain
-	CookieJar   http.CookieJar
-	Logger      log.Logger
-	Interactive bool
+	Keychain        keychain.Keychain
+	CookieJar       http.CookieJar
+	Logger          log.Logger
+	OperatingSystem util.OperatingSystem
+	Machine         util.Machine
+	Interactive     bool
 }
 
 func NewAppStore(args *Args) AppStore {
@@ -50,8 +52,10 @@ func NewAppStore(args *Args) AppStore {
 		searchClient:   http.NewClient[SearchResult](clientArgs),
 		purchaseClient: http.NewClient[PurchaseResult](clientArgs),
 		downloadClient: http.NewClient[DownloadResult](clientArgs),
+		httpClient:     http.NewClient[interface{}](clientArgs),
 		ioReader:       os.Stdin,
-		machine:        util.NewMachine(),
+		machine:        args.Machine,
+		os:             args.OperatingSystem,
 		logger:         args.Logger,
 		interactive:    args.Interactive,
 	}
