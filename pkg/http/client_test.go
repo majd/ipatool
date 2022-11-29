@@ -70,6 +70,26 @@ var _ = Describe("Client", Ordered, func() {
 			MaxTimes(1)
 	})
 
+	It("returns request", func() {
+		sut := NewClient[XMLResult](&Args{})
+
+		req, err := sut.NewRequest("GET", fmt.Sprintf("http://localhost:%d/json", port), nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(req).ToNot(BeNil())
+	})
+
+	It("returns response", func() {
+		sut := NewClient[XMLResult](&Args{})
+
+		req, err := sut.NewRequest("GET", fmt.Sprintf("http://localhost:%d/json", port), nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(req).ToNot(BeNil())
+
+		res, err := sut.Do(req)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).ToNot(BeNil())
+	})
+
 	When("payload decodes successfully", func() {
 		When("cookie jar fails to save", func() {
 			var testErr = errors.New("test")
