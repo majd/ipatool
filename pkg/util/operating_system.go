@@ -9,6 +9,8 @@ type OperatingSystem interface {
 	Executable() (string, error)
 	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	Remove(name string) error
+	IsNotExist(err error) bool
+	MkdirAll(path string, perm os.FileMode) error
 }
 
 type operatingSystem struct{}
@@ -35,4 +37,12 @@ func (*operatingSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.F
 
 func (*operatingSystem) Remove(name string) error {
 	return os.Remove(name)
+}
+
+func (*operatingSystem) IsNotExist(err error) bool {
+	return os.IsNotExist(err)
+}
+
+func (*operatingSystem) MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
 }
