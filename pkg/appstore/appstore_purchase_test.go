@@ -52,7 +52,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(ErrReadMAC.Error())))
 		})
 	})
@@ -73,7 +73,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "")
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(ErrKeychainGet.Error())))
 			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
 		})
@@ -95,7 +95,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", "")
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
 		})
 	})
@@ -120,7 +120,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(ErrReadApp.Error())))
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
@@ -156,7 +156,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(ErrAppPaid.Error())))
 		})
 	})
@@ -199,7 +199,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
@@ -263,7 +263,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 			})
 
 			It("returns error", func() {
-				err := as.Purchase("", DeviceFamilyPhone)
+				err := as.Purchase("")
 				Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
 			})
 		})
@@ -317,7 +317,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 			})
 
 			It("attempts to purcahse app", func() {
-				err := as.Purchase("", DeviceFamilyPhone)
+				err := as.Purchase("")
 				Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
 			})
 		})
@@ -367,7 +367,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(CustomerMessageBadLogin)))
 		})
 	})
@@ -415,7 +415,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(ErrGeneric.Error())))
 		})
 	})
@@ -461,7 +461,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring(ErrLicenseExists.Error())))
 		})
 	})
@@ -514,7 +514,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns nil", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
@@ -564,7 +564,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 
 		It("returns nil", func() {
-			err := as.Purchase("", DeviceFamilyPhone)
+			err := as.Purchase("")
 			Expect(err).To(MatchError(ContainSubstring("failed to acquire license")))
 		})
 	})

@@ -13,9 +13,9 @@ type AppStore interface {
 	Login(email, password, authCode string) error
 	Info() error
 	Revoke() error
-	Search(term, countryCode, deviceFamily string, limit int64) error
-	Purchase(bundleID, deviceFamily string) error
-	Download(bundleID, deviceFamily, outputPath string, acquireLicense bool) error
+	Search(term string, limit int64) error
+	Purchase(bundleID string) error
+	Download(bundleID string, outputPath string, acquireLicense bool) error
 }
 
 type appstore struct {
@@ -32,7 +32,7 @@ type appstore struct {
 	interactive    bool
 }
 
-type Args struct {
+type AppStoreArgs struct {
 	Keychain        keychain.Keychain
 	CookieJar       http.CookieJar
 	Logger          log.Logger
@@ -41,8 +41,8 @@ type Args struct {
 	Interactive     bool
 }
 
-func NewAppStore(args *Args) AppStore {
-	clientArgs := &http.Args{
+func NewAppStore(args AppStoreArgs) AppStore {
+	clientArgs := http.ClientArgs{
 		CookieJar: args.CookieJar,
 	}
 

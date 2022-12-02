@@ -71,7 +71,7 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Download("", "", "", false)
+			err := as.Download("", "", false)
 			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
 		})
 	})
@@ -84,7 +84,7 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Download("", "", "", false)
+			err := as.Download("", "", false)
 			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
 		})
 	})
@@ -101,7 +101,7 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Download("", DeviceFamilyPhone, "", false)
+			err := as.Download("", "", false)
 			Expect(err).To(MatchError(ContainSubstring(ErrReadApp.Error())))
 		})
 	})
@@ -128,7 +128,7 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Download("", DeviceFamilyPhone, "test-out", false)
+			err := as.Download("", "test-out", false)
 			Expect(err).To(MatchError(ContainSubstring("failed to resolve destination path")))
 		})
 	})
@@ -159,7 +159,7 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Download("", DeviceFamilyPhone, "", false)
+			err := as.Download("", "", false)
 			Expect(err).To(MatchError(ContainSubstring(ErrReadMAC.Error())))
 		})
 	})
@@ -198,7 +198,7 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Download("", DeviceFamilyPhone, "", false)
+			err := as.Download("", "", false)
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
@@ -256,7 +256,7 @@ var _ = Describe("AppStore (Download)", func() {
 				})
 
 				It("returns error", func() {
-					err := as.Download("", DeviceFamilyPhone, "", false)
+					err := as.Download("", "", false)
 					Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
 				})
 			})
@@ -283,7 +283,7 @@ var _ = Describe("AppStore (Download)", func() {
 				})
 
 				It("attempts to download app", func() {
-					err := as.Download("", DeviceFamilyPhone, "", false)
+					err := as.Download("", "", false)
 					Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
 				})
 			})
@@ -328,7 +328,7 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Download("", DeviceFamilyPhone, "", false)
+			err := as.Download("", "", false)
 			Expect(err).To(MatchError(ContainSubstring(ErrLicenseRequired.Error())))
 		})
 
@@ -371,7 +371,7 @@ var _ = Describe("AppStore (Download)", func() {
 				})
 
 				It("attempts to download app", func() {
-					err := as.Download("", DeviceFamilyPhone, "", true)
+					err := as.Download("", "", true)
 					Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
 				})
 			})
@@ -384,7 +384,7 @@ var _ = Describe("AppStore (Download)", func() {
 				})
 
 				It("returns error", func() {
-					err := as.Download("", DeviceFamilyPhone, "", true)
+					err := as.Download("", "", true)
 					Expect(err).To(MatchError(ContainSubstring(ErrPurchase.Error())))
 				})
 			})
@@ -434,7 +434,7 @@ var _ = Describe("AppStore (Download)", func() {
 			})
 
 			It("returns customer message as error", func() {
-				err := as.Download("", DeviceFamilyPhone, "", true)
+				err := as.Download("", "", true)
 				Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
 			})
 		})
@@ -451,7 +451,7 @@ var _ = Describe("AppStore (Download)", func() {
 			})
 
 			It("returns generic error", func() {
-				err := as.Download("", DeviceFamilyPhone, "", true)
+				err := as.Download("", "", true)
 				Expect(err).To(MatchError(ContainSubstring(ErrGeneric.Error())))
 			})
 		})
@@ -496,7 +496,7 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Download("", DeviceFamilyPhone, "", true)
+			err := as.Download("", "", true)
 			Expect(err).To(MatchError(ContainSubstring("received 0 items from the App Store")))
 		})
 	})
@@ -546,7 +546,7 @@ var _ = Describe("AppStore (Download)", func() {
 			})
 
 			It("returns error", func() {
-				err := as.Download("", DeviceFamilyPhone, "", true)
+				err := as.Download("", "", true)
 				Expect(err).To(MatchError(ContainSubstring(ErrCreateRequest.Error())))
 			})
 		})
@@ -563,7 +563,7 @@ var _ = Describe("AppStore (Download)", func() {
 			})
 
 			It("returns error", func() {
-				err := as.Download("", DeviceFamilyPhone, "", true)
+				err := as.Download("", "", true)
 				Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 			})
 		})
@@ -586,7 +586,7 @@ var _ = Describe("AppStore (Download)", func() {
 			})
 
 			It("returns error", func() {
-				err := as.Download("", DeviceFamilyPhone, "", true)
+				err := as.Download("", "", true)
 				Expect(err).To(MatchError(ContainSubstring("failed to open file")))
 			})
 		})
@@ -613,7 +613,7 @@ var _ = Describe("AppStore (Download)", func() {
 			})
 
 			It("returns error", func() {
-				err := as.Download("", DeviceFamilyPhone, "", true)
+				err := as.Download("", "", true)
 				Expect(err).To(MatchError(ContainSubstring("failed to write data to file")))
 			})
 		})
@@ -697,7 +697,7 @@ var _ = Describe("AppStore (Download)", func() {
 				OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(nil, testErr)
 
-			err := as.Download("", DeviceFamilyPhone, "", true)
+			err := as.Download("", "", true)
 			Expect(err).To(MatchError(ContainSubstring("failed to open destination file")))
 
 			testData, err := os.ReadFile(testFile.Name())
@@ -768,7 +768,7 @@ var _ = Describe("AppStore (Download)", func() {
 				})
 
 				It("succeeds", func() {
-					err := as.Download("", DeviceFamilyPhone, outputPath, true)
+					err := as.Download("", outputPath, true)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})
@@ -806,7 +806,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 				It("succeeds", func() {
 					outputPath := strings.TrimSuffix(tmpFile.Name(), ".tmp")
-					err := as.Download("", DeviceFamilyPhone, outputPath, true)
+					err := as.Download("", outputPath, true)
 					Expect(err).ToNot(HaveOccurred())
 				})
 			})

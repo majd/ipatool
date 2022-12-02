@@ -14,7 +14,7 @@ type PurchaseResult struct {
 	Status          int    `plist:"status,omitempty"`
 }
 
-func (a *appstore) Purchase(bundleID, deviceFamily string) error {
+func (a *appstore) Purchase(bundleID string) error {
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
 		return errors.Wrap(err, ErrReadMAC.Error())
@@ -23,7 +23,7 @@ func (a *appstore) Purchase(bundleID, deviceFamily string) error {
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 	a.logger.Verbose().Str("mac", macAddr).Str("guid", guid).Send()
 
-	err = a.purchase(bundleID, deviceFamily, guid, true)
+	err = a.purchase(bundleID, guid, true)
 	if err != nil {
 		return errors.Wrap(err, ErrPurchase.Error())
 	}
@@ -32,7 +32,7 @@ func (a *appstore) Purchase(bundleID, deviceFamily string) error {
 	return nil
 }
 
-func (a *appstore) purchase(bundleID, deviceFamily, guid string, attemptToRenewCredentials bool) error {
+func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredentials bool) error {
 	acc, err := a.account()
 	if err != nil {
 		return errors.Wrap(err, ErrReadAccount.Error())
@@ -43,7 +43,7 @@ func (a *appstore) purchase(bundleID, deviceFamily, guid string, attemptToRenewC
 		return errors.Wrap(err, ErrInvalidCountryCode.Error())
 	}
 
-	app, err := a.lookup(bundleID, countryCode, deviceFamily)
+	app, err := a.lookup(bundleID, countryCode)
 	if err != nil {
 		return errors.Wrap(err, ErrReadApp.Error())
 	}
@@ -66,7 +66,7 @@ func (a *appstore) purchase(bundleID, deviceFamily, guid string, attemptToRenewC
 				return errors.Wrap(err, ErrPasswordTokenExpired.Error())
 			}
 
-			return a.purchase(bundleID, deviceFamily, guid, false)
+			return a.purchase(bundleID, guid, false)
 		}
 
 		return ErrPasswordTokenExpired

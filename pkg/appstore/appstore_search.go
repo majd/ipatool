@@ -13,15 +13,18 @@ type SearchResult struct {
 	Results []App `json:"results,omitempty"`
 }
 
-func (a *appstore) Search(term, countryCode, deviceFamily string, limit int64) error {
-	if StoreFronts[countryCode] == "" {
-		return ErrInvalidCountryCode
+func (a *appstore) Search(term string, limit int64) error {
+	acc, err := a.account()
+	if err != nil {
+		return errors.Wrap(err, ErrReadAccount.Error())
 	}
 
-	request, err := a.searchRequest(term, countryCode, deviceFamily, limit)
+	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
 	if err != nil {
-		return errors.Wrap(err, ErrCreateRequest.Error())
+		return errors.Wrap(err, ErrInvalidCountryCode.Error())
 	}
+
+	request := a.searchRequest(term, countryCode, limit)
 
 	res, err := a.searchClient.Send(request)
 	if err != nil {
@@ -37,37 +40,21 @@ func (a *appstore) Search(term, countryCode, deviceFamily string, limit int64) e
 	return nil
 }
 
-func (a *appstore) searchRequest(term, countryCode, deviceFamily string, limit int64) (http.Request, error) {
-	searchURL, err := a.searchURL(term, countryCode, deviceFamily, limit)
-	if err != nil {
-		return http.Request{}, errors.Wrap(err, ErrURL.Error())
-	}
-
+func (a *appstore) searchRequest(term, countryCode string, limit int64) http.Request {
 	return http.Request{
-		URL:            searchURL,
+		URL:            a.searchURL(term, countryCode, limit),
 		Method:         http.MethodGET,
 		ResponseFormat: http.ResponseFormatJSON,
-	}, nil
+	}
 }
 
-func (a *appstore) searchURL(term, countryCode, deviceFamily string, limit int64) (string, error) {
-	var entity string
-
-	switch deviceFamily {
-	case DeviceFamilyPhone:
-		entity = "software"
-	case DeviceFamilyPad:
-		entity = "iPadSoftware"
-	default:
-		return "", ErrInvalidDeviceFamily
-	}
-
+func (a *appstore) searchURL(term, countryCode string, limit int64) string {
 	params := url.Values{}
-	params.Add("entity", entity)
+	params.Add("entity", "software,iPadSoftware")
 	params.Add("limit", strconv.Itoa(int(limit)))
 	params.Add("media", "software")
 	params.Add("term", term)
 	params.Add("country", countryCode)
 
-	return fmt.Sprintf("https://%s%s?%s", iTunesAPIDomain, iTunesAPIPathSearch, params.Encode()), nil
+	return fmt.Sprintf("https://%s%s?%s", iTunesAPIDomain, iTunesAPIPathSearch, params.Encode())
 }

@@ -3,6 +3,7 @@ package appstore
 import (
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
+	"github.com/majd/ipatool/pkg/keychain"
 	"github.com/majd/ipatool/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -12,20 +13,23 @@ import (
 
 var _ = Describe("AppStore (Search)", func() {
 	var (
-		ctrl       *gomock.Controller
-		mockClient *http.MockClient[SearchResult]
-		mockLogger *log.MockLogger
-		as         AppStore
+		ctrl         *gomock.Controller
+		mockClient   *http.MockClient[SearchResult]
+		mockLogger   *log.MockLogger
+		mockKeychain *keychain.MockKeychain
+		as           AppStore
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockClient = http.NewMockClient[SearchResult](ctrl)
 		mockLogger = log.NewMockLogger(ctrl)
+		mockKeychain = keychain.NewMockKeychain(ctrl)
 		as = &appstore{
 			searchClient: mockClient,
 			ioReader:     os.Stdin,
 			logger:       mockLogger,
+			keychain:     mockKeychain,
 		}
 	})
 
@@ -33,17 +37,29 @@ var _ = Describe("AppStore (Search)", func() {
 		ctrl.Finish()
 	})
 
-	When("country code is invalid", func() {
+	When("user is not logged in", func() {
+		BeforeEach(func() {
+			mockKeychain.EXPECT().
+				Get("account").
+				Return(nil, ErrKeychainGet)
+		})
+
 		It("returns error", func() {
-			err := as.Search("", "XYZ", "", 0)
-			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
+			err := as.Search("", 0)
+			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
 		})
 	})
 
-	When("device family is invalid", func() {
+	When("country code is invalid", func() {
+		BeforeEach(func() {
+			mockKeychain.EXPECT().
+				Get("account").
+				Return([]byte("{}"), nil)
+		})
+
 		It("returns error", func() {
-			err := as.Search("", "US", "XYZ", 0)
-			Expect(err).To(MatchError(ContainSubstring(ErrInvalidDeviceFamily.Error())))
+			err := as.Search("", 0)
+			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
 		})
 	})
 
@@ -51,13 +67,17 @@ var _ = Describe("AppStore (Search)", func() {
 		var testErr = errors.New("test")
 
 		BeforeEach(func() {
+			mockKeychain.EXPECT().
+				Get("account").
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
+
 			mockClient.EXPECT().
 				Send(gomock.Any()).
 				Return(http.Result[SearchResult]{}, testErr)
 		})
 
 		It("returns error", func() {
-			err := as.Search("", "US", DeviceFamilyPhone, 0)
+			err := as.Search("", 0)
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
@@ -74,10 +94,14 @@ var _ = Describe("AppStore (Search)", func() {
 				Return(http.Result[SearchResult]{
 					StatusCode: 400,
 				}, nil)
+
+			mockKeychain.EXPECT().
+				Get("account").
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 		})
 
 		It("returns error", func() {
-			err := as.Search("", "US", DeviceFamilyPad, 0)
+			err := as.Search("", 0)
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
@@ -97,10 +121,14 @@ var _ = Describe("AppStore (Search)", func() {
 						Results: []App{},
 					},
 				}, nil)
+
+			mockKeychain.EXPECT().
+				Get("account").
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 		})
 
 		It("returns nil", func() {
-			err := as.Search("", "US", DeviceFamilyPhone, 0)
+			err := as.Search("", 0)
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})

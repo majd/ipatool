@@ -1,9 +1,6 @@
 package appstore
 
 const (
-	DeviceFamilyPhone = "iPhone"
-	DeviceFamilyPad   = "iPad"
-
 	FailureTypeInvalidCredentials   = "-5000"
 	FailureTypePasswordTokenExpired = "2034"
 	FailureTypeLicenseNotFound      = "9610"
