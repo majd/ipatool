@@ -19,12 +19,12 @@ type logger struct {
 	verbose        bool
 }
 
-type Args struct {
+type LoggerArgs struct {
 	Verbose bool
 	Writer  io.Writer
 }
 
-func NewLogger(args *Args) Logger {
+func NewLogger(args LoggerArgs) Logger {
 	internalLogger := log.Logger
 	level := zerolog.InfoLevel
 
