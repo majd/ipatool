@@ -16,7 +16,7 @@ var _ = Describe("Machine", func() {
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockOS = NewMockOperatingSystem(ctrl)
-		machine = NewMachine(&MachineArgs{
+		machine = NewMachine(MachineArgs{
 			OperatingSystem: mockOS,
 		})
 	})

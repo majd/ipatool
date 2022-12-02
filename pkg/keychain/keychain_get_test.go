@@ -18,7 +18,7 @@ var _ = Describe("Keychain (Get)", func() {
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeyring = NewMockKeyring(ctrl)
-		keychain = NewKeychain(&Args{
+		keychain = NewKeychain(KeychainArgs{
 			Keyring: mockKeyring,
 		})
 	})

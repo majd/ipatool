@@ -21,7 +21,7 @@ type MachineArgs struct {
 	OperatingSystem OperatingSystem
 }
 
-func NewMachine(args *MachineArgs) Machine {
+func NewMachine(args MachineArgs) Machine {
 	return &machine{
 		os: args.OperatingSystem,
 	}
