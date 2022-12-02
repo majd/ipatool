@@ -71,7 +71,7 @@ var _ = Describe("Client", Ordered, func() {
 	})
 
 	It("returns request", func() {
-		sut := NewClient[XMLResult](&Args{})
+		sut := NewClient[XMLResult](ClientArgs{})
 
 		req, err := sut.NewRequest("GET", fmt.Sprintf("http://localhost:%d/json", port), nil)
 		Expect(err).ToNot(HaveOccurred())
@@ -79,7 +79,7 @@ var _ = Describe("Client", Ordered, func() {
 	})
 
 	It("returns response", func() {
-		sut := NewClient[XMLResult](&Args{})
+		sut := NewClient[XMLResult](ClientArgs{})
 
 		req, err := sut.NewRequest("GET", fmt.Sprintf("http://localhost:%d/json", port), nil)
 		Expect(err).ToNot(HaveOccurred())
@@ -101,7 +101,7 @@ var _ = Describe("Client", Ordered, func() {
 			})
 
 			It("returns error", func() {
-				sut := NewClient[JSONResult](&Args{
+				sut := NewClient[JSONResult](ClientArgs{
 					CookieJar: mockCookieJar,
 				})
 				_, err := sut.Send(Request{
@@ -122,7 +122,7 @@ var _ = Describe("Client", Ordered, func() {
 			})
 
 			It("decodes JSON response", func() {
-				sut := NewClient[JSONResult](&Args{
+				sut := NewClient[JSONResult](ClientArgs{
 					CookieJar: mockCookieJar,
 				})
 				res, err := sut.Send(Request{
@@ -144,7 +144,7 @@ var _ = Describe("Client", Ordered, func() {
 			})
 
 			It("decodes XML response", func() {
-				sut := NewClient[XMLResult](&Args{
+				sut := NewClient[XMLResult](ClientArgs{
 					CookieJar: mockCookieJar,
 				})
 				res, err := sut.Send(Request{
@@ -158,7 +158,7 @@ var _ = Describe("Client", Ordered, func() {
 			})
 
 			It("returns error when content type is not supported", func() {
-				sut := NewClient[XMLResult](&Args{
+				sut := NewClient[XMLResult](ClientArgs{
 					CookieJar: mockCookieJar,
 				})
 				_, err := sut.Send(Request{
@@ -174,7 +174,7 @@ var _ = Describe("Client", Ordered, func() {
 
 	When("payload fails to decode", func() {
 		It("returns error", func() {
-			sut := NewClient[XMLResult](&Args{
+			sut := NewClient[XMLResult](ClientArgs{
 				CookieJar: mockCookieJar,
 			})
 			_, err := sut.Send(Request{

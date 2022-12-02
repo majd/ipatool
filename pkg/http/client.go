@@ -23,11 +23,11 @@ type client[R interface{}] struct {
 	cookieJar      CookieJar
 }
 
-type Args struct {
+type ClientArgs struct {
 	CookieJar CookieJar
 }
 
-func NewClient[R interface{}](args *Args) Client[R] {
+func NewClient[R interface{}](args ClientArgs) Client[R] {
 	return &client[R]{
 		internalClient: http.Client{
 			Timeout: time.Second * 15,

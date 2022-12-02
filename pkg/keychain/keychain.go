@@ -11,11 +11,11 @@ type keychain struct {
 	keyring Keyring
 }
 
-type Args struct {
+type KeychainArgs struct {
 	Keyring Keyring
 }
 
-func NewKeychain(args *Args) Keychain {
+func NewKeychain(args KeychainArgs) Keychain {
 	return &keychain{
 		keyring: args.Keyring,
 	}
