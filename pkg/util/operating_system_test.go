@@ -3,6 +3,7 @@ package util
 import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"io/fs"
 	goos "os"
 	"path"
 )
@@ -69,6 +70,20 @@ var _ = Describe("Operating System", func() {
 			res, err := os.Executable()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).ToNot(BeNil())
+		})
+	})
+
+	When("error is 'ErrNotExist'", func() {
+		It("returns true", func() {
+			res := os.IsNotExist(fs.ErrNotExist)
+			Expect(res).To(BeTrue())
+		})
+	})
+
+	When("directory does not exist", func() {
+		It("creates directory", func() {
+			err := os.MkdirAll(goos.TempDir(), 0664)
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 })

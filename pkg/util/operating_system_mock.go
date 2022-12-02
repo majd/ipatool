@@ -63,6 +63,34 @@ func (mr *MockOperatingSystemMockRecorder) Getenv(key interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Getenv", reflect.TypeOf((*MockOperatingSystem)(nil).Getenv), key)
 }
 
+// IsNotExist mocks base method.
+func (m *MockOperatingSystem) IsNotExist(err error) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsNotExist", err)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsNotExist indicates an expected call of IsNotExist.
+func (mr *MockOperatingSystemMockRecorder) IsNotExist(err interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsNotExist", reflect.TypeOf((*MockOperatingSystem)(nil).IsNotExist), err)
+}
+
+// MkdirAll mocks base method.
+func (m *MockOperatingSystem) MkdirAll(path string, perm os.FileMode) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MkdirAll", path, perm)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// MkdirAll indicates an expected call of MkdirAll.
+func (mr *MockOperatingSystemMockRecorder) MkdirAll(path, perm interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MkdirAll", reflect.TypeOf((*MockOperatingSystem)(nil).MkdirAll), path, perm)
+}
+
 // OpenFile mocks base method.
 func (m *MockOperatingSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	m.ctrl.T.Helper()
