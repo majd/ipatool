@@ -40,7 +40,7 @@ type PackageInfo struct {
 	BundleExecutable string `plist:"CFBundleExecutable,omitempty"`
 }
 
-func (a *appstore) Download(bundleID, deviceFamily, outputPath string, acquireLicense bool) error {
+func (a *appstore) Download(bundleID string, outputPath string, acquireLicense bool) error {
 	acc, err := a.account()
 	if err != nil {
 		return errors.Wrap(err, ErrReadAccount.Error())
@@ -51,7 +51,7 @@ func (a *appstore) Download(bundleID, deviceFamily, outputPath string, acquireLi
 		return errors.Wrap(err, ErrInvalidCountryCode.Error())
 	}
 
-	app, err := a.lookup(bundleID, countryCode, deviceFamily)
+	app, err := a.lookup(bundleID, countryCode)
 	if err != nil {
 		return errors.Wrap(err, ErrReadApp.Error())
 	}
@@ -69,7 +69,7 @@ func (a *appstore) Download(bundleID, deviceFamily, outputPath string, acquireLi
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 	a.logger.Verbose().Str("mac", macAddr).Str("guid", guid).Send()
 
-	err = a.download(acc, app, deviceFamily, destination, guid, acquireLicense, true)
+	err = a.download(acc, app, destination, guid, acquireLicense, true)
 	if err != nil {
 		return errors.Wrap(err, ErrDownload.Error())
 	}
@@ -79,7 +79,7 @@ func (a *appstore) Download(bundleID, deviceFamily, outputPath string, acquireLi
 	return nil
 }
 
-func (a *appstore) download(acc Account, app App, deviceFamily, dst, guid string, acquireLicense, attemptToRenewCredentials bool) error {
+func (a *appstore) download(acc Account, app App, dst, guid string, acquireLicense, attemptToRenewCredentials bool) error {
 	req := a.downloadRequest(acc, app, guid)
 
 	res, err := a.downloadClient.Send(req)
@@ -95,7 +95,7 @@ func (a *appstore) download(acc Account, app App, deviceFamily, dst, guid string
 				return errors.Wrap(err, ErrPasswordTokenExpired.Error())
 			}
 
-			return a.download(acc, app, deviceFamily, dst, guid, acquireLicense, false)
+			return a.download(acc, app, dst, guid, acquireLicense, false)
 		}
 
 		return ErrPasswordTokenExpired
@@ -103,12 +103,12 @@ func (a *appstore) download(acc Account, app App, deviceFamily, dst, guid string
 
 	if res.Data.FailureType == FailureTypeLicenseNotFound && acquireLicense {
 		a.logger.Verbose().Msg("attempting to acquire license")
-		err = a.purchase(app.BundleID, deviceFamily, guid, true)
+		err = a.purchase(app.BundleID, guid, true)
 		if err != nil {
 			return errors.Wrap(err, ErrPurchase.Error())
 		}
 
-		return a.download(acc, app, deviceFamily, dst, guid, false, attemptToRenewCredentials)
+		return a.download(acc, app, dst, guid, false, attemptToRenewCredentials)
 	}
 
 	if res.Data.FailureType == FailureTypeLicenseNotFound {

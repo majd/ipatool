@@ -21,7 +21,7 @@ var _ = Describe("AppStore (Revoke)", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
 		mockLogger = log.NewMockLogger(ctrl)
-		appstore = NewAppStore(&Args{
+		appstore = NewAppStore(AppStoreArgs{
 			Keychain: mockKeychain,
 			Logger:   mockLogger,
 		})
