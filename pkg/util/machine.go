@@ -2,6 +2,7 @@ package util
 
 import (
 	"github.com/pkg/errors"
+	"golang.org/x/term"
 	"net"
 	"path/filepath"
 	"runtime"
@@ -11,6 +12,7 @@ import (
 type Machine interface {
 	MacAddress() (string, error)
 	HomeDirectory() string
+	ReadPassword(fd int) ([]byte, error)
 }
 
 type machine struct {
@@ -30,11 +32,11 @@ func NewMachine(args MachineArgs) Machine {
 func (*machine) MacAddress() (string, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get network interfaces")
+		return "", errors.Wrap(err, ErrGetNetworkInterfaces.Error())
 	}
 
 	if len(ifaces) == 0 {
-		return "", errors.New("no network interfaces were found")
+		return "", errors.New(ErrEmptyNetworkInterfaces.Error())
 	}
 
 	for _, iface := range ifaces {
@@ -44,7 +46,7 @@ func (*machine) MacAddress() (string, error) {
 		}
 	}
 
-	return "", errors.New("could not find a network interface with a MAC address")
+	return "", errors.New(ErrInvalidNetworkInterface.Error())
 }
 
 func (m *machine) HomeDirectory() string {
@@ -53,4 +55,8 @@ func (m *machine) HomeDirectory() string {
 	}
 
 	return m.os.Getenv("HOME")
+}
+
+func (*machine) ReadPassword(fd int) ([]byte, error) {
+	return term.ReadPassword(fd)
 }

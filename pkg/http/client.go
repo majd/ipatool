@@ -44,13 +44,13 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 	if req.Payload != nil {
 		data, err = req.Payload.data()
 		if err != nil {
-			return Result[R]{}, errors.Wrap(err, "failed to read payload data")
+			return Result[R]{}, errors.Wrap(err, ErrGetPayloadData.Error())
 		}
 	}
 
 	request, err := http.NewRequest(req.Method, req.URL, bytes.NewReader(data))
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, "failed to create HTTP request")
+		return Result[R]{}, errors.Wrap(err, ErrCreateRequest.Error())
 	}
 
 	for key, val := range req.Headers {
@@ -59,12 +59,12 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 
 	res, err := c.internalClient.Do(request)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, "request failed")
+		return Result[R]{}, errors.Wrap(err, ErrRequest.Error())
 	}
 
 	err = c.cookieJar.Save()
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, "failed to save cookies")
+		return Result[R]{}, errors.Wrap(err, ErrSaveCookie.Error())
 	}
 
 	if req.ResponseFormat == ResponseFormatJSON {
@@ -74,7 +74,7 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 		return c.handleXMLResponse(res)
 	}
 
-	return Result[R]{}, errors.Errorf("unsupported response body content type: %s", req.ResponseFormat)
+	return Result[R]{}, errors.Errorf("%s: %s", ErrUnsupportedContentType.Error(), req.ResponseFormat)
 }
 
 func (c *client[R]) Do(req *http.Request) (*http.Response, error) {
@@ -88,13 +88,13 @@ func (*client[R]) NewRequest(method, url string, body io.Reader) (*http.Request,
 func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, "failed to read response body")
+		return Result[R]{}, errors.Wrap(err, ErrGetResponseBody.Error())
 	}
 
 	var data R
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, "failed to unmarshall JSON data")
+		return Result[R]{}, errors.Wrap(err, ErrUnmarshalJSON.Error())
 	}
 
 	return Result[R]{
@@ -106,13 +106,13 @@ func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {
 func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, "failed to read response body")
+		return Result[R]{}, errors.Wrap(err, ErrGetResponseBody.Error())
 	}
 
 	var data R
 	_, err = plist.Unmarshal(body, &data)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, "failed to unmarshall XML data")
+		return Result[R]{}, errors.Wrap(err, ErrUnmarshalXML.Error())
 	}
 
 	headers := map[string]string{}
