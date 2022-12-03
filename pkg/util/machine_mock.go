@@ -61,3 +61,18 @@ func (mr *MockMachineMockRecorder) MacAddress() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MacAddress", reflect.TypeOf((*MockMachine)(nil).MacAddress))
 }
+
+// ReadPassword mocks base method.
+func (m *MockMachine) ReadPassword(fd int) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReadPassword", fd)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadPassword indicates an expected call of ReadPassword.
+func (mr *MockMachineMockRecorder) ReadPassword(fd interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadPassword", reflect.TypeOf((*MockMachine)(nil).ReadPassword), fd)
+}

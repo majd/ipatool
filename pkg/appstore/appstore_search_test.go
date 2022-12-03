@@ -41,12 +41,12 @@ var _ = Describe("AppStore (Search)", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
-				Return(nil, ErrKeychainGet)
+				Return(nil, ErrGetKeychainItem)
 		})
 
 		It("returns error", func() {
 			err := as.Search("", 0)
-			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrGetAccount.Error())))
 		})
 	})
 

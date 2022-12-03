@@ -10,6 +10,9 @@ func (k *keychain) Set(key string, data []byte) error {
 		Key:  key,
 		Data: data,
 	})
+	if err != nil {
+		return errors.Wrap(err, ErrSetKeychainItem.Error())
+	}
 
-	return errors.Wrap(err, "failed to set item in keyring")
+	return nil
 }

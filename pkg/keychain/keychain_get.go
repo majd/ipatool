@@ -7,7 +7,7 @@ import (
 func (k *keychain) Get(key string) ([]byte, error) {
 	item, err := k.keyring.Get(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to get item from keyring")
+		return nil, errors.Wrap(err, ErrGetKeychainItem.Error())
 	}
 
 	return item.Data, nil

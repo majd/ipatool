@@ -4,6 +4,7 @@ import (
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"syscall"
 )
 
 var _ = Describe("Machine", func() {
@@ -39,6 +40,13 @@ var _ = Describe("Machine", func() {
 			res, err := machine.MacAddress()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(ContainSubstring(":"))
+		})
+	})
+
+	When("reading password from stdout", func() {
+		It("returns error", func() {
+			_, err := machine.ReadPassword(syscall.Stdout)
+			Expect(err).To(MatchError(ContainSubstring("inappropriate ioctl for device")))
 		})
 	})
 })

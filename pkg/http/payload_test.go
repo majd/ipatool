@@ -30,7 +30,7 @@ var _ = Describe("Payload", func() {
 			}
 
 			data, err := sut.data()
-			Expect(err).To(MatchError(ContainSubstring("found unsupported value type")))
+			Expect(err).To(MatchError(ContainSubstring(ErrUnsupportedValueType.Error())))
 			Expect(data).To(BeNil())
 		})
 	})

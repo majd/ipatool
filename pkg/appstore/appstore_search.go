@@ -16,7 +16,7 @@ type SearchResult struct {
 func (a *appstore) Search(term string, limit int64) error {
 	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, ErrReadAccount.Error())
+		return errors.Wrap(err, ErrGetAccount.Error())
 	}
 
 	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)

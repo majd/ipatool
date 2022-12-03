@@ -48,12 +48,12 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
 				MacAddress().
-				Return("", ErrReadMAC)
+				Return("", ErrGetMAC)
 		})
 
 		It("returns error", func() {
 			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrReadMAC.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrGetMAC.Error())))
 		})
 	})
 
@@ -69,13 +69,13 @@ var _ = Describe("AppStore (Purchase)", func() {
 
 			mockKeychain.EXPECT().
 				Get("account").
-				Return(nil, ErrKeychainGet)
+				Return(nil, ErrGetKeychainItem)
 		})
 
 		It("returns error", func() {
 			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrKeychainGet.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrGetKeychainItem.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrGetAccount.Error())))
 		})
 	})
 
@@ -121,7 +121,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 
 		It("returns error", func() {
 			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrReadApp.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrAppLookup.Error())))
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
@@ -157,7 +157,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 
 		It("returns error", func() {
 			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrAppPaid.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrPaidApp.Error())))
 		})
 	})
 
@@ -565,7 +565,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 
 		It("returns nil", func() {
 			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring("failed to acquire license")))
+			Expect(err).To(MatchError(ContainSubstring(ErrPurchase.Error())))
 		})
 	})
 })
