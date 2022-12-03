@@ -43,7 +43,7 @@ var _ = Describe("AppStore (Info)", func() {
 		It("returns wrapped error", func() {
 			err := appstore.Info()
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrGetAccount.Error())))
 		})
 	})
 

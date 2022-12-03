@@ -25,7 +25,7 @@ func (p *XMLPayload) data() ([]byte, error) {
 
 	err := plist.NewEncoder(buffer).Encode(p.Content)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to encode XML object")
+		return nil, errors.Wrap(err, ErrEncodePayloadXML.Error())
 	}
 
 	return buffer.Bytes(), nil
@@ -41,7 +41,7 @@ func (p *URLPayload) data() ([]byte, error) {
 		case int:
 			params.Add(key, strconv.Itoa(val.(int)))
 		default:
-			return nil, errors.Errorf("found unsupported value type: %s", t)
+			return nil, errors.Errorf("%s: %s", ErrUnsupportedValueType.Error(), t)
 		}
 	}
 

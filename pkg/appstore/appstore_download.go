@@ -43,7 +43,7 @@ type PackageInfo struct {
 func (a *appstore) Download(bundleID string, outputPath string, acquireLicense bool) error {
 	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, ErrReadAccount.Error())
+		return errors.Wrap(err, ErrGetAccount.Error())
 	}
 
 	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
@@ -53,17 +53,17 @@ func (a *appstore) Download(bundleID string, outputPath string, acquireLicense b
 
 	app, err := a.lookup(bundleID, countryCode)
 	if err != nil {
-		return errors.Wrap(err, ErrReadApp.Error())
+		return errors.Wrap(err, ErrAppLookup.Error())
 	}
 
 	destination, err := a.resolveDestinationPath(app, outputPath)
 	if err != nil {
-		return errors.Wrap(err, "failed to resolve destination path")
+		return errors.Wrap(err, ErrResolveDestinationPath.Error())
 	}
 
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
-		return errors.Wrap(err, ErrReadMAC.Error())
+		return errors.Wrap(err, ErrGetMAC.Error())
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
@@ -71,7 +71,7 @@ func (a *appstore) Download(bundleID string, outputPath string, acquireLicense b
 
 	err = a.download(acc, app, destination, guid, acquireLicense, true)
 	if err != nil {
-		return errors.Wrap(err, ErrDownload.Error())
+		return errors.Wrap(err, ErrDownloadFile.Error())
 	}
 
 	a.logger.Log().Str("output", destination).Bool("success", true).Send()
@@ -127,24 +127,24 @@ func (a *appstore) download(acc Account, app App, dst, guid string, acquireLicen
 
 	if len(res.Data.Items) == 0 {
 		a.logger.Verbose().Interface("response", res).Send()
-		return errors.New("received 0 items from the App Store")
+		return ErrInvalidResponse
 	}
 
 	item := res.Data.Items[0]
 
 	err = a.downloadFile(fmt.Sprintf("%s.tmp", dst), item.URL)
 	if err != nil {
-		return errors.Wrap(err, ErrDownload.Error())
+		return errors.Wrap(err, ErrDownloadFile.Error())
 	}
 
 	err = a.applyPatches(item, acc, fmt.Sprintf("%s.tmp", dst), dst)
 	if err != nil {
-		return errors.Wrap(err, "failed to patch app package")
+		return errors.Wrap(err, ErrPatchApp.Error())
 	}
 
 	err = a.os.Remove(fmt.Sprintf("%s.tmp", dst))
 	if err != nil {
-		return errors.Wrap(err, "failed to remove temporary file")
+		return errors.Wrap(err, ErrRemoveTempFile.Error())
 	}
 
 	return nil
@@ -169,7 +169,7 @@ func (a *appstore) downloadFile(dst, sourceURL string) (err error) {
 
 	file, err := a.os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return errors.Wrap(err, "failed to open file")
+		return errors.Wrap(err, ErrOpenFile.Error())
 	}
 
 	sizeMB := float64(res.ContentLength) / (1 << 20)
@@ -177,7 +177,7 @@ func (a *appstore) downloadFile(dst, sourceURL string) (err error) {
 
 	_, err = io.Copy(file, res.Body)
 	if err != nil {
-		return errors.Wrap(err, "failed to write data to file")
+		return errors.Wrap(err, ErrFileWrite.Error())
 	}
 
 	return nil
@@ -211,7 +211,7 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 	if path == "" {
 		workdir, err := a.currentDirectory()
 		if err != nil {
-			return "", errors.Wrap(err, "failed to get current directory path")
+			return "", errors.Wrap(err, ErrGetCurrentDirectory.Error())
 		}
 
 		return fmt.Sprintf("%s%s", workdir, file), nil
@@ -219,7 +219,7 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 
 	isDir, err := a.isDirectory(path)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to determine if the supplied path is a directory")
+		return "", errors.Wrap(err, ErrCheckDirectory.Error())
 	}
 
 	if isDir {
@@ -232,7 +232,7 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 func (a *appstore) currentDirectory() (string, error) {
 	path, err := a.os.Executable()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get executable path name")
+		return "", errors.Wrap(err, ErrGetExecutablePath.Error())
 	}
 
 	return filepath.Dir(path), nil
@@ -241,7 +241,7 @@ func (a *appstore) currentDirectory() (string, error) {
 func (a *appstore) isDirectory(path string) (bool, error) {
 	info, err := a.os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
-		return false, errors.Wrap(err, "failed to get file metadata")
+		return false, errors.Wrap(err, ErrGetFileMetadata.Error())
 	}
 
 	if info == nil {
@@ -254,12 +254,12 @@ func (a *appstore) isDirectory(path string) (bool, error) {
 func (a *appstore) applyPatches(item DownloadItemResult, acc Account, src, dst string) (err error) {
 	dstFile, err := a.os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		return errors.Wrap(err, "failed to open destination file")
+		return errors.Wrap(err, ErrOpenFile.Error())
 	}
 
 	srcZip, err := zip.OpenReader(src)
 	if err != nil {
-		return errors.Wrap(err, "failed to open source file")
+		return errors.Wrap(err, ErrOpenZipFile.Error())
 	}
 	defer func() {
 		if closeErr := srcZip.Close(); closeErr != err && err == nil {
@@ -279,23 +279,23 @@ func (a *appstore) applyPatches(item DownloadItemResult, acc Account, src, dst s
 
 	appBundle, err := a.replicateZip(srcZip, dstZip, infoData, manifestData)
 	if err != nil {
-		return errors.Wrap(err, "failed to replicate zip")
+		return errors.Wrap(err, ErrReplicateZip.Error())
 	}
 
 	err = a.writeMetadata(item.Metadata, acc, dstZip)
 	if err != nil {
-		return errors.Wrap(err, "failed to write metadata")
+		return errors.Wrap(err, ErrWriteMetadataFile.Error())
 	}
 
 	if manifestData.Len() > 0 {
 		err = a.applySinfPatches(item, dstZip, manifestData.Bytes(), appBundle)
 		if err != nil {
-			return errors.Wrap(err, "failed to apply patches")
+			return errors.Wrap(err, ErrApplyPatches.Error())
 		}
 	} else {
 		err = a.applyLegacySinfPatches(item, dstZip, infoData.Bytes(), appBundle)
 		if err != nil {
-			return errors.Wrap(err, "failed to apply legacy patches")
+			return errors.Wrap(err, ErrApplyLegacyPatches.Error())
 		}
 	}
 
@@ -308,17 +308,17 @@ func (a *appstore) writeMetadata(metadata map[string]interface{}, acc Account, z
 
 	metadataFile, err := zip.Create("iTunesMetadata.plist")
 	if err != nil {
-		return errors.Wrap(err, "failed to create metadata file")
+		return errors.Wrap(err, ErrCreateMetadataFile.Error())
 	}
 
 	data, err := plist.Marshal(metadata, plist.BinaryFormat)
 	if err != nil {
-		return errors.Wrap(err, "failed to encode metadata")
+		return errors.Wrap(err, ErrEncodeMetadataFile.Error())
 	}
 
 	_, err = metadataFile.Write(data)
 	if err != nil {
-		return errors.Wrap(err, "failed to write metadata")
+		return errors.Wrap(err, ErrWriteMetadataFile.Error())
 	}
 
 	return nil
@@ -328,49 +328,49 @@ func (a *appstore) replicateZip(src *zip.ReadCloser, dst *zip.Writer, info *byte
 	for _, file := range src.File {
 		srcFile, err := file.OpenRaw()
 		if err != nil {
-			return "", errors.Wrap(err, "failed to read file")
+			return "", errors.Wrap(err, ErrOpenFile.Error())
 		}
 
 		if strings.HasSuffix(file.Name, ".app/SC_Info/Manifest.plist") {
 			srcFileD, err := file.Open()
 			if err != nil {
-				return "", errors.Wrap(err, "failed to open decompressed manifest file")
+				return "", errors.Wrap(err, ErrDecompressManifestFile.Error())
 			}
 
 			_, err = io.Copy(manifest, srcFileD)
 			if err != nil {
-				return "", errors.Wrap(err, "failed to read manifest file")
+				return "", errors.Wrap(err, ErrGetManifestFile.Error())
 			}
 		}
 
 		if strings.Contains(file.Name, ".app/Info.plist") {
 			srcFileD, err := file.Open()
 			if err != nil {
-				return "", errors.Wrap(err, "failed to open decompressed info file")
+				return "", errors.Wrap(err, ErrDecompressInfoFile.Error())
 			}
 
 			appBundle = filepath.Base(strings.TrimSuffix(file.Name, ".app/Info.plist"))
 
 			_, err = io.Copy(info, srcFileD)
 			if err != nil {
-				return "", errors.Wrap(err, "failed to read info file")
+				return "", errors.Wrap(err, ErrGetInfoFile.Error())
 			}
 		}
 
 		header := file.FileHeader
 		dstFile, err := dst.CreateRaw(&header)
 		if err != nil {
-			return "", errors.Wrap(err, "failed to create destination file")
+			return "", errors.Wrap(err, ErrCreateDestinationFile.Error())
 		}
 
 		_, err = io.Copy(dstFile, srcFile)
 		if err != nil {
-			return "", errors.Wrap(err, "failed to write file")
+			return "", errors.Wrap(err, ErrFileWrite.Error())
 		}
 	}
 
 	if appBundle == "" {
-		return "", errors.New("failed to determine name of app bundle")
+		return "", ErrGetBundleName
 	}
 
 	return appBundle, nil
@@ -380,12 +380,12 @@ func (a *appstore) applySinfPatches(item DownloadItemResult, zip *zip.Writer, ma
 	var manifest PackageManifest
 	_, err := plist.Unmarshal(manifestData, &manifest)
 	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal manifest data")
+		return errors.Wrap(err, ErrUnmarshal.Error())
 	}
 
 	zipped, err := util.Zip(item.Sinfs, manifest.SinfPaths)
 	if err != nil {
-		return errors.Wrap(err, "failed to zip sinfs and sinf paths")
+		return errors.Wrap(err, ErrZipSinfs.Error())
 	}
 
 	for _, pair := range zipped {
@@ -394,12 +394,12 @@ func (a *appstore) applySinfPatches(item DownloadItemResult, zip *zip.Writer, ma
 
 		file, err := zip.Create(sp)
 		if err != nil {
-			return errors.Wrap(err, "failed to create sinf file")
+			return errors.Wrap(err, ErrCreateSinfFile.Error())
 		}
 
 		_, err = file.Write(pair.First.Data)
 		if err != nil {
-			return errors.Wrap(err, "failed to write sinf data")
+			return errors.Wrap(err, ErrWriteSinfData.Error())
 		}
 	}
 
@@ -412,7 +412,7 @@ func (a *appstore) applyLegacySinfPatches(item DownloadItemResult, zip *zip.Writ
 	var info PackageInfo
 	_, err := plist.Unmarshal(infoData, &info)
 	if err != nil {
-		return errors.Wrap(err, "failed to unmarshal info data")
+		return errors.Wrap(err, ErrUnmarshal.Error())
 	}
 
 	sp := fmt.Sprintf("Payload/%s.app/SC_Info/%s.sinf", appBundle, info.BundleExecutable)
@@ -420,12 +420,12 @@ func (a *appstore) applyLegacySinfPatches(item DownloadItemResult, zip *zip.Writ
 
 	file, err := zip.Create(sp)
 	if err != nil {
-		return errors.Wrap(err, "failed to create sinf file")
+		return errors.Wrap(err, ErrCreateSinfFile.Error())
 	}
 
 	_, err = file.Write(item.Sinfs[0].Data)
 	if err != nil {
-		return errors.Wrap(err, "failed to write sinf data")
+		return errors.Wrap(err, ErrWriteSinfData.Error())
 	}
 
 	return nil

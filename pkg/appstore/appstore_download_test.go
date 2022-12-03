@@ -72,7 +72,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 		It("returns error", func() {
 			err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrReadAccount.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrGetAccount.Error())))
 		})
 	})
 
@@ -102,7 +102,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 		It("returns error", func() {
 			err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrReadApp.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrAppLookup.Error())))
 		})
 	})
 
@@ -160,7 +160,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 		It("returns error", func() {
 			err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrReadMAC.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrGetMAC.Error())))
 		})
 	})
 
@@ -614,7 +614,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 			It("returns error", func() {
 				err := as.Download("", "", true)
-				Expect(err).To(MatchError(ContainSubstring("failed to write data to file")))
+				Expect(err).To(MatchError(ContainSubstring(ErrFileWrite.Error())))
 			})
 		})
 	})
@@ -698,7 +698,7 @@ var _ = Describe("AppStore (Download)", func() {
 				Return(nil, testErr)
 
 			err := as.Download("", "", true)
-			Expect(err).To(MatchError(ContainSubstring("failed to open destination file")))
+			Expect(err).To(MatchError(ContainSubstring(ErrOpenFile.Error())))
 
 			testData, err := os.ReadFile(testFile.Name())
 			Expect(err).ToNot(HaveOccurred())

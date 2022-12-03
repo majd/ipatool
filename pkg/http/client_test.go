@@ -188,7 +188,7 @@ var _ = Describe("Client", Ordered, func() {
 				},
 			})
 
-			Expect(err).To(MatchError(ContainSubstring("failed to read payload data")))
+			Expect(err).To(MatchError(ContainSubstring(ErrGetPayloadData.Error())))
 		})
 	})
 })

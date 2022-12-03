@@ -8,7 +8,7 @@ import (
 func (a *appstore) Info() error {
 	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, ErrReadAccount.Error())
+		return errors.Wrap(err, ErrGetAccount.Error())
 	}
 
 	a.logger.Log().
@@ -23,7 +23,7 @@ func (a *appstore) Info() error {
 func (a *appstore) account() (Account, error) {
 	data, err := a.keychain.Get("account")
 	if err != nil {
-		return Account{}, errors.Wrap(err, ErrKeychainGet.Error())
+		return Account{}, errors.Wrap(err, ErrGetKeychainItem.Error())
 	}
 
 	var acc Account

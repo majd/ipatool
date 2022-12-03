@@ -17,7 +17,7 @@ type PurchaseResult struct {
 func (a *appstore) Purchase(bundleID string) error {
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
-		return errors.Wrap(err, ErrReadMAC.Error())
+		return errors.Wrap(err, ErrGetMAC.Error())
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
@@ -35,7 +35,7 @@ func (a *appstore) Purchase(bundleID string) error {
 func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredentials bool) error {
 	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, ErrReadAccount.Error())
+		return errors.Wrap(err, ErrGetAccount.Error())
 	}
 
 	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
@@ -45,11 +45,11 @@ func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredenti
 
 	app, err := a.lookup(bundleID, countryCode)
 	if err != nil {
-		return errors.Wrap(err, ErrReadApp.Error())
+		return errors.Wrap(err, ErrAppLookup.Error())
 	}
 
 	if app.Price > 0 {
-		return ErrAppPaid
+		return ErrPaidApp
 	}
 
 	req := a.purchaseRequest(acc, app, acc.StoreFront, guid)
@@ -88,7 +88,7 @@ func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredenti
 
 	if res.Data.JingleDocType != "purchaseSuccess" || res.Data.Status != 0 {
 		a.logger.Verbose().Interface("response", res).Send()
-		return errors.New("failed to acquire license")
+		return errors.New(ErrPurchase.Error())
 	}
 
 	return nil
@@ -103,7 +103,7 @@ func (*appstore) countryCodeFromStoreFront(storeFront string) (string, error) {
 		}
 	}
 
-	return "", errors.New("could not infer country code from store front")
+	return "", errors.New(ErrInvalidStoreFront.Error())
 }
 
 func (a *appstore) purchaseRequest(acc Account, app App, storeFront, guid string) http.Request {

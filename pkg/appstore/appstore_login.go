@@ -8,6 +8,7 @@ import (
 	"github.com/majd/ipatool/pkg/util"
 	"github.com/pkg/errors"
 	"strings"
+	"syscall"
 )
 
 type LoginAddressResult struct {
@@ -29,9 +30,23 @@ type LoginResult struct {
 }
 
 func (a *appstore) Login(email, password, authCode string) error {
+	if password == "" && !a.interactive {
+		return ErrPasswordRequired
+	}
+
+	if password == "" && a.interactive {
+		a.logger.Log().Msg("enter password:")
+
+		var err error
+		password, err = a.promptForPassword()
+		if err != nil {
+			return errors.Wrap(err, ErrGetData.Error())
+		}
+	}
+
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
-		return errors.Wrap(err, ErrReadMAC.Error())
+		return errors.Wrap(err, ErrGetMAC.Error())
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
@@ -39,7 +54,7 @@ func (a *appstore) Login(email, password, authCode string) error {
 
 	acc, err := a.login(email, password, authCode, guid, 0, false)
 	if err != nil {
-		return errors.Wrap(err, "failed to log in")
+		return errors.Wrap(err, ErrLogin.Error())
 	}
 
 	a.logger.Log().
@@ -88,7 +103,7 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int, fa
 			a.logger.Log().Msg("enter 2FA code:")
 			authCode, err = a.promptForAuthCode()
 			if err != nil {
-				return Account{}, errors.Wrap(err, ErrReadData.Error())
+				return Account{}, errors.Wrap(err, ErrGetData.Error())
 			}
 
 			return a.login(email, password, authCode, guid, 0, failOnAuthCodeRequirement)
@@ -115,7 +130,7 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int, fa
 
 	err = a.keychain.Set("account", data)
 	if err != nil {
-		return Account{}, errors.Wrap(err, ErrKeychainSet.Error())
+		return Account{}, errors.Wrap(err, ErrSetKeychainItem.Error())
 	}
 
 	return acc, nil
@@ -153,7 +168,7 @@ func (a *appstore) promptForAuthCode() (string, error) {
 	reader := bufio.NewReader(a.ioReader)
 	authCode, err := reader.ReadString('\n')
 	if err != nil {
-		return "", errors.Wrap(err, ErrReadData.Error())
+		return "", errors.Wrap(err, ErrGetData.Error())
 	}
 
 	return strings.Trim(authCode, "\n"), nil
@@ -167,4 +182,13 @@ func (*appstore) authDomain(authCode, guid string) string {
 
 	return fmt.Sprintf(
 		"https://%s-%s%s?guid=%s", prefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathAuthenticate, guid)
+}
+
+func (a *appstore) promptForPassword() (string, error) {
+	password, err := a.machine.ReadPassword(syscall.Stdin)
+	if err != nil {
+		return "", errors.Wrap(err, ErrGetData.Error())
+	}
+
+	return string(password), nil
 }

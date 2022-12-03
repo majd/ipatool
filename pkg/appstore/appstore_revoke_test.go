@@ -43,7 +43,7 @@ var _ = Describe("AppStore (Revoke)", func() {
 		It("returns wrapped error", func() {
 			err := appstore.Revoke()
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrKeychainRemove.Error())))
+			Expect(err).To(MatchError(ContainSubstring(ErrRemoveKeychainItem.Error())))
 		})
 	})
 
