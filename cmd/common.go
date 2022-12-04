@@ -16,7 +16,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 )
 
 func newCookieJar() (*cookiejar.Jar, error) {
@@ -70,7 +69,7 @@ func newKeyring(logger log.Logger, passphrase string, interactive bool) (keyring
 
 			path := strings.Split(s, " unlock ")[1]
 			logger.Log().Msgf("enter passphrase to unlock %s (this is separate from your Apple ID password): ", path)
-			password, err := term.ReadPassword(syscall.Stdin)
+			password, err := term.ReadPassword(int(os.Stdin.Fd()))
 			if err != nil {
 				return "", errors.Wrap(err, "failed to read password")
 			}

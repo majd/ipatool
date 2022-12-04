@@ -1,4 +1,4 @@
-name: Dry Builds
+name: Dry Build
 
 on:
   pull_request:
@@ -6,6 +6,8 @@ on:
       - main
 
 jobs:
+  build:
+    name: Build
   build_ios:
     name: Dry build (iOS)
     runs-on: macos-12
