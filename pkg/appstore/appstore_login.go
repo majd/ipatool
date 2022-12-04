@@ -7,8 +7,8 @@ import (
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/util"
 	"github.com/pkg/errors"
+	"os"
 	"strings"
-	"syscall"
 )
 
 type LoginAddressResult struct {
@@ -185,7 +185,7 @@ func (*appstore) authDomain(authCode, guid string) string {
 }
 
 func (a *appstore) promptForPassword() (string, error) {
-	password, err := a.machine.ReadPassword(syscall.Stdin)
+	password, err := a.machine.ReadPassword(int(os.Stdin.Fd()))
 	if err != nil {
 		return "", errors.Wrap(err, ErrGetData.Error())
 	}
