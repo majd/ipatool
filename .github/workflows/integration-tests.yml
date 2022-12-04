@@ -11,44 +11,68 @@ on:
 jobs:
   build:
     name: Build
-    runs-on: macos-12
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ darwin, linux, windows ]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Cache SwiftPM packages
-        uses: actions/cache@v3
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v3
         with:
-          path: .build/checkouts
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-            ${{ runner.os }}-spm-
-      - name: Inject version
-        run: ./Scripts/version
-      - name: Build
-        run: make build-macos
-      - name: Upload binary
-        uses: actions/upload-artifact@v2
+          go-version: '1.19.3'
+          cache: true
+      - run: ./tools/version.sh
+      - run: go build -o ipatool-${{ matrix.os }}
+        env:
+          GOOS: ${{ matrix.os }}
+      - uses: actions/upload-artifact@v2
         with:
-          name: ipatool
-          path: .build/ipatool
+          name: ipatool-${{ matrix.os }}
+          path: ipatool-${{ matrix.os }}
           if-no-files-found: error
-  test:
-    name: Test
-    runs-on: ${{ matrix.macos }}
+  test_macos:
+    name: Test (macOS)
+    runs-on: macos-latest
     needs: [build]
     strategy:
       fail-fast: false
       matrix:
-        macos: [macos-11, macos-12]
         command: [auth, download, purchase, search]
     steps:
-      - name: Download binary
-        uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v2
         with:
-          name: ipatool
-          path: ipatool-current
-      - name: Update permissions
-        run: chmod +x ./ipatool-current/ipatool
-      - name: Run tests
-        run: ./ipatool-current/ipatool ${{ matrix.command }} --help
+          name: ipatool-darwin
+          path: ipatool
+      - run: chmod +x ./ipatool/ipatool-darwin
+      - run: ./ipatool/ipatool-darwin ${{ matrix.command }} --help
+  test_linux:
+    name: Test (Linux)
+    runs-on: ubuntu-latest
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [auth, download, purchase, search]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: ipatool-linux
+          path: ipatool
+      - run: chmod +x ./ipatool/ipatool-linux
+      - run: ./ipatool/ipatool-linux ${{ matrix.command }} --help
+  test_windows:
+    name: Test (Windows)
+    runs-on: windows-latest
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        command: [auth, download, purchase, search]
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: ipatool-windows
+          path: ipatool
+      - run: chmod +x ./ipatool/ipatool-windows
+      - run: ./ipatool/ipatool-windows ${{ matrix.command }} --help

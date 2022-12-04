@@ -17,6 +17,7 @@ func rootCmd() *cobra.Command {
 		Short:         "A cli tool for interacting with Apple's ipa files",
 		SilenceErrors: true,
 		SilenceUsage:  true,
+		Version:       version,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			ctx := context.WithValue(context.Background(), "logger", newLogger(format, verbose))
 			ctx = context.WithValue(ctx, "interactive", nonInteractive == false)

@@ -8,45 +8,20 @@ on:
 jobs:
   build:
     name: Build
-  build_ios:
-    name: Dry build (iOS)
-    runs-on: macos-12
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ darwin, linux, windows ]
+        arch: [ arm64, amd64 ]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Cache SwiftPM packages
-        uses: actions/cache@v3
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v3
         with:
-          path: .build/checkouts
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-            ${{ runner.os }}-spm-
-      - name: Install dependencies
-        run: brew install xcodegen ldid
-      - name: Inject version
-        run: ./Scripts/version
-      - name: Build
-        run: |
-          make build-ios
-          file .build/ipatool
-  build_macos:
-    name: Dry build (macOS)
-    runs-on: macos-12
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Cache SwiftPM packages
-        uses: actions/cache@v3
-        with:
-          path: .build/checkouts
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-            ${{ runner.os }}-spm-
-      - name: Inject version
-        run: ./Scripts/version
-      - name: Build
-        run: |
-          make build-macos
-          file .build/ipatool
+          go-version: '1.19.3'
+          cache: true
+      - run: ./tools/version.sh
+      - run: go build -o ipatool-${{ matrix.os }}
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}

@@ -9,23 +9,14 @@ on:
       - main
 
 jobs:
-  test-networking:
-    name: Test Networking
-    runs-on: macos-12
+  run_tests:
+    name: Run tests
+    runs-on: macos-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      - name: Cache SwiftPM packages
-        uses: actions/cache@v3
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v3
         with:
-          path: .build/checkouts
-          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-          restore-keys: |
-            ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
-            ${{ runner.os }}-spm-
-      - name: Inject version
-        run: ./Scripts/version
-      - name: Build
-        run: swift build
-      - name: Run tests
-        run: swift test --filter NetworkingTests
+          go-version: '1.19.3'
+          cache: true
+      - run: ./tools/version.sh
+      - run: go test -v github.com/majd/ipatool/...
