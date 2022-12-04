@@ -55,7 +55,7 @@ var _ = Describe("AppStore (Download)", func() {
 			machine:        mockMachine,
 			os:             mockOS,
 			logger:         mockLogger,
-			interactive:    false,
+			interactive:    true,
 		}
 	})
 

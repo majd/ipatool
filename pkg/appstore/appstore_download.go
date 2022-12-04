@@ -7,11 +7,13 @@ import (
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/util"
 	"github.com/pkg/errors"
+	"github.com/schollz/progressbar/v3"
 	"howett.net/plist"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type DownloadSinfResult struct {
@@ -175,7 +177,27 @@ func (a *appstore) downloadFile(dst, sourceURL string) (err error) {
 	sizeMB := float64(res.ContentLength) / (1 << 20)
 	a.logger.Verbose().Str("size", fmt.Sprintf("%.2fMB", sizeMB)).Msg("downloading")
 
-	_, err = io.Copy(file, res.Body)
+	if a.interactive {
+		bar := progressbar.NewOptions64(res.ContentLength,
+			progressbar.OptionSetDescription("downloading"),
+			progressbar.OptionSetWriter(os.Stdout),
+			progressbar.OptionShowBytes(true),
+			progressbar.OptionSetWidth(20),
+			progressbar.OptionFullWidth(),
+			progressbar.OptionThrottle(65*time.Millisecond),
+			progressbar.OptionShowCount(),
+			progressbar.OptionClearOnFinish(),
+			progressbar.OptionSpinnerType(14),
+			progressbar.OptionSetRenderBlankState(true),
+			progressbar.OptionSetElapsedTime(false),
+			progressbar.OptionSetPredictTime(false),
+		)
+
+		_, err = io.Copy(io.MultiWriter(file, bar), res.Body)
+	} else {
+		_, err = io.Copy(file, res.Body)
+	}
+
 	if err != nil {
 		return errors.Wrap(err, ErrFileWrite.Error())
 	}
