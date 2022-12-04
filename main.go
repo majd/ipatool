@@ -2,8 +2,9 @@ package main
 
 import (
 	"github.com/majd/ipatool/cmd"
+	"os"
 )
 
 func main() {
-	cmd.Execute()
+	os.Exit(cmd.Execute())
 }

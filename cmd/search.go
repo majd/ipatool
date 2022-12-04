@@ -1,25 +1,34 @@
 package cmd
 
 import (
-	"github.com/majd/ipatool/pkg/appstore"
+	"github.com/99designs/keyring"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func searchCmd() *cobra.Command {
+	var keychainPassphrase string
 	var limit int64
-	var countryCode string
-	var deviceFamily string
 
 	cmd := &cobra.Command{
 		Use:   "search <term>",
 		Short: "Search for iOS apps available on the App Store",
 		Args:  cobra.ExactArgs(1),
-		Run:   func(cmd *cobra.Command, args []string) {},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			appstore, err := newAppStore(cmd, keychainPassphrase)
+			if err != nil {
+				return errors.Wrap(err, "failed to create appstore client")
+			}
+
+			return appstore.Search(args[0], limit)
+		},
 	}
 
-	cmd.Flags().Int64VarP(&limit, "limit", "l", 5, "The maximum amount of search results to retrieve")
-	cmd.Flags().StringVarP(&countryCode, "country", "c", "US", "The two-letter (ISO 3166-1 alpha-2) country code for the iTunes Store")
-	cmd.Flags().StringVarP(&deviceFamily, "device-family", "d", appstore.DeviceFamilyPhone, "The device family to limit the search query to")
+	cmd.Flags().Int64VarP(&limit, "limit", "l", 5, "maximum amount of search results to retrieve")
+
+	if keyringBackendType() == keyring.FileBackend {
+		cmd.PersistentFlags().StringVar(&keychainPassphrase, "keychain-passphrase", "", "passphrase for unlocking keychain")
+	}
 
 	return cmd
 }
