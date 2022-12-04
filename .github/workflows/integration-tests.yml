@@ -43,9 +43,9 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: ipatool-darwin
-          path: ipatool
-      - run: chmod +x ./ipatool/ipatool-darwin
-      - run: ./ipatool/ipatool-darwin ${{ matrix.command }} --help
+          path: build
+      - run: chmod +x ./build/ipatool-darwin
+      - run: ./build/ipatool-darwin ${{ matrix.command }} --help
   test_linux:
     name: Test (Linux)
     runs-on: ubuntu-latest
@@ -58,9 +58,9 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: ipatool-linux
-          path: ipatool
-      - run: chmod +x ./ipatool/ipatool-linux
-      - run: ./ipatool/ipatool-linux ${{ matrix.command }} --help
+          path: build
+      - run: chmod +x ./build/ipatool-linux
+      - run: ./build/ipatool-linux ${{ matrix.command }} --help
   test_windows:
     name: Test (Windows)
     runs-on: windows-latest
@@ -73,6 +73,6 @@ jobs:
       - uses: actions/download-artifact@v2
         with:
           name: ipatool-windows
-          path: ipatool
-      - run: chmod +x ./ipatool/ipatool-windows
-      - run: ./ipatool/ipatool-windows ${{ matrix.command }} --help
+          path: build
+      - run: chmod +x ./build/ipatool-windows
+      - run: ./build/ipatool-windows ${{ matrix.command }} --help
