@@ -1,4 +1,4 @@
-name: Issues cleanup
+name: Issues Cleanup
 
 on:
   issue_comment:

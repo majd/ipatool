@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  get_version:
+    name: Get version
+    runs-on: ubuntu-latest
+    steps:
+      - id: set_output
+        run: echo ::set-output name=version::${GITHUB_REF#refs/tags/v}
+    outputs:
+      version: ${{ steps.set_output.outputs.version }}
+  test:
+    name: Run tests
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19.3'
+          cache: true
+      - run: ./tools/version.sh
+      - run: go test -v github.com/majd/ipatool/...
+  build:
+    name: Build
+    runs-on: macos-latest
+    needs: [get_version, test]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ darwin, linux, windows ]
+        arch: [ arm64, amd64 ]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-go@v3
+        with:
+          go-version: '1.19.3'
+          cache: true
+      - run: ./tools/version.sh
+      - run: go build -o ipatool-${{ needs.get_version.outputs.version }}-${GOOS//darwin/macos}-$GOARCH
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+      - id: output
+        run: echo ::set-output name=file::ipatool-${{ needs.get_version.outputs.version }}-${GOOS//darwin/macos}-$GOARCH
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+      - uses: actions/upload-artifact@v2
+        with:
+          name: ${{ steps.output.outputs.file }}
+          path: ${{ steps.output.outputs.file }}
+          if-no-files-found: error
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    needs: [build]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ darwin, linux, windows ]
+        arch: [ arm64, amd64 ]
+    steps:
+      - id: output
+        run: echo ::set-output name=file::ipatool-${{ needs.get_version.outputs.version }}-${GOOS//darwin/macos}-$GOARCH
+        env:
+          GOOS: ${{ matrix.os }}
+          GOARCH: ${{ matrix.arch }}
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ steps.output.outputs.file }}
+          path: bin
+      - run: tar -czvf ${{ steps.output.outputs.file }}.tar.gz bin/${{ steps.output.outputs.file }}
+      - run: ./tools/sha256sum.sh ${{ steps.output.outputs.file }}.tar.gz > ${{ steps.output.outputs.file }}.tar.gz.sha256sum
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ steps.output.outputs.file }}.tar.gz
+          asset_name: ${{ steps.output.outputs.file }}.tar.gz
+          tag: ${{ github.ref }}
+          overwrite: false
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ${{ steps.output.outputs.file }}.tar.gz.sha256sum
+          asset_name: ${{ steps.output.outputs.file }}.tar.gz.sha256sum
+          tag: ${{ github.ref }}
+          overwrite: false
