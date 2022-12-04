@@ -1,33 +1,43 @@
 package cmd
 
 import (
-	"github.com/majd/ipatool/pkg/log"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"os"
+	"github.com/thediveo/enumflag/v2"
+	"golang.org/x/net/context"
 )
 
-func configureLogger(level string) error {
-	logLevel, err := log.LevelFromString(level)
-	if err != nil {
-		return err
-	}
-
-	log.Logger = log.Output(log.NewWriter()).Level(logLevel)
-	return nil
-}
-
 func rootCmd() *cobra.Command {
-	var logLevel string
+	var verbose bool
+	var nonInteractive bool
+	var format OutputFormat
 
 	cmd := &cobra.Command{
-		Use:   "ipatool",
-		Short: "A cli tool for interacting with Apple's ipa files",
+		Use:           "ipatool",
+		Short:         "A cli tool for interacting with Apple's ipa files",
+		SilenceErrors: true,
+		SilenceUsage:  true,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			return configureLogger(logLevel)
+			ctx := context.WithValue(context.Background(), "logger", newLogger(format, verbose))
+			ctx = context.WithValue(ctx, "interactive", nonInteractive == false)
+			cmd.SetContext(ctx)
+
+			err := configureConfigDirectory()
+			if err != nil {
+				return errors.Wrap(err, "failed to configure config directory")
+			}
+
+			return nil
 		},
 	}
 
-	cmd.PersistentFlags().StringVar(&logLevel, "log-level", log.InfoLevel, "The log level")
+	cmd.PersistentFlags().VarP(
+		enumflag.New(&format, "format", map[OutputFormat][]string{
+			OutputFormatText: {"text"},
+			OutputFormatJSON: {"json"},
+		}, enumflag.EnumCaseSensitive), "format", "", "sets output format for command; can be 'text', 'json'")
+	cmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "enables verbose logs")
+	cmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "", false, "run in non-interactive session")
 
 	cmd.AddCommand(authCmd())
 	cmd.AddCommand(downloadCmd())
@@ -37,8 +47,28 @@ func rootCmd() *cobra.Command {
 	return cmd
 }
 
-func Execute() {
-	if err := rootCmd().Execute(); err != nil {
-		os.Exit(1)
+// Execute runs the program and returns the approperiate exit status code.
+func Execute() (exitCode int) {
+	cmd := rootCmd()
+	err := cmd.Execute()
+	if err != nil {
+		exitCode = 1
+
+		logger := newLogger(OutputFormatText, false)
+		outputFormat, parseErr := parseOutputFormat(cmd.Flag("format").Value.String())
+		if parseErr != nil {
+			logger.Error().Err(parseErr).Send()
+			return
+		}
+
+		logger = newLogger(outputFormat, cmd.Flag("verbose").Value.String() == "true")
+
+		logger.Verbose().Stack().Err(err).Send()
+		logger.Error().
+			Err(err).
+			Bool("success", false).
+			Send()
 	}
+
+	return
 }
