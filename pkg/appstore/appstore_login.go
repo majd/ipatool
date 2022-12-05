@@ -171,7 +171,10 @@ func (a *appstore) promptForAuthCode() (string, error) {
 		return "", errors.Wrap(err, ErrGetData.Error())
 	}
 
-	return strings.Trim(authCode, "\n"), nil
+	authCode = strings.Trim(authCode, "\n")
+	authCode = strings.Trim(authCode, "\r")
+
+	return authCode, nil
 }
 
 func (*appstore) authDomain(authCode, guid string) string {
