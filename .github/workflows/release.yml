@@ -65,6 +65,7 @@ jobs:
         os: [ darwin, linux, windows ]
         arch: [ arm64, amd64 ]
     steps:
+      - uses: actions/checkout@v2
       - id: output
         run: echo ::set-output name=file::ipatool-${{ needs.get_version.outputs.version }}-${GOOS//darwin/macos}-$GOARCH
         env:
@@ -74,7 +75,6 @@ jobs:
         with:
           name: ${{ steps.output.outputs.file }}
           path: bin
-      - uses: actions/checkout@v2
       - run: tar -czvf ${{ steps.output.outputs.file }}.tar.gz bin/${{ steps.output.outputs.file }}
       - run: ./tools/sha256sum.sh ${{ steps.output.outputs.file }}.tar.gz > ${{ steps.output.outputs.file }}.tar.gz.sha256sum
       - uses: svenstaro/upload-release-action@v2
