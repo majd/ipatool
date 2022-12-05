@@ -74,6 +74,7 @@ jobs:
         with:
           name: ${{ steps.output.outputs.file }}
           path: bin
+      - uses: actions/checkout@v2
       - run: tar -czvf ${{ steps.output.outputs.file }}.tar.gz bin/${{ steps.output.outputs.file }}
       - run: ./tools/sha256sum.sh ${{ steps.output.outputs.file }}.tar.gz > ${{ steps.output.outputs.file }}.tar.gz.sha256sum
       - uses: svenstaro/upload-release-action@v2
