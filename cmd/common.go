@@ -69,12 +69,16 @@ func newKeyring(logger log.Logger, passphrase string, interactive bool) (keyring
 
 			path := strings.Split(s, " unlock ")[1]
 			logger.Log().Msgf("enter passphrase to unlock %s (this is separate from your Apple ID password): ", path)
-			password, err := term.ReadPassword(int(os.Stdin.Fd()))
+			bytes, err := term.ReadPassword(int(os.Stdin.Fd()))
 			if err != nil {
 				return "", errors.Wrap(err, "failed to read password")
 			}
 
-			return string(password), nil
+			password := string(bytes)
+			password = strings.Trim(password, "\n")
+			password = strings.Trim(password, "\r")
+
+			return password, nil
 		},
 	})
 	if err != nil {
