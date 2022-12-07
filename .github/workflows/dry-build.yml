@@ -21,7 +21,9 @@ jobs:
           go-version: '1.19.3'
           cache: true
       - run: ./tools/version.sh
-      - run: go build -o ipatool-${{ matrix.os }}
+      - run: go build -o ipatool-${{ matrix.os }}-${{ matrix.arch }}
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
+          CGO_CFLAGS: -mmacosx-version-min=10.15
+          CGO_LDFLAGS: -mmacosx-version-min=10.15
