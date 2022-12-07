@@ -78,7 +78,7 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 }
 
 func (c *client[R]) Do(req *http.Request) (*http.Response, error) {
-	return c.internalClient.Do(req)
+	return http.DefaultClient.Do(req)
 }
 
 func (*client[R]) NewRequest(method, url string, body io.Reader) (*http.Request, error) {

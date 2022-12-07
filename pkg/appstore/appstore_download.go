@@ -174,6 +174,12 @@ func (a *appstore) downloadFile(dst, sourceURL string) (err error) {
 		return errors.Wrap(err, ErrOpenFile.Error())
 	}
 
+	defer func() {
+		if closeErr := file.Close(); closeErr != err && err == nil {
+			err = closeErr
+		}
+	}()
+
 	sizeMB := float64(res.ContentLength) / (1 << 20)
 	a.logger.Verbose().Str("size", fmt.Sprintf("%.2fMB", sizeMB)).Msg("downloading")
 
