@@ -45,6 +45,8 @@ jobs:
         env:
           GOOS: ${{ matrix.os }}
           GOARCH: ${{ matrix.arch }}
+          CGO_CFLAGS: -mmacosx-version-min=10.15
+          CGO_LDFLAGS: -mmacosx-version-min=10.15
       - id: output
         run: echo ::set-output name=file::ipatool-${{ needs.get_version.outputs.version }}-${GOOS//darwin/macos}-$GOARCH
         env:

@@ -23,6 +23,8 @@ jobs:
       - run: go build -o ipatool-${{ matrix.os }}
         env:
           GOOS: ${{ matrix.os }}
+          CGO_CFLAGS: -mmacosx-version-min=10.15
+          CGO_LDFLAGS: -mmacosx-version-min=10.15
       - uses: actions/upload-artifact@v2
         with:
           name: ipatool-${{ matrix.os }}
