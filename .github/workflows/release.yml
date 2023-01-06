@@ -114,6 +114,9 @@ jobs:
       - run: tar -czvf $BIN.tar.gz bin/$BIN
         env:
           BIN: ipatool-${{ needs.get_version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}
+      - run: ./tools/sha256sum.sh $TARBALL > $TARBALL.sha256sum
+        env:
+          TARBALL: ipatool-${{ needs.get_version.outputs.version }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz
       - uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
