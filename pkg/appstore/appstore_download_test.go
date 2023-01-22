@@ -860,7 +860,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 					r, err := zip.OpenReader(outputPath)
 					Expect(err).ToNot(HaveOccurred())
-    				defer r.Close()
+					defer r.Close()
 
 					found := false
 					for _, f := range r.File {
