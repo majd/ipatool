@@ -868,7 +868,6 @@ var _ = Describe("AppStore (Download)", func() {
 							found = true
 							break
 						}
-						fmt.Println(f.Name)
 					}
 					Expect(found).To(BeFalse())
 				})
