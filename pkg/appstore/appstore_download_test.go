@@ -150,7 +150,7 @@ var _ = Describe("AppStore (Download)", func() {
 				}, nil)
 
 			mockOS.EXPECT().
-				Executable().
+				Getwd().
 				Return("", nil)
 
 			mockMachine.EXPECT().
@@ -181,7 +181,7 @@ var _ = Describe("AppStore (Download)", func() {
 				}, nil)
 
 			mockOS.EXPECT().
-				Executable().
+				Getwd().
 				Return("", nil)
 
 			mockMachine.EXPECT().
@@ -220,7 +220,7 @@ var _ = Describe("AppStore (Download)", func() {
 				}, nil)
 
 			mockOS.EXPECT().
-				Executable().
+				Getwd().
 				Return("", nil)
 
 			mockMachine.EXPECT().
@@ -307,7 +307,7 @@ var _ = Describe("AppStore (Download)", func() {
 				}, nil)
 
 			mockOS.EXPECT().
-				Executable().
+				Getwd().
 				Return("", nil)
 
 			mockMachine.EXPECT().
@@ -408,7 +408,7 @@ var _ = Describe("AppStore (Download)", func() {
 				}, nil)
 
 			mockOS.EXPECT().
-				Executable().
+				Getwd().
 				Return("", nil)
 
 			mockMachine.EXPECT().
@@ -474,7 +474,7 @@ var _ = Describe("AppStore (Download)", func() {
 				}, nil)
 
 			mockOS.EXPECT().
-				Executable().
+				Getwd().
 				Return("", nil)
 
 			mockMachine.EXPECT().
@@ -518,7 +518,7 @@ var _ = Describe("AppStore (Download)", func() {
 				}, nil)
 
 			mockOS.EXPECT().
-				Executable().
+				Getwd().
 				Return("", nil)
 
 			mockMachine.EXPECT().
@@ -690,7 +690,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 		It("writes data to file", func() {
 			mockOS.EXPECT().
-				Executable().
+				Getwd().
 				Return("", nil)
 
 			mockOS.EXPECT().

@@ -6,7 +6,7 @@ import "os"
 type OperatingSystem interface {
 	Getenv(key string) string
 	Stat(name string) (os.FileInfo, error)
-	Executable() (string, error)
+	Getwd() (string, error)
 	OpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	Remove(name string) error
 	IsNotExist(err error) bool
@@ -27,8 +27,8 @@ func (*operatingSystem) Stat(name string) (os.FileInfo, error) {
 	return os.Stat(name)
 }
 
-func (*operatingSystem) Executable() (string, error) {
-	return os.Executable()
+func (*operatingSystem) Getwd() (string, error) {
+	return os.Getwd()
 }
 
 func (*operatingSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {

@@ -237,7 +237,7 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 	file := fmt.Sprintf("/%s_%d_v%s_%d.ipa", app.BundleID, app.ID, app.Version, util.RandInt(100, 999))
 
 	if path == "" {
-		workdir, err := a.currentDirectory()
+		workdir, err := a.os.Getwd()
 		if err != nil {
 			return "", errors.Wrap(err, ErrGetCurrentDirectory.Error())
 		}
@@ -255,15 +255,6 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 	}
 
 	return path, nil
-}
-
-func (a *appstore) currentDirectory() (string, error) {
-	path, err := a.os.Executable()
-	if err != nil {
-		return "", errors.Wrap(err, ErrGetExecutablePath.Error())
-	}
-
-	return filepath.Dir(path), nil
 }
 
 func (a *appstore) isDirectory(path string) (bool, error) {

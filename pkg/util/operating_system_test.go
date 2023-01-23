@@ -65,9 +65,9 @@ var _ = Describe("Operating System", func() {
 		})
 	})
 
-	When("executing", func() {
-		It("returns executable path", func() {
-			res, err := os.Executable()
+	When("running", func() {
+		It("returns current working directory", func() {
+			res, err := os.Getwd()
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).ToNot(BeNil())
 		})

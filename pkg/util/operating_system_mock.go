@@ -34,21 +34,6 @@ func (m *MockOperatingSystem) EXPECT() *MockOperatingSystemMockRecorder {
 	return m.recorder
 }
 
-// Executable mocks base method.
-func (m *MockOperatingSystem) Executable() (string, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Executable")
-	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// Executable indicates an expected call of Executable.
-func (mr *MockOperatingSystemMockRecorder) Executable() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Executable", reflect.TypeOf((*MockOperatingSystem)(nil).Executable))
-}
-
 // Getenv mocks base method.
 func (m *MockOperatingSystem) Getenv(key string) string {
 	m.ctrl.T.Helper()
@@ -61,6 +46,21 @@ func (m *MockOperatingSystem) Getenv(key string) string {
 func (mr *MockOperatingSystemMockRecorder) Getenv(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Getenv", reflect.TypeOf((*MockOperatingSystem)(nil).Getenv), key)
+}
+
+// Getwd mocks base method.
+func (m *MockOperatingSystem) Getwd() (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Getwd")
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Getwd indicates an expected call of Getwd.
+func (mr *MockOperatingSystemMockRecorder) Getwd() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Getwd", reflect.TypeOf((*MockOperatingSystem)(nil).Getwd))
 }
 
 // IsNotExist mocks base method.
