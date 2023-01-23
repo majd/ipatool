@@ -129,7 +129,7 @@ The tool can be compiled using the Go toolchain.
 $ go build -o ipatool
 ```
 
-Unit tests can be executing with the following command.
+Unit tests can be executed with the following command.
 
 ```shell
 $ go test -v github.com/majd/ipatool/...
