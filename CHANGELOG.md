@@ -1,5 +1,16 @@
 ## Changelog
 
+### Version [2.0.2](https://github.com/majd/ipatool/releases/tag/v2.0.2)
+
+- Fixed Sinf patches when the app contains an Apple Watch app.
+- Added storefront code for Albania.
+- Fixed default output path to be current working directory.
+
+### Version [2.0.1](https://github.com/majd/ipatool/releases/tag/v2.0.1)
+
+- Linux & Windows releases now include the sha256 hash.
+- Added storefront code for Mongolia.
+
 ### Version [2.0.0](https://github.com/majd/ipatool/releases/tag/v2.0.0)
 
 - Added support for Windows.
@@ -8,7 +19,7 @@
 - Implemented new `auth info` command.
 - Implemented `--verbose` flag that replaces the `--debug-level` flag to enable verbose logging.
 - Implemented `--format` which allows specifying logs output format to either text or json (default: text).
-- Implemented flag `--non-interactive` flag to disable running the tool in an interactive session.
+- Implemented `--non-interactive` flag to disable running the tool in an interactive session.
 - The relevant command (i.e. purchase) will now automatically determine the country and the device family from the authenticated account. The following flags have been deprecated.
     - `--country`
     - `--device-family`
