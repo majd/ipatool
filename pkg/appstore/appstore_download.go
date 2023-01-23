@@ -377,7 +377,9 @@ func (a *appstore) replicateZip(src *zip.ReadCloser, dst *zip.Writer, info *byte
 				return "", errors.Wrap(err, ErrDecompressInfoFile.Error())
 			}
 
-			appBundle = filepath.Base(strings.TrimSuffix(file.Name, ".app/Info.plist"))
+			if !strings.Contains(file.Name, "/Watch/") {
+				appBundle = filepath.Base(strings.TrimSuffix(file.Name, ".app/Info.plist"))
+			}
 
 			_, err = io.Copy(info, srcFileD)
 			if err != nil {

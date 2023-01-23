@@ -773,7 +773,7 @@ var _ = Describe("AppStore (Download)", func() {
 				})
 			})
 
-			When("app uses modern FiarPlay protection", func() {
+			When("app uses modern FairPlay protection", func() {
 				BeforeEach(func() {
 					zipFile = zip.NewWriter(tmpFile)
 					w, err := zipFile.Create("Payload/Test.app/SC_Info/Manifest.plist")
@@ -808,6 +808,68 @@ var _ = Describe("AppStore (Download)", func() {
 					outputPath := strings.TrimSuffix(tmpFile.Name(), ".tmp")
 					err := as.Download("", outputPath, true)
 					Expect(err).ToNot(HaveOccurred())
+				})
+			})
+
+			When("app uses modern FairPlay protection and has Watch app", func() {
+				BeforeEach(func() {
+					zipFile = zip.NewWriter(tmpFile)
+					w, err := zipFile.Create("Payload/Test.app/SC_Info/Manifest.plist")
+					Expect(err).ToNot(HaveOccurred())
+
+					manifest, err := plist.Marshal(PackageManifest{
+						SinfPaths: []string{
+							"SC_Info/TestApp.sinf",
+						},
+					}, plist.BinaryFormat)
+					Expect(err).ToNot(HaveOccurred())
+
+					_, err = w.Write(manifest)
+					Expect(err).ToNot(HaveOccurred())
+
+					w, err = zipFile.Create("Payload/Test.app/Info.plist")
+					Expect(err).ToNot(HaveOccurred())
+
+					info, err := plist.Marshal(map[string]interface{}{
+						"CFBundleExecutable": "Test",
+					}, plist.BinaryFormat)
+					Expect(err).ToNot(HaveOccurred())
+
+					_, err = w.Write(info)
+					Expect(err).ToNot(HaveOccurred())
+
+					w, err = zipFile.Create("Payload/Test.app/Watch/Test Watch App.app/Info.plist")
+					Expect(err).ToNot(HaveOccurred())
+
+					watchInfo, err := plist.Marshal(map[string]interface{}{
+						"WKWatchKitApp": true,
+					}, plist.BinaryFormat)
+					Expect(err).ToNot(HaveOccurred())
+
+					_, err = w.Write(watchInfo)
+					Expect(err).ToNot(HaveOccurred())
+
+					err = zipFile.Close()
+					Expect(err).ToNot(HaveOccurred())
+				})
+
+				It("sinf is in the correct path", func() {
+					outputPath := strings.TrimSuffix(tmpFile.Name(), ".tmp")
+					err := as.Download("", outputPath, true)
+					Expect(err).ToNot(HaveOccurred())
+
+					r, err := zip.OpenReader(outputPath)
+					Expect(err).ToNot(HaveOccurred())
+					defer r.Close()
+
+					found := false
+					for _, f := range r.File {
+						if f.Name == "Payload/Test Watch App.app/SC_Info/TestApp.sinf" {
+							found = true
+							break
+						}
+					}
+					Expect(found).To(BeFalse())
 				})
 			})
 		})
