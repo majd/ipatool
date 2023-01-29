@@ -53,4 +53,5 @@ var (
 	ErrWriteMetadataFile      = errors.New("failed to write metadata")
 	ErrWriteSinfData          = errors.New("failed to write sinf data")
 	ErrZipSinfs               = errors.New("failed to zip sinfs and sinf paths")
+	ErrTemporarilyUnavailable = errors.New("item is temporarily unavailable")
 )
