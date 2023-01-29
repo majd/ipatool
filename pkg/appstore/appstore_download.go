@@ -42,7 +42,7 @@ type PackageInfo struct {
 	BundleExecutable string `plist:"CFBundleExecutable,omitempty"`
 }
 
-func (a *appstore) Download(bundleID string, outputPath string, acquireLicense bool) error {
+func (a *appstore) Download(bundleID string, outputPath string, acquireLicense bool, skipExisting bool) error {
 	acc, err := a.account()
 	if err != nil {
 		return errors.Wrap(err, ErrGetAccount.Error())
@@ -60,6 +60,15 @@ func (a *appstore) Download(bundleID string, outputPath string, acquireLicense b
 
 	destination, err := a.resolveDestinationPath(app, outputPath)
 	if err != nil {
+		return errors.Wrap(err, ErrResolveDestinationPath.Error())
+	}
+
+	if _, err := os.Stat(destination); err == nil {
+		if skipExisting {
+			a.logger.Log().Str("output", destination).Bool("success", true).Msg("already exists")
+			return nil
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return errors.Wrap(err, ErrResolveDestinationPath.Error())
 	}
 
