@@ -1,6 +1,8 @@
 package appstore
 
-import "github.com/rs/zerolog"
+import (
+	"github.com/rs/zerolog"
+)
 
 type App struct {
 	ID       int64   `json:"trackId,omitempty"`
