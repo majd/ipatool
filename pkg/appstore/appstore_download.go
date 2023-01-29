@@ -233,7 +233,7 @@ func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request
 }
 
 func (a *appstore) resolveDestinationPath(app App, path string) (string, error) {
-	file := fmt.Sprintf("/%s_%d_v%s_%d.ipa", app.BundleID, app.ID, app.Version, util.RandInt(100, 999))
+	file := app.GetIPAName()
 
 	if path == "" {
 		workdir, err := a.os.Getwd()
@@ -241,7 +241,7 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 			return "", errors.Wrap(err, ErrGetCurrentDirectory.Error())
 		}
 
-		return fmt.Sprintf("%s%s", workdir, file), nil
+		return fmt.Sprintf("%s/%s", workdir, file), nil
 	}
 
 	isDir, err := a.isDirectory(path)
@@ -250,7 +250,7 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 	}
 
 	if isDir {
-		return fmt.Sprintf("%s%s", path, file), nil
+		return fmt.Sprintf("%s/%s", path, file), nil
 	}
 
 	return path, nil

@@ -63,4 +63,16 @@ var _ = Describe("App", func() {
 		Expect(out["version"]).To(Equal("1.0"))
 		Expect(out["price"]).To(Equal(float64(0)))
 	})
+
+	It("formats ipa name correctly", func() {
+		app := App{
+			ID:       42,
+			BundleID: "app.bundle-id1",
+			Name:     "      some  app&symb.ols2  !!!",
+			Version:  "1.0",
+			Price:    0,
+		}
+
+		Expect(app.GetIPAName()).To(Equal("app.bundle-id1+some_app_symb.ols2+42+1.0.ipa"))
+	})
 })

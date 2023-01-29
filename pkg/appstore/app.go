@@ -1,6 +1,11 @@
 package appstore
 
-import "github.com/rs/zerolog"
+import (
+	"fmt"
+	"github.com/rs/zerolog"
+	"regexp"
+	"strings"
+)
 
 type App struct {
 	ID       int64   `json:"trackId,omitempty"`
@@ -25,4 +30,22 @@ func (a App) MarshalZerologObject(event *zerolog.Event) {
 		Str("name", a.Name).
 		Str("version", a.Version).
 		Float64("price", a.Price)
+}
+
+func (a App) GetIPAName() string {
+	return fmt.Sprintf("%s+%s+%d+%s.ipa",
+		a.cleanName(a.BundleID),
+		a.cleanName(a.Name),
+		a.ID,
+		a.cleanName(a.Version))
+}
+
+var cleanRegex1 = regexp.MustCompile("[^-\\w.]")
+var cleanRegex2 = regexp.MustCompile("\\s+")
+
+func (a App) cleanName(name string) string {
+	name = cleanRegex1.ReplaceAllString(name, " ")
+	name = strings.TrimSpace(name)
+	name = cleanRegex2.ReplaceAllString(name, "_")
+	return name
 }
