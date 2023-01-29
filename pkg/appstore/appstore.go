@@ -15,7 +15,7 @@ type AppStore interface {
 	Revoke() error
 	Search(term string, limit int64) error
 	Purchase(bundleID string) error
-	Download(bundleID string, outputPath string, acquireLicense bool) error
+	Download(bundleID string, outputPath string, acquireLicense bool, skipExisting bool) error
 }
 
 type appstore struct {

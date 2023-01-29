@@ -11,6 +11,7 @@ func downloadCmd() *cobra.Command {
 	var acquireLicense bool
 	var outputPath string
 	var bundleID string
+	var skipExisting bool
 
 	cmd := &cobra.Command{
 		Use:   "download",
@@ -21,12 +22,13 @@ func downloadCmd() *cobra.Command {
 				return errors.Wrap(err, "failed to create appstore client")
 			}
 
-			return appstore.Download(bundleID, outputPath, acquireLicense)
+			return appstore.Download(bundleID, outputPath, acquireLicense, skipExisting)
 		},
 	}
 
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (required)")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "The destination path of the downloaded app package")
+	cmd.Flags().BoolVar(&skipExisting, "skip-existing", false, "Skip downloading if destination path already exists")
 	cmd.Flags().BoolVar(&acquireLicense, "purchase", false, "Obtain a license for the app if needed")
 
 	if keyringBackendType() == keyring.FileBackend {
