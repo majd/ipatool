@@ -33,6 +33,10 @@ func newCookieJar() (*cookiejar.Jar, error) {
 }
 
 func keyringBackendType() keyring.BackendType {
+	if os.Getenv("IPATOOL_KEYRING_BACKEND_FILE") != "" {
+		return keyring.FileBackend
+	}
+
 	allowedBackends := []keyring.BackendType{
 		keyring.KeychainBackend,
 		keyring.SecretServiceBackend,
