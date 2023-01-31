@@ -44,6 +44,7 @@ func rootCmd() *cobra.Command {
 	cmd.AddCommand(downloadCmd())
 	cmd.AddCommand(purchaseCmd())
 	cmd.AddCommand(searchCmd())
+	cmd.AddCommand(lookupCmd())
 
 	return cmd
 }

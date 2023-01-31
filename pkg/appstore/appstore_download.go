@@ -42,34 +42,28 @@ type PackageInfo struct {
 	BundleExecutable string `plist:"CFBundleExecutable,omitempty"`
 }
 
-func (a *appstore) Download(bundleID string, outputPath string, acquireLicense bool, skipExisting bool) error {
+func (a *appstore) Download(bundleOrAppID any, outputPath string, acquireLicense bool, skipExisting bool, dryRun bool) error {
 	acc, err := a.account()
 	if err != nil {
 		return errors.Wrap(err, ErrGetAccount.Error())
 	}
 
-	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
-	if err != nil {
-		return errors.Wrap(err, ErrInvalidCountryCode.Error())
-	}
-
-	app, err := a.lookup(bundleID, countryCode)
-	if err != nil {
-		return errors.Wrap(err, ErrAppLookup.Error())
-	}
-
-	destination, err := a.resolveDestinationPath(app, outputPath)
-	if err != nil {
-		return errors.Wrap(err, ErrResolveDestinationPath.Error())
-	}
-
-	if _, err := os.Stat(destination); err == nil {
-		if skipExisting {
-			a.logger.Log().Str("output", destination).Bool("success", true).Msg("already exists")
-			return nil
+	var appID int64
+	if val, ok := bundleOrAppID.(int64); ok {
+		appID = val
+	} else {
+		countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
+		if err != nil {
+			return errors.Wrap(err, ErrInvalidCountryCode.Error())
 		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return errors.Wrap(err, ErrResolveDestinationPath.Error())
+		app, err := a.lookup(bundleOrAppID, countryCode)
+		if err != nil {
+			return errors.Wrap(err, ErrAppLookup.Error())
+		}
+		if app.Price > 0 {
+			return ErrPaidApp
+		}
+		appID = app.ID
 	}
 
 	macAddr, err := a.machine.MacAddress()
@@ -80,22 +74,68 @@ func (a *appstore) Download(bundleID string, outputPath string, acquireLicense b
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 	a.logger.Verbose().Str("mac", macAddr).Str("guid", guid).Send()
 
-	err = a.download(acc, app, destination, guid, acquireLicense, true)
+	item, err := a.downloadItem(acc, appID, outputPath, guid, acquireLicense, true, false)
 	if err != nil {
 		return errors.Wrap(err, ErrDownloadFile.Error())
 	}
 
-	a.logger.Log().Str("output", destination).Bool("success", true).Send()
+	// bundleShortVersionString is optional, but if present, it is the public-facing version
+	// these versions may not match the iTunes version, and there's no way to fetch the latter for unlisted apps
+	versionString := item.Metadata["bundleVersion"].(string)
+	if val, ok := item.Metadata["bundleShortVersionString"]; ok {
+		versionString = val.(string)
+	}
+	app := App{
+		ID:       appID,
+		BundleID: item.Metadata["softwareVersionBundleId"].(string),
+		// there is also bundleDisplayName, but this matches lookup name
+		Name:    item.Metadata["itemName"].(string),
+		Version: versionString,
+		Price:   0,
+	}
+
+	dst, err := a.resolveDestinationPath(app, outputPath)
+	if err != nil {
+		return errors.Wrap(err, ErrResolveDestinationPath.Error())
+	}
+
+	if _, err := os.Stat(dst); err == nil {
+		if skipExisting {
+			a.logger.Log().Str("output", dst).Bool("success", true).Msg("already exists")
+			return errors.Wrap(err, ErrResolveDestinationPath.Error())
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return errors.Wrap(err, ErrResolveDestinationPath.Error())
+	}
+
+	if !dryRun {
+		err = a.downloadFile(fmt.Sprintf("%s.tmp", dst), item.URL)
+		if err != nil {
+			return errors.Wrap(err, ErrDownloadFile.Error())
+		}
+
+		err = a.applyPatches(item, acc, fmt.Sprintf("%s.tmp", dst), dst)
+		if err != nil {
+			return errors.Wrap(err, ErrPatchApp.Error())
+		}
+
+		err = a.os.Remove(fmt.Sprintf("%s.tmp", dst))
+		if err != nil {
+			return errors.Wrap(err, ErrRemoveTempFile.Error())
+		}
+	}
+
+	a.logger.Log().Str("output", dst).Bool("success", true).Send()
 
 	return nil
 }
 
-func (a *appstore) download(acc Account, app App, dst, guid string, acquireLicense, attemptToRenewCredentials bool) error {
-	req := a.downloadRequest(acc, app, guid)
+func (a *appstore) downloadItem(acc Account, appID int64, dst, guid string, acquireLicense, attemptToRenewCredentials, dryRun bool) (DownloadItemResult, error) {
+	req := a.downloadRequest(acc, appID, guid)
 
 	res, err := a.downloadClient.Send(req)
 	if err != nil {
-		return errors.Wrap(err, ErrRequest.Error())
+		return DownloadItemResult{}, errors.Wrap(err, ErrRequest.Error())
 	}
 
 	if res.Data.FailureType == FailureTypePasswordTokenExpired {
@@ -103,62 +143,45 @@ func (a *appstore) download(acc Account, app App, dst, guid string, acquireLicen
 			a.logger.Verbose().Msg("retrieving new password token")
 			acc, err = a.login(acc.Email, acc.Password, "", guid, 0, true)
 			if err != nil {
-				return errors.Wrap(err, ErrPasswordTokenExpired.Error())
+				return DownloadItemResult{}, errors.Wrap(err, ErrPasswordTokenExpired.Error())
 			}
 
-			return a.download(acc, app, dst, guid, acquireLicense, false)
+			return a.downloadItem(acc, appID, dst, guid, acquireLicense, false, dryRun)
 		}
 
-		return ErrPasswordTokenExpired
+		return DownloadItemResult{}, ErrPasswordTokenExpired
 	}
 
 	if res.Data.FailureType == FailureTypeLicenseNotFound && acquireLicense {
 		a.logger.Verbose().Msg("attempting to acquire license")
-		err = a.purchase(app.BundleID, guid, true)
+		err = a.purchase(acc, appID, guid, true)
 		if err != nil {
-			return errors.Wrap(err, ErrPurchase.Error())
+			return DownloadItemResult{}, errors.Wrap(err, ErrPurchase.Error())
 		}
 
-		return a.download(acc, app, dst, guid, false, attemptToRenewCredentials)
+		return a.downloadItem(acc, appID, dst, guid, false, attemptToRenewCredentials, dryRun)
 	}
 
 	if res.Data.FailureType == FailureTypeLicenseNotFound {
-		return ErrLicenseRequired
+		return DownloadItemResult{}, ErrLicenseRequired
 	}
 
 	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
 		a.logger.Verbose().Interface("response", res).Send()
-		return errors.New(res.Data.CustomerMessage)
+		return DownloadItemResult{}, errors.New(res.Data.CustomerMessage)
 	}
 
 	if res.Data.FailureType != "" {
 		a.logger.Verbose().Interface("response", res).Send()
-		return ErrGeneric
+		return DownloadItemResult{}, ErrGeneric
 	}
 
 	if len(res.Data.Items) == 0 {
 		a.logger.Verbose().Interface("response", res).Send()
-		return ErrInvalidResponse
+		return DownloadItemResult{}, ErrInvalidResponse
 	}
 
-	item := res.Data.Items[0]
-
-	err = a.downloadFile(fmt.Sprintf("%s.tmp", dst), item.URL)
-	if err != nil {
-		return errors.Wrap(err, ErrDownloadFile.Error())
-	}
-
-	err = a.applyPatches(item, acc, fmt.Sprintf("%s.tmp", dst), dst)
-	if err != nil {
-		return errors.Wrap(err, ErrPatchApp.Error())
-	}
-
-	err = a.os.Remove(fmt.Sprintf("%s.tmp", dst))
-	if err != nil {
-		return errors.Wrap(err, ErrRemoveTempFile.Error())
-	}
-
-	return nil
+	return res.Data.Items[0], nil
 }
 
 func (a *appstore) downloadFile(dst, sourceURL string) (err error) {
@@ -220,7 +243,7 @@ func (a *appstore) downloadFile(dst, sourceURL string) (err error) {
 	return nil
 }
 
-func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request {
+func (*appstore) downloadRequest(acc Account, appID int64, guid string) http.Request {
 	host := fmt.Sprintf("%s-%s", PriavteAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
 	return http.Request{
 		URL:            fmt.Sprintf("https://%s%s?guid=%s", host, PrivateAppStoreAPIPathDownload, guid),
@@ -235,7 +258,7 @@ func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request
 			Content: map[string]interface{}{
 				"creditDisplay": "",
 				"guid":          guid,
-				"salableAdamId": app.ID,
+				"salableAdamId": appID,
 			},
 		},
 	}

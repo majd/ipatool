@@ -14,7 +14,7 @@ type PurchaseResult struct {
 	Status          int    `plist:"status,omitempty"`
 }
 
-func (a *appstore) Purchase(bundleID string) error {
+func (a *appstore) Purchase(bundleOrAppID any) error {
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
 		return errors.Wrap(err, ErrGetMAC.Error())
@@ -23,7 +23,30 @@ func (a *appstore) Purchase(bundleID string) error {
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 	a.logger.Verbose().Str("mac", macAddr).Str("guid", guid).Send()
 
-	err = a.purchase(bundleID, guid, true)
+	acc, err := a.account()
+	if err != nil {
+		return errors.Wrap(err, ErrGetAccount.Error())
+	}
+
+	var appID int64
+	if val, ok := bundleOrAppID.(int64); ok {
+		appID = val
+	} else {
+		countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
+		if err != nil {
+			return errors.Wrap(err, ErrInvalidCountryCode.Error())
+		}
+		app, err := a.lookup(bundleOrAppID, countryCode)
+		if err != nil {
+			return errors.Wrap(err, ErrAppLookup.Error())
+		}
+		if app.Price > 0 {
+			return ErrPaidApp
+		}
+		appID = app.ID
+	}
+
+	err = a.purchase(acc, appID, guid, true)
 	if err != nil {
 		return errors.Wrap(err, ErrPurchase.Error())
 	}
@@ -32,8 +55,8 @@ func (a *appstore) Purchase(bundleID string) error {
 	return nil
 }
 
-func (a *appstore) purchaseWithParams(acc Account, app App, bundleID string, guid string, attemptToRenewCredentials bool, pricingParameters string) error {
-	req := a.purchaseRequest(acc, app, acc.StoreFront, guid, pricingParameters)
+func (a *appstore) purchaseWithParams(acc Account, appID int64, guid string, attemptToRenewCredentials bool, pricingParameters string) error {
+	req := a.purchaseRequest(acc, appID, acc.StoreFront, guid, pricingParameters)
 	res, err := a.purchaseClient.Send(req)
 	if err != nil {
 		return errors.Wrap(err, ErrRequest.Error())
@@ -51,7 +74,7 @@ func (a *appstore) purchaseWithParams(acc Account, app App, bundleID string, gui
 				return errors.Wrap(err, ErrPasswordTokenExpired.Error())
 			}
 
-			return a.purchaseWithParams(acc, app, bundleID, guid, false, pricingParameters)
+			return a.purchaseWithParams(acc, appID, guid, false, pricingParameters)
 		}
 
 		return ErrPasswordTokenExpired
@@ -79,28 +102,9 @@ func (a *appstore) purchaseWithParams(acc Account, app App, bundleID string, gui
 	return nil
 }
 
-func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredentials bool) error {
-	acc, err := a.account()
-	if err != nil {
-		return errors.Wrap(err, ErrGetAccount.Error())
-	}
-
-	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
-	if err != nil {
-		return errors.Wrap(err, ErrInvalidCountryCode.Error())
-	}
-
-	app, err := a.lookup(bundleID, countryCode)
-	if err != nil {
-		return errors.Wrap(err, ErrAppLookup.Error())
-	}
-
-	if app.Price > 0 {
-		return ErrPaidApp
-	}
-
+func (a *appstore) purchase(acc Account, appID int64, guid string, attemptToRenewCredentials bool) error {
 	for _, pricingParameters := range []string{"STDQ", "GAME"} {
-		if err := a.purchaseWithParams(acc, app, bundleID, guid, attemptToRenewCredentials, pricingParameters); err == ErrTemporarilyUnavailable {
+		if err := a.purchaseWithParams(acc, appID, guid, attemptToRenewCredentials, pricingParameters); err == ErrTemporarilyUnavailable {
 			continue
 		} else if err != nil {
 			return err
@@ -123,7 +127,7 @@ func (*appstore) countryCodeFromStoreFront(storeFront string) (string, error) {
 	return "", errors.New(ErrInvalidStoreFront.Error())
 }
 
-func (a *appstore) purchaseRequest(acc Account, app App, storeFront, guid string, pricingParameters string) http.Request {
+func (a *appstore) purchaseRequest(acc Account, appID int64, storeFront, guid, pricingParameters string) http.Request {
 	return http.Request{
 		URL:            fmt.Sprintf("https://%s%s", PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathPurchase),
 		Method:         http.MethodPOST,
@@ -143,12 +147,12 @@ func (a *appstore) purchaseRequest(acc Account, app App, storeFront, guid string
 				"hasDoneAgeCheck":           "true",
 				"guid":                      guid,
 				"needDiv":                   "0",
-				"origPage":                  fmt.Sprintf("Software-%d", app.ID),
+				"origPage":                  fmt.Sprintf("Software-%d", appID),
 				"origPageLocation":          "Buy",
 				"price":                     "0",
 				"pricingParameters":         pricingParameters,
 				"productType":               "C",
-				"salableAdamId":             app.ID,
+				"salableAdamId":             appID,
 			},
 		},
 	}

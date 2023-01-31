@@ -167,3 +167,13 @@ func newAppStore(
 		OperatingSystem: os,
 	}), nil
 }
+
+func parseID(bundleID string, appID int64) (any, error) {
+	if (bundleID == "" && appID == -1) || (bundleID != "" && appID != -1) {
+		return nil, errors.New("required exactly one of flags \"bundle-identifier\", \"app-id\"")
+	}
+	if bundleID != "" {
+		return bundleID, nil
+	}
+	return appID, nil
+}
