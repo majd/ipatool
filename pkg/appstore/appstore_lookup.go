@@ -7,7 +7,7 @@ import (
 	"net/url"
 )
 
-func (a *appstore) lookup(bundleOrAppID any, countryCode string) (App, error) {
+func (a *appstore) Lookup(bundleOrAppID any, countryCode string) (App, error) {
 	if StoreFronts[countryCode] == "" {
 		return App{}, ErrInvalidCountryCode
 	}

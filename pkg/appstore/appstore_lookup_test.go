@@ -35,7 +35,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 
 	When("country code is invalid", func() {
 		It("returns error", func() {
-			_, err := as.lookup("", "XYZ")
+			_, err := as.Lookup("", "XYZ")
 			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
 		})
 	})
@@ -50,7 +50,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 		})
 
 		It("returns error", func() {
-			_, err := as.lookup("", "US")
+			_, err := as.Lookup("", "US")
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
@@ -70,7 +70,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 		})
 
 		It("returns error", func() {
-			_, err := as.lookup("", "US")
+			_, err := as.Lookup("", "US")
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
@@ -90,7 +90,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 			})
 
 			It("returns error", func() {
-				_, err := as.lookup("", "US")
+				_, err := as.Lookup("", "US")
 				Expect(err).To(MatchError(ContainSubstring(ErrAppNotFound.Error())))
 			})
 		})
@@ -117,7 +117,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 			})
 
 			It("returns app", func() {
-				app, err := as.lookup("", "US")
+				app, err := as.Lookup("", "US")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(app).To(Equal(testApp))
 			})

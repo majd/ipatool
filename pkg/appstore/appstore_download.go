@@ -56,7 +56,7 @@ func (a *appstore) Download(bundleOrAppID any, outputPath string, acquireLicense
 		if err != nil {
 			return errors.Wrap(err, ErrInvalidCountryCode.Error())
 		}
-		app, err := a.lookup(bundleOrAppID, countryCode)
+		app, err := a.Lookup(bundleOrAppID, countryCode)
 		if err != nil {
 			return errors.Wrap(err, ErrAppLookup.Error())
 		}
