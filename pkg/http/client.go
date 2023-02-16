@@ -27,11 +27,23 @@ type ClientArgs struct {
 	CookieJar CookieJar
 }
 
+type AddHeaderTransport struct {
+	T http.RoundTripper
+}
+
+func (adt *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", DefaultUserAgent)
+	}
+	return adt.T.RoundTrip(req)
+}
+
 func NewClient[R interface{}](args ClientArgs) Client[R] {
 	return &client[R]{
 		internalClient: http.Client{
-			Timeout: time.Second * 15,
-			Jar:     args.CookieJar,
+			Timeout:   time.Second * 15,
+			Jar:       args.CookieJar,
+			Transport: &AddHeaderTransport{http.DefaultTransport},
 		},
 		cookieJar: args.CookieJar,
 	}
@@ -78,7 +90,7 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 }
 
 func (c *client[R]) Do(req *http.Request) (*http.Response, error) {
-	return http.DefaultClient.Do(req)
+	return c.internalClient.Do(req)
 }
 
 func (*client[R]) NewRequest(method, url string, body io.Reader) (*http.Request, error) {
