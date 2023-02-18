@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"time"
 )
 
 //go:generate mockgen -source=client.go -destination=client_mock.go -package=http
@@ -41,7 +40,7 @@ func (adt *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, err
 func NewClient[R interface{}](args ClientArgs) Client[R] {
 	return &client[R]{
 		internalClient: http.Client{
-			Timeout:   time.Second * 15,
+			Timeout:   0,
 			Jar:       args.CookieJar,
 			Transport: &AddHeaderTransport{http.DefaultTransport},
 		},
