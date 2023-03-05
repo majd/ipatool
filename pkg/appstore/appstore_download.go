@@ -218,7 +218,6 @@ func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
-			"User-Agent":   "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8",
 			"Content-Type": "application/x-apple-plist",
 			"iCloud-DSID":  acc.DirectoryServicesID,
 			"X-Dsid":       acc.DirectoryServicesID,
@@ -233,8 +232,15 @@ func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request
 	}
 }
 
+func fileName(app App) string {
+	return fmt.Sprintf("%s_%d_%s.ipa",
+		app.BundleID,
+		app.ID,
+		app.Version)
+}
+
 func (a *appstore) resolveDestinationPath(app App, path string) (string, error) {
-	file := fmt.Sprintf("/%s_%d_v%s_%d.ipa", app.BundleID, app.ID, app.Version, util.RandInt(100, 999))
+	file := fileName(app)
 
 	if path == "" {
 		workdir, err := a.os.Getwd()
@@ -242,7 +248,7 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 			return "", errors.Wrap(err, ErrGetCurrentDirectory.Error())
 		}
 
-		return fmt.Sprintf("%s%s", workdir, file), nil
+		return fmt.Sprintf("%s/%s", workdir, file), nil
 	}
 
 	isDir, err := a.isDirectory(path)
@@ -251,7 +257,7 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 	}
 
 	if isDir {
-		return fmt.Sprintf("%s%s", path, file), nil
+		return fmt.Sprintf("%s/%s", path, file), nil
 	}
 
 	return path, nil

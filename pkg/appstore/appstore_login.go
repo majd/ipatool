@@ -147,7 +147,6 @@ func (a *appstore) loginRequest(email, password, authCode, guid string) http.Req
 		URL:            a.authDomain(authCode, guid),
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
-			"User-Agent":   "Configurator/2.15 (Macintosh; OperatingSystem X 11.0.0; 16G29) AppleWebKit/2603.3.8",
 			"Content-Type": "application/x-www-form-urlencoded",
 		},
 		Payload: &http.XMLPayload{

@@ -2,6 +2,7 @@ package http
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/golang/mock/gomock"
@@ -50,6 +51,11 @@ var _ = Describe("Client", Ordered, func() {
 
 		http.HandleFunc("/error", func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Add("Content-Type", "application/random-type")
+		})
+
+		http.HandleFunc("/headers", func(w http.ResponseWriter, r *http.Request) {
+			err := json.NewEncoder(w).Encode(r.Header)
+			Expect(err).ToNot(HaveOccurred())
 		})
 
 		go func() {
@@ -190,5 +196,22 @@ var _ = Describe("Client", Ordered, func() {
 
 			Expect(err).To(MatchError(ContainSubstring(ErrGetPayloadData.Error())))
 		})
+	})
+
+	It("uses default headers", func() {
+		sut := NewClient[XMLResult](ClientArgs{})
+
+		req, err := sut.NewRequest("GET", fmt.Sprintf("http://localhost:%d/headers", port), nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(req).ToNot(BeNil())
+
+		res, err := sut.Do(req)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res).ToNot(BeNil())
+
+		headers := http.Header{}
+		err = json.NewDecoder(res.Body).Decode(&headers)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(headers.Get("User-Agent")).To(Equal(DefaultUserAgent))
 	})
 })
