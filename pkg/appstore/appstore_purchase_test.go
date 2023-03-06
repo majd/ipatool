@@ -276,28 +276,6 @@ var _ = Describe("AppStore (Purchase)", func() {
 						Data: LoginResult{},
 					}, nil)
 
-				mockKeychain.EXPECT().
-					Get("account").
-					Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-				mockSearchClient.EXPECT().
-					Send(gomock.Any()).
-					Return(http.Result[SearchResult]{
-						StatusCode: 200,
-						Data: SearchResult{
-							Count: 1,
-							Results: []App{
-								{
-									ID:       0,
-									BundleID: "",
-									Name:     "",
-									Version:  "",
-									Price:    0,
-								},
-							},
-						},
-					}, nil)
-
 				mockLogger.EXPECT().
 					Verbose().
 					Return(nil).
@@ -316,7 +294,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 					}, nil)
 			})
 
-			It("attempts to purcahse app", func() {
+			It("attempts to purchase app", func() {
 				err := as.Purchase("")
 				Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
 			})
@@ -466,7 +444,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 	})
 
-	When("sucessfully purchases the app", func() {
+	When("successfully purchases the app", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
 				Get("account").
@@ -495,7 +473,17 @@ var _ = Describe("AppStore (Purchase)", func() {
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
-				Send(gomock.Any()).
+				Send(pricingParametersMatcher{"STDQ"}).
+				Return(http.Result[PurchaseResult]{
+					StatusCode: 200,
+					Data: PurchaseResult{
+						CustomerMessage: "This item is temporarily unavailable.",
+						FailureType:     FailureTypeTemporarilyUnavailable,
+					},
+				}, nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(pricingParametersMatcher{"GAME"}).
 				Return(http.Result[PurchaseResult]{
 					StatusCode: 200,
 					Data: PurchaseResult{
@@ -569,3 +557,16 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 	})
 })
+
+type pricingParametersMatcher struct {
+	pricingParameters string
+}
+
+func (p pricingParametersMatcher) Matches(in interface{}) bool {
+	request := in.(http.Request)
+	return request.Payload.(*http.XMLPayload).Content["pricingParameters"] == p.pricingParameters
+}
+
+func (p pricingParametersMatcher) String() string {
+	return "payload pricingParameters is " + p.pricingParameters
+}

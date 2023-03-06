@@ -32,30 +32,15 @@ func (a *appstore) Purchase(bundleID string) error {
 	return nil
 }
 
-func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredentials bool) error {
-	acc, err := a.account()
-	if err != nil {
-		return errors.Wrap(err, ErrGetAccount.Error())
-	}
-
-	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
-	if err != nil {
-		return errors.Wrap(err, ErrInvalidCountryCode.Error())
-	}
-
-	app, err := a.lookup(bundleID, countryCode)
-	if err != nil {
-		return errors.Wrap(err, ErrAppLookup.Error())
-	}
-
-	if app.Price > 0 {
-		return ErrPaidApp
-	}
-
-	req := a.purchaseRequest(acc, app, acc.StoreFront, guid)
+func (a *appstore) purchaseWithParams(acc Account, app App, bundleID string, guid string, attemptToRenewCredentials bool, pricingParameters string) error {
+	req := a.purchaseRequest(acc, app, acc.StoreFront, guid, pricingParameters)
 	res, err := a.purchaseClient.Send(req)
 	if err != nil {
 		return errors.Wrap(err, ErrRequest.Error())
+	}
+
+	if res.Data.FailureType == FailureTypeTemporarilyUnavailable {
+		return ErrTemporarilyUnavailable
 	}
 
 	if res.Data.FailureType == FailureTypePasswordTokenExpired {
@@ -66,7 +51,7 @@ func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredenti
 				return errors.Wrap(err, ErrPasswordTokenExpired.Error())
 			}
 
-			return a.purchase(bundleID, guid, false)
+			return a.purchaseWithParams(acc, app, bundleID, guid, false, pricingParameters)
 		}
 
 		return ErrPasswordTokenExpired
@@ -94,6 +79,38 @@ func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredenti
 	return nil
 }
 
+func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredentials bool) error {
+	acc, err := a.account()
+	if err != nil {
+		return errors.Wrap(err, ErrGetAccount.Error())
+	}
+
+	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
+	if err != nil {
+		return errors.Wrap(err, ErrInvalidCountryCode.Error())
+	}
+
+	app, err := a.lookup(bundleID, countryCode)
+	if err != nil {
+		return errors.Wrap(err, ErrAppLookup.Error())
+	}
+
+	if app.Price > 0 {
+		return ErrPaidApp
+	}
+
+	for _, pricingParameters := range []string{"STDQ", "GAME"} {
+		if err := a.purchaseWithParams(acc, app, bundleID, guid, attemptToRenewCredentials, pricingParameters); err == ErrTemporarilyUnavailable {
+			continue
+		} else if err != nil {
+			return err
+		} else {
+			return nil
+		}
+	}
+	return ErrTemporarilyUnavailable
+}
+
 func (*appstore) countryCodeFromStoreFront(storeFront string) (string, error) {
 	for key, val := range StoreFronts {
 		parts := strings.Split(storeFront, "-")
@@ -106,7 +123,7 @@ func (*appstore) countryCodeFromStoreFront(storeFront string) (string, error) {
 	return "", errors.New(ErrInvalidStoreFront.Error())
 }
 
-func (a *appstore) purchaseRequest(acc Account, app App, storeFront, guid string) http.Request {
+func (a *appstore) purchaseRequest(acc Account, app App, storeFront, guid string, pricingParameters string) http.Request {
 	return http.Request{
 		URL:            fmt.Sprintf("https://%s%s", PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathPurchase),
 		Method:         http.MethodPOST,
@@ -129,7 +146,7 @@ func (a *appstore) purchaseRequest(acc Account, app App, storeFront, guid string
 				"origPage":                  fmt.Sprintf("Software-%d", app.ID),
 				"origPageLocation":          "Buy",
 				"price":                     "0",
-				"pricingParameters":         "STDQ",
+				"pricingParameters":         pricingParameters,
 				"productType":               "C",
 				"salableAdamId":             app.ID,
 			},
