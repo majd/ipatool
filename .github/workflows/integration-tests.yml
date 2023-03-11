@@ -11,8 +11,6 @@ jobs:
     runs-on: macos-latest
     strategy:
       fail-fast: false
-      matrix:
-        os: [ darwin, linux, windows ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v3
@@ -20,18 +18,17 @@ jobs:
           go-version: '1.19.3'
           cache: true
       - run: ./tools/version.sh
-      - run: go build -o ipatool-${{ matrix.os }}
+      - run: go build -o ipatool
         env:
-          GOOS: ${{ matrix.os }}
           CGO_CFLAGS: -mmacosx-version-min=10.15
           CGO_LDFLAGS: -mmacosx-version-min=10.15
       - uses: actions/upload-artifact@v2
         with:
-          name: ipatool-${{ matrix.os }}
-          path: ipatool-${{ matrix.os }}
+          name: ipatool
+          path: ipatool
           if-no-files-found: error
-  test_macos:
-    name: Test (macOS)
+  test:
+    name: Test
     runs-on: macos-latest
     needs: [build]
     strategy:
@@ -41,37 +38,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v2
         with:
-          name: ipatool-darwin
+          name: ipatool
           path: build
-      - run: chmod +x ./build/ipatool-darwin
-      - run: ./build/ipatool-darwin ${{ matrix.command }} --help
-  test_linux:
-    name: Test (Linux)
-    runs-on: ubuntu-latest
-    needs: [build]
-    strategy:
-      fail-fast: false
-      matrix:
-        command: [auth, download, purchase, search]
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: ipatool-linux
-          path: build
-      - run: chmod +x ./build/ipatool-linux
-      - run: ./build/ipatool-linux ${{ matrix.command }} --help
-  test_windows:
-    name: Test (Windows)
-    runs-on: windows-latest
-    needs: [build]
-    strategy:
-      fail-fast: false
-      matrix:
-        command: [auth, download, purchase, search]
-    steps:
-      - uses: actions/download-artifact@v2
-        with:
-          name: ipatool-windows
-          path: build
-      - run: chmod +x ./build/ipatool-windows
-      - run: ./build/ipatool-windows ${{ matrix.command }} --help
+      - run: chmod +x ./build/ipatool
+      - run: ./build/ipatool ${{ matrix.command }} --help
