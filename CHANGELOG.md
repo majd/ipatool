@@ -1,5 +1,11 @@
 ## Changelog
 
+### Version [2.0.3](https://github.com/majd/ipatool/releases/tag/v2.0.3)
+
+- Added support for downloading Apple Arcade games.
+- Fixed windows builds not having exe extension.
+
+
 ### Version [2.0.2](https://github.com/majd/ipatool/releases/tag/v2.0.2)
 
 - Fixed Sinf patches when the app contains an Apple Watch app.
