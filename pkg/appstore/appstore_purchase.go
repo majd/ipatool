@@ -32,6 +32,41 @@ func (a *appstore) Purchase(bundleID string) error {
 	return nil
 }
 
+func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredentials bool) error {
+	acc, err := a.account()
+	if err != nil {
+		return errors.Wrap(err, ErrGetAccount.Error())
+	}
+
+	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
+	if err != nil {
+		return errors.Wrap(err, ErrInvalidCountryCode.Error())
+	}
+
+	app, err := a.lookup(bundleID, countryCode)
+	if err != nil {
+		return errors.Wrap(err, ErrAppLookup.Error())
+	}
+
+	if app.Price > 0 {
+		return ErrPaidApp
+	}
+
+	err = a.purchaseWithParams(acc, app, bundleID, guid, attemptToRenewCredentials, PricingParameterAppStore)
+	if err != nil {
+		if err == ErrTemporarilyUnavailable {
+			err = a.purchaseWithParams(acc, app, bundleID, guid, attemptToRenewCredentials, PricingParameterAppleArcade)
+			if err != nil {
+				return errors.Wrapf(err, "failed to purchase item with param '%s'", PricingParameterAppleArcade)
+			}
+		}
+
+		return errors.Wrapf(err, "failed to purchase item with param '%s'", PricingParameterAppStore)
+	}
+
+	return nil
+}
+
 func (a *appstore) purchaseWithParams(acc Account, app App, bundleID string, guid string, attemptToRenewCredentials bool, pricingParameters string) error {
 	req := a.purchaseRequest(acc, app, acc.StoreFront, guid, pricingParameters)
 	res, err := a.purchaseClient.Send(req)
@@ -41,6 +76,11 @@ func (a *appstore) purchaseWithParams(acc Account, app App, bundleID string, gui
 
 	if res.Data.FailureType == FailureTypeTemporarilyUnavailable {
 		return ErrTemporarilyUnavailable
+	}
+
+	if res.Data.CustomerMessage == CustomerMessageSubscriptionRequired {
+		a.logger.Verbose().Interface("response", res).Send()
+		return ErrSubscriptionRequired
 	}
 
 	if res.Data.FailureType == FailureTypePasswordTokenExpired {
@@ -77,38 +117,6 @@ func (a *appstore) purchaseWithParams(acc Account, app App, bundleID string, gui
 	}
 
 	return nil
-}
-
-func (a *appstore) purchase(bundleID string, guid string, attemptToRenewCredentials bool) error {
-	acc, err := a.account()
-	if err != nil {
-		return errors.Wrap(err, ErrGetAccount.Error())
-	}
-
-	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
-	if err != nil {
-		return errors.Wrap(err, ErrInvalidCountryCode.Error())
-	}
-
-	app, err := a.lookup(bundleID, countryCode)
-	if err != nil {
-		return errors.Wrap(err, ErrAppLookup.Error())
-	}
-
-	if app.Price > 0 {
-		return ErrPaidApp
-	}
-
-	for _, pricingParameters := range []string{"STDQ", "GAME"} {
-		if err := a.purchaseWithParams(acc, app, bundleID, guid, attemptToRenewCredentials, pricingParameters); err == ErrTemporarilyUnavailable {
-			continue
-		} else if err != nil {
-			return err
-		} else {
-			return nil
-		}
-	}
-	return ErrTemporarilyUnavailable
 }
 
 func (*appstore) countryCodeFromStoreFront(storeFront string) (string, error) {

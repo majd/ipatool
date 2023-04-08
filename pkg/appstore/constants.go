@@ -6,7 +6,8 @@ const (
 	FailureTypeLicenseNotFound        = "9610"
 	FailureTypeTemporarilyUnavailable = "2059"
 
-	CustomerMessageBadLogin = "MZFinance.BadLogin.Configurator_message"
+	CustomerMessageBadLogin             = "MZFinance.BadLogin.Configurator_message"
+	CustomerMessageSubscriptionRequired = "Subscription Required"
 
 	iTunesAPIDomain     = "itunes.apple.com"
 	iTunesAPIPathSearch = "/search"
@@ -20,4 +21,7 @@ const (
 	PrivateAppStoreAPIPathDownload                = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 
 	HTTPHeaderStoreFront = "X-Set-Apple-Store-Front"
+
+	PricingParameterAppStore    = "STDQ"
+	PricingParameterAppleArcade = "GAME"
 )

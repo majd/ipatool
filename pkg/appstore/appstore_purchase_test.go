@@ -444,6 +444,65 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 	})
 
+	When("subscription is required", func() {
+		BeforeEach(func() {
+			mockKeychain.EXPECT().
+				Get("account").
+				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
+
+			mockSearchClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[SearchResult]{
+					StatusCode: 200,
+					Data: SearchResult{
+						Count: 1,
+						Results: []App{
+							{
+								ID:       0,
+								BundleID: "",
+								Name:     "",
+								Version:  "",
+								Price:    0,
+							},
+						},
+					},
+				}, nil)
+
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(pricingParametersMatcher{"STDQ"}).
+				Return(http.Result[PurchaseResult]{
+					StatusCode: 200,
+					Data: PurchaseResult{
+						CustomerMessage: "This item is temporarily unavailable.",
+						FailureType:     FailureTypeTemporarilyUnavailable,
+					},
+				}, nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(pricingParametersMatcher{"GAME"}).
+				Return(http.Result[PurchaseResult]{
+					StatusCode: 200,
+					Data: PurchaseResult{
+						CustomerMessage: CustomerMessageSubscriptionRequired,
+					},
+				}, nil)
+
+			mockLogger.EXPECT().
+				Verbose().
+				Return(nil).
+				Times(2)
+		})
+
+		It("returns error", func() {
+			err := as.Purchase("")
+			Expect(err).To(MatchError(ContainSubstring(ErrSubscriptionRequired.Error())))
+		})
+	})
+
 	When("successfully purchases the app", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
