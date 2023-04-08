@@ -146,7 +146,7 @@ jobs:
       - uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ipatool-${{ needs.get_version.outputs.version }}-$linux-${{ matrix.arch }}.*
+          file: ipatool-${{ needs.get_version.outputs.version }}-linux-${{ matrix.arch }}.*
           tag: ${{ github.ref }}
           overwrite: false
           file_glob: true
