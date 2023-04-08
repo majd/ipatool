@@ -157,9 +157,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
         with:
-          repository: ${{ secrets.HOMEBREW_REPO }}
-          ref: main
-          token: ${{ secrets.GH_TOKEN }}
+          path: ./ipatool
       - uses: actions/download-artifact@v2
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-macos-arm64
@@ -176,8 +174,8 @@ jobs:
           FILE: ipatool-${{ needs.get_version.outputs.version }}-macos-amd64
       - id: sha256
         run: |
-          SHA256_ARM64=$(./tools/sha256sum.sh ipatool-${{ needs.get_version.outputs.version }}-macos-arm64.tar.gz)
-          SHA256_AMD64=$(./tools/sha256sum.sh ipatool-${{ needs.get_version.outputs.version }}-macos-amd64.tar.gz)
+          SHA256_ARM64=$(./ipatool/tools/sha256sum.sh ipatool-${{ needs.get_version.outputs.version }}-macos-arm64.tar.gz)
+          SHA256_AMD64=$(./ipatool/tools/sha256sum.sh ipatool-${{ needs.get_version.outputs.version }}-macos-amd64.tar.gz)
           echo $SHA256_ARM64 > ipatool-${{ needs.get_version.outputs.version }}-macos-arm64.tar.gz.sha256sum
           echo $SHA256_AMD64 > ipatool-${{ needs.get_version.outputs.version }}-macos-amd64.tar.gz.sha256sum
           echo ::set-output name=sha256_arm64::$SHA256_ARM64
@@ -189,7 +187,14 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: false
           file_glob: true
+      - uses: actions/checkout@v2
+        with:
+          repository: ${{ secrets.HOMEBREW_REPO }}
+          ref: main
+          token: ${{ secrets.GH_TOKEN }}
+          path: homebrew-repo
       - run: |
+          cd homebrew-repo
           sed -i "3s/.*/    sha256 \"$SHA256_ARM64\"/" Casks/ipatool.rb
           sed -i "4s/.*/    url \"https:\/\/github.com\/majd\/ipatool\/releases\/download\/v${{ needs.get_version.outputs.version }}\/ipatool-${{ needs.get_version.outputs.version }}-macos-arm64.tar.gz\"/" Casks/ipatool.rb
           sed -i "5s/.*/    binary \"bin\/ipatool-${{ needs.get_version.outputs.version }}-macos-arm64\", target: \"ipatool\"/" Casks/ipatool.rb
