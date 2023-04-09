@@ -29,9 +29,14 @@ type LoginResult struct {
 	PasswordToken       string             `plist:"passwordToken,omitempty"`
 }
 
-func (a *appstore) Login(email, password, authCode string) error {
+type LoginOutput struct {
+	Name  string
+	Email string
+}
+
+func (a *appstore) Login(email, password, authCode string) (LoginOutput, error) {
 	if password == "" && !a.interactive {
-		return ErrPasswordRequired
+		return LoginOutput{}, ErrPasswordRequired
 	}
 
 	if password == "" && a.interactive {
@@ -40,13 +45,13 @@ func (a *appstore) Login(email, password, authCode string) error {
 		var err error
 		password, err = a.promptForPassword()
 		if err != nil {
-			return errors.Wrap(err, ErrGetData.Error())
+			return LoginOutput{}, errors.Wrap(err, ErrGetData.Error())
 		}
 	}
 
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
-		return errors.Wrap(err, ErrGetMAC.Error())
+		return LoginOutput{}, errors.Wrap(err, ErrGetMAC.Error())
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
@@ -54,16 +59,13 @@ func (a *appstore) Login(email, password, authCode string) error {
 
 	acc, err := a.login(email, password, authCode, guid, 0, false)
 	if err != nil {
-		return errors.Wrap(err, ErrLogin.Error())
+		return LoginOutput{}, errors.Wrap(err, ErrLogin.Error())
 	}
 
-	a.logger.Log().
-		Str("name", acc.Name).
-		Str("email", acc.Email).
-		Bool("success", true).
-		Send()
-
-	return nil
+	return LoginOutput{
+		Name:  acc.Name,
+		Email: acc.Email,
+	}, nil
 }
 
 func (a *appstore) login(email, password, authCode, guid string, attempt int, failOnAuthCodeRequirement bool) (Account, error) {
@@ -108,8 +110,7 @@ func (a *appstore) login(email, password, authCode, guid string, attempt int, fa
 
 			return a.login(email, password, authCode, guid, 0, failOnAuthCodeRequirement)
 		} else {
-			a.logger.Log().Msg("2FA code is required; run the command again and supply a code using the `--auth-code` flag")
-			return Account{}, nil
+			return Account{}, ErrAuthCodeRequired
 		}
 	}
 

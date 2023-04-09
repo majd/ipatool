@@ -10,12 +10,12 @@ import (
 )
 
 type AppStore interface {
-	Login(email, password, authCode string) error
-	Info() error
+	Login(email, password, authCode string) (LoginOutput, error)
+	Info() (InfoOutput, error)
 	Revoke() error
-	Search(term string, limit int64) error
+	Search(term string, limit int64) (SearchOutput, error)
 	Purchase(bundleID string) error
-	Download(bundleID string, outputPath string, acquireLicense bool) error
+	Download(bundleID string, outputPath string, acquireLicense bool) (DownloadOutput, error)
 }
 
 type appstore struct {

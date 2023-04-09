@@ -28,7 +28,6 @@ func (a *appstore) Purchase(bundleID string) error {
 		return errors.Wrap(err, ErrPurchase.Error())
 	}
 
-	a.logger.Log().Bool("success", true).Send()
 	return nil
 }
 
