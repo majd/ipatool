@@ -11,7 +11,7 @@ import (
 
 type AppStore interface {
 	Login(email, password, authCode string) error
-	Info() error
+	Info() (InfoOutput, error)
 	Revoke() error
 	Search(term string, limit int64) error
 	Purchase(bundleID string) error

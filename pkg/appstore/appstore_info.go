@@ -5,19 +5,21 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (a *appstore) Info() error {
+type InfoOutput struct {
+	Name  string
+	Email string
+}
+
+func (a *appstore) Info() (InfoOutput, error) {
 	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, ErrGetAccount.Error())
+		return InfoOutput{}, errors.Wrap(err, ErrGetAccount.Error())
 	}
 
-	a.logger.Log().
-		Str("name", acc.Name).
-		Str("email", acc.Email).
-		Bool("success", true).
-		Send()
-
-	return nil
+	return InfoOutput{
+		Name:  acc.Name,
+		Email: acc.Email,
+	}, nil
 }
 
 func (a *appstore) account() (Account, error) {
