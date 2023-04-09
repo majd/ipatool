@@ -7,6 +7,31 @@ import (
 	"net/url"
 )
 
+type LookupOutput struct {
+	App App
+}
+
+func (a *appstore) Lookup(bundleID string) (LookupOutput, error) {
+	acc, err := a.account()
+	if err != nil {
+		return LookupOutput{}, errors.Wrap(err, ErrGetAccount.Error())
+	}
+
+	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
+	if err != nil {
+		return LookupOutput{}, errors.Wrap(err, ErrInvalidCountryCode.Error())
+	}
+
+	app, err := a.lookup(bundleID, countryCode)
+	if err != nil {
+		return LookupOutput{}, err
+	}
+
+	return LookupOutput{
+		App: app,
+	}, nil
+}
+
 func (a *appstore) lookup(bundleID, countryCode string) (App, error) {
 	if StoreFronts[countryCode] == "" {
 		return App{}, ErrInvalidCountryCode

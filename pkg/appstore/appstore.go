@@ -13,6 +13,7 @@ type AppStore interface {
 	Login(email, password, authCode string) (LoginOutput, error)
 	Info() (InfoOutput, error)
 	Revoke() error
+	Lookup(bundleID string) (LookupOutput, error)
 	Search(term string, limit int64) (SearchOutput, error)
 	Purchase(bundleID string) error
 	Download(bundleID string, outputPath string, acquireLicense bool) (DownloadOutput, error)
