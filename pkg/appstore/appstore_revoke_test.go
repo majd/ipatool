@@ -3,7 +3,6 @@ package appstore
 import (
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/keychain"
-	"github.com/majd/ipatool/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -14,16 +13,13 @@ var _ = Describe("AppStore (Revoke)", func() {
 		ctrl         *gomock.Controller
 		appstore     AppStore
 		mockKeychain *keychain.MockKeychain
-		mockLogger   *log.MockLogger
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
-		mockLogger = log.NewMockLogger(ctrl)
 		appstore = NewAppStore(AppStoreArgs{
 			Keychain: mockKeychain,
-			Logger:   mockLogger,
 		})
 	})
 
@@ -49,10 +45,6 @@ var _ = Describe("AppStore (Revoke)", func() {
 
 	When("keychain removes item", func() {
 		BeforeEach(func() {
-			mockLogger.EXPECT().
-				Log().
-				Return(nil)
-
 			mockKeychain.EXPECT().
 				Remove("account").
 				Return(nil)

@@ -90,7 +90,15 @@ func revokeCmd() *cobra.Command {
 				return errors.Wrap(err, "failed to create appstore client")
 			}
 
-			return appstore.Revoke()
+			err = appstore.Revoke()
+			if err != nil {
+				return err
+			}
+
+			logger := cmd.Context().Value("logger").(log.Logger)
+			logger.Log().Bool("success", true).Send()
+
+			return nil
 		},
 	}
 }

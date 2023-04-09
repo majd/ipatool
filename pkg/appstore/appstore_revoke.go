@@ -10,6 +10,5 @@ func (a *appstore) Revoke() error {
 		return errors.Wrap(err, ErrRemoveKeychainItem.Error())
 	}
 
-	a.logger.Log().Bool("success", true).Send()
 	return nil
 }
