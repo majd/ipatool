@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/99designs/keyring"
+	"github.com/majd/ipatool/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -21,7 +22,15 @@ func downloadCmd() *cobra.Command {
 				return errors.Wrap(err, "failed to create appstore client")
 			}
 
-			return appstore.Download(bundleID, outputPath, acquireLicense)
+			out, err := appstore.Download(bundleID, outputPath, acquireLicense)
+			if err != nil {
+				return err
+			}
+
+			logger := cmd.Context().Value("logger").(log.Logger)
+			logger.Log().Str("output", out.DestinationPath).Bool("success", true).Send()
+
+			return nil
 		},
 	}
 

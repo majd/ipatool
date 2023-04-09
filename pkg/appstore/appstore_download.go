@@ -42,30 +42,34 @@ type PackageInfo struct {
 	BundleExecutable string `plist:"CFBundleExecutable,omitempty"`
 }
 
-func (a *appstore) Download(bundleID string, outputPath string, acquireLicense bool) error {
+type DownloadOutput struct {
+	DestinationPath string
+}
+
+func (a *appstore) Download(bundleID string, outputPath string, acquireLicense bool) (DownloadOutput, error) {
 	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, ErrGetAccount.Error())
+		return DownloadOutput{}, errors.Wrap(err, ErrGetAccount.Error())
 	}
 
 	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
 	if err != nil {
-		return errors.Wrap(err, ErrInvalidCountryCode.Error())
+		return DownloadOutput{}, errors.Wrap(err, ErrInvalidCountryCode.Error())
 	}
 
 	app, err := a.lookup(bundleID, countryCode)
 	if err != nil {
-		return errors.Wrap(err, ErrAppLookup.Error())
+		return DownloadOutput{}, errors.Wrap(err, ErrAppLookup.Error())
 	}
 
 	destination, err := a.resolveDestinationPath(app, outputPath)
 	if err != nil {
-		return errors.Wrap(err, ErrResolveDestinationPath.Error())
+		return DownloadOutput{}, errors.Wrap(err, ErrResolveDestinationPath.Error())
 	}
 
 	macAddr, err := a.machine.MacAddress()
 	if err != nil {
-		return errors.Wrap(err, ErrGetMAC.Error())
+		return DownloadOutput{}, errors.Wrap(err, ErrGetMAC.Error())
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
@@ -73,12 +77,12 @@ func (a *appstore) Download(bundleID string, outputPath string, acquireLicense b
 
 	err = a.download(acc, app, destination, guid, acquireLicense, true)
 	if err != nil {
-		return errors.Wrap(err, ErrDownloadFile.Error())
+		return DownloadOutput{}, errors.Wrap(err, ErrDownloadFile.Error())
 	}
 
-	a.logger.Log().Str("output", destination).Bool("success", true).Send()
-
-	return nil
+	return DownloadOutput{
+		DestinationPath: destination,
+	}, nil
 }
 
 func (a *appstore) download(acc Account, app App, dst, guid string, acquireLicense, attemptToRenewCredentials bool) error {
