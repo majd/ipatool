@@ -13,31 +13,32 @@ type SearchResult struct {
 	Results []App `json:"results,omitempty"`
 }
 
-func (a *appstore) Search(term string, limit int64) error {
+type SearchOutput = SearchResult
+
+func (a *appstore) Search(term string, limit int64) (SearchOutput, error) {
 	acc, err := a.account()
 	if err != nil {
-		return errors.Wrap(err, ErrGetAccount.Error())
+		return SearchOutput{}, errors.Wrap(err, ErrGetAccount.Error())
 	}
 
 	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
 	if err != nil {
-		return errors.Wrap(err, ErrInvalidCountryCode.Error())
+		return SearchOutput{}, errors.Wrap(err, ErrInvalidCountryCode.Error())
 	}
 
 	request := a.searchRequest(term, countryCode, limit)
 
 	res, err := a.searchClient.Send(request)
 	if err != nil {
-		return errors.Wrap(err, ErrRequest.Error())
+		return SearchOutput{}, errors.Wrap(err, ErrRequest.Error())
 	}
 
 	if res.StatusCode != 200 {
 		a.logger.Verbose().Interface("data", res.Data).Int("status", res.StatusCode).Send()
-		return ErrRequest
+		return SearchOutput{}, ErrRequest
 	}
 
-	a.logger.Log().Int("count", res.Data.Count).Array("apps", Apps(res.Data.Results)).Send()
-	return nil
+	return res.Data, nil
 }
 
 func (a *appstore) searchRequest(term, countryCode string, limit int64) http.Request {

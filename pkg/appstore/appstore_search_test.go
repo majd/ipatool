@@ -45,7 +45,7 @@ var _ = Describe("AppStore (Search)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Search("", 0)
+			_, err := as.Search("", 0)
 			Expect(err).To(MatchError(ContainSubstring(ErrGetAccount.Error())))
 		})
 	})
@@ -58,7 +58,7 @@ var _ = Describe("AppStore (Search)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Search("", 0)
+			_, err := as.Search("", 0)
 			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
 		})
 	})
@@ -77,7 +77,7 @@ var _ = Describe("AppStore (Search)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Search("", 0)
+			_, err := as.Search("", 0)
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
@@ -101,24 +101,36 @@ var _ = Describe("AppStore (Search)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Search("", 0)
+			_, err := as.Search("", 0)
 			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
 		})
 	})
 
 	When("request is successful", func() {
-		BeforeEach(func() {
-			mockLogger.EXPECT().
-				Log().
-				Return(nil)
+		const (
+			testID       = 0
+			testBundleID = "test-bundle-id"
+			testName     = "test-name"
+			testVersion  = "test-version"
+			testPrice    = 0.0
+		)
 
+		BeforeEach(func() {
 			mockClient.EXPECT().
 				Send(gomock.Any()).
 				Return(http.Result[SearchResult]{
 					StatusCode: 200,
 					Data: SearchResult{
-						Count:   0,
-						Results: []App{},
+						Count: 1,
+						Results: []App{
+							{
+								ID:       testID,
+								BundleID: testBundleID,
+								Name:     testName,
+								Version:  testVersion,
+								Price:    testPrice,
+							},
+						},
 					},
 				}, nil)
 
@@ -127,9 +139,18 @@ var _ = Describe("AppStore (Search)", func() {
 				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
 		})
 
-		It("returns nil", func() {
-			err := as.Search("", 0)
+		It("returns output", func() {
+			out, err := as.Search("", 0)
 			Expect(err).ToNot(HaveOccurred())
+			Expect(out.Count).To(Equal(1))
+			Expect(len(out.Results)).To(Equal(1))
+			Expect(out.Results[0]).To(Equal(App{
+				ID:       testID,
+				BundleID: testBundleID,
+				Name:     testName,
+				Version:  testVersion,
+				Price:    testPrice,
+			}))
 		})
 	})
 })
