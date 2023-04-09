@@ -18,7 +18,10 @@ import (
 
 var _ = Describe("AppStore (Login)", func() {
 	const (
-		testPassword = "test-password"
+		testPassword  = "test-password"
+		testEmail     = "test-email"
+		testFirstName = "test-first-name"
+		testLastName  = "test-last-name"
 	)
 
 	var (
@@ -62,7 +65,7 @@ var _ = Describe("AppStore (Login)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Login("", "", "")
+			_, err := as.Login("", "", "")
 			Expect(err).To(MatchError(ContainSubstring("password is required")))
 		})
 	})
@@ -86,7 +89,7 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 
 			It("succeeds", func() {
-				err := as.Login("", "", "")
+				_, err := as.Login("", "", "")
 				Expect(err).To(MatchError(ContainSubstring("success")))
 			})
 		})
@@ -99,7 +102,7 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 
 			It("returns error", func() {
-				err := as.Login("", "", "")
+				_, err := as.Login("", "", "")
 				Expect(err).To(MatchError(ContainSubstring(ErrGetData.Error())))
 			})
 		})
@@ -113,13 +116,13 @@ var _ = Describe("AppStore (Login)", func() {
 		})
 
 		It("returns error", func() {
-			err := as.Login("", testPassword, "")
+			_, err := as.Login("", testPassword, "")
 			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
 			Expect(err).To(MatchError(ContainSubstring(ErrGetMAC.Error())))
 		})
 	})
 
-	When("sucessfully reads Machine's MAC address", func() {
+	When("sucessfully reads machine's MAC address", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
 				MacAddress().
@@ -134,7 +137,7 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 
 			It("returns wrapped error", func() {
-				err := as.Login("", testPassword, "")
+				_, err := as.Login("", testPassword, "")
 				Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
 			})
 		})
@@ -155,7 +158,7 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 
 			It("retries one more time", func() {
-				err := as.Login("", testPassword, "")
+				_, err := as.Login("", testPassword, "")
 				Expect(err).To(MatchError(ContainSubstring(testCustomerMessage)))
 			})
 		})
@@ -172,7 +175,7 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 
 			It("returns error", func() {
-				err := as.Login("", testPassword, "")
+				_, err := as.Login("", testPassword, "")
 				Expect(err).To(MatchError(ContainSubstring(ErrGeneric.Error())))
 			})
 		})
@@ -181,11 +184,6 @@ var _ = Describe("AppStore (Login)", func() {
 			When("not running in interactive mode", func() {
 				BeforeEach(func() {
 					as.(*appstore).interactive = false
-
-					mockLogger.EXPECT().
-						Log().
-						Return(nil).
-						Times(2)
 
 					mockClient.EXPECT().
 						Send(gomock.Any()).
@@ -197,9 +195,9 @@ var _ = Describe("AppStore (Login)", func() {
 						}, nil)
 				})
 
-				It("prints message", func() {
-					err := as.Login("", testPassword, "")
-					Expect(err).ToNot(HaveOccurred())
+				It("returns error", func() {
+					_, err := as.Login("", testPassword, "")
+					Expect(err).To(MatchError(ContainSubstring(ErrAuthCodeRequired.Error())))
 				})
 			})
 
@@ -207,29 +205,45 @@ var _ = Describe("AppStore (Login)", func() {
 				BeforeEach(func() {
 					mockLogger.EXPECT().
 						Log().
-						Return(nil).
-						Times(2)
+						Return(nil)
 
 					mockKeychain.EXPECT().
 						Set("account", gomock.Any()).
 						Return(nil)
 
-					mockClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[LoginResult]{
-							Data: LoginResult{
-								FailureType:     "",
-								CustomerMessage: CustomerMessageBadLogin,
-							},
-						}, nil).
-						Times(2)
+					gomock.InOrder(
+						mockClient.EXPECT().
+							Send(gomock.Any()).
+							Return(http.Result[LoginResult]{
+								Data: LoginResult{
+									FailureType:     "",
+									CustomerMessage: CustomerMessageBadLogin,
+								},
+							}, nil),
+						mockClient.EXPECT().
+							Send(gomock.Any()).
+							Return(http.Result[LoginResult]{
+								Data: LoginResult{
+									Account: LoginAccountResult{
+										Email: testEmail,
+										Address: LoginAddressResult{
+											FirstName: testFirstName,
+											LastName:  testLastName,
+										},
+									},
+								},
+							}, nil),
+					)
 
 					as.(*appstore).ioReader = strings.NewReader("123456\n")
 				})
 
 				It("successfully authenticates", func() {
-					err := as.Login("", testPassword, "")
+					out, err := as.Login("", testPassword, "")
 					Expect(err).ToNot(HaveOccurred())
+					Expect(out.Email).To(Equal(testEmail))
+					Expect(out.Name).To(Equal(strings.Join([]string{testFirstName, testLastName}, " ")))
+
 				})
 			})
 
@@ -252,7 +266,7 @@ var _ = Describe("AppStore (Login)", func() {
 				})
 
 				It("fails to read 2FA code from stdin", func() {
-					err := as.Login("", testPassword, "")
+					_, err := as.Login("", testPassword, "")
 					Expect(err).To(MatchError(ContainSubstring(ErrGetData.Error())))
 				})
 			})
@@ -260,9 +274,6 @@ var _ = Describe("AppStore (Login)", func() {
 
 		When("store API returns valid response", func() {
 			const (
-				testEmail               = "test-email"
-				testFirstName           = "test-first-name"
-				testLastName            = "test-last-name"
 				testPasswordToken       = "test-password-token"
 				testDirectoryServicesID = "directory-services-id"
 			)
@@ -307,7 +318,7 @@ var _ = Describe("AppStore (Login)", func() {
 				})
 
 				It("returns error", func() {
-					err := as.Login("", testPassword, "")
+					_, err := as.Login("", testPassword, "")
 					Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
 					Expect(err).To(MatchError(ContainSubstring(ErrSetKeychainItem.Error())))
 				})
@@ -315,10 +326,6 @@ var _ = Describe("AppStore (Login)", func() {
 
 			When("sucessfully saves account in keychain", func() {
 				BeforeEach(func() {
-					mockLogger.EXPECT().
-						Log().
-						Return(nil)
-
 					mockKeychain.EXPECT().
 						Set("account", gomock.Any()).
 						Do(func(key string, data []byte) {
@@ -339,8 +346,10 @@ var _ = Describe("AppStore (Login)", func() {
 				})
 
 				It("returns nil", func() {
-					err := as.Login("", testPassword, "")
+					out, err := as.Login("", testPassword, "")
 					Expect(err).ToNot(HaveOccurred())
+					Expect(out.Email).To(Equal(testEmail))
+					Expect(out.Name).To(Equal(strings.Join([]string{testFirstName, testLastName}, " ")))
 				})
 			})
 		})

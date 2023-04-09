@@ -10,7 +10,7 @@ import (
 )
 
 type AppStore interface {
-	Login(email, password, authCode string) error
+	Login(email, password, authCode string) (LoginOutput, error)
 	Info() (InfoOutput, error)
 	Revoke() error
 	Search(term string, limit int64) error

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/99designs/keyring"
+	"github.com/majd/ipatool/pkg/appstore"
 	"github.com/majd/ipatool/pkg/log"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -35,12 +36,29 @@ func loginCmd() *cobra.Command {
 		Use:   "login",
 		Short: "Login to the App Store",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			appstore, err := newAppStore(cmd, keychainPassphrase)
+			store, err := newAppStore(cmd, keychainPassphrase)
 			if err != nil {
 				return errors.Wrap(err, "failed to create appstore client")
 			}
 
-			return appstore.Login(email, password, authCode)
+			logger := cmd.Context().Value("logger").(log.Logger)
+			out, err := store.Login(email, password, authCode)
+			if err != nil {
+				if err == appstore.ErrAuthCodeRequired {
+					logger.Log().Msg("2FA code is required; run the command again and supply a code using the `--auth-code` flag")
+					return nil
+				}
+
+				return err
+			}
+
+			logger.Log().
+				Str("name", out.Name).
+				Str("email", out.Email).
+				Bool("success", true).
+				Send()
+
+			return nil
 		},
 	}
 
