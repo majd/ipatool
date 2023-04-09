@@ -554,10 +554,6 @@ var _ = Describe("AppStore (Purchase)", func() {
 			mockLogger.EXPECT().
 				Verbose().
 				Return(nil)
-
-			mockLogger.EXPECT().
-				Log().
-				Return(nil)
 		})
 
 		It("returns nil", func() {
