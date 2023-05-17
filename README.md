@@ -62,6 +62,8 @@ Global Flags:
 Use "ipatool auth [command] --help" for more information about a command.
 ```
 
+You may login with `ipatool auth login --email` followed by your iCloud email. It will then ask you to `enter 2FA code:`, if you don't get a 2FA alert, you can get a 2FA code by following the Apple guides for [Mac](https://support.apple.com/en-ie/guide/mac-help/mchl8bd4e9c2/mac) or [iOS](https://support.apple.com/en-us/HT204974).
+
 To search for apps on the App Store, use the `search` command.
 
 ```
