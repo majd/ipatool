@@ -7,6 +7,8 @@ import (
 	"golang.org/x/net/context"
 )
 
+var version = "dev"
+
 func rootCmd() *cobra.Command {
 	var verbose bool
 	var nonInteractive bool
@@ -48,7 +50,7 @@ func rootCmd() *cobra.Command {
 	return cmd
 }
 
-// Execute runs the program and returns the approperiate exit status code.
+// Execute runs the program and returns the appropriate exit status code.
 func Execute() (exitCode int) {
 	cmd := rootCmd()
 	err := cmd.Execute()

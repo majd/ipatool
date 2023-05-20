@@ -19,7 +19,6 @@ jobs:
         with:
           go-version: '1.19.3'
           cache: true
-      - run: ./tools/version.sh
       - run: go build -o ipatool-$GOOS-$GOARCH.exe
         env:
           GOOS: windows
@@ -37,7 +36,6 @@ jobs:
         with:
           go-version: '1.19.3'
           cache: true
-      - run: ./tools/version.sh
       - run: go build -o ipatool-$GOOS-$GOARCH
         env:
           GOOS: linux
@@ -55,7 +53,6 @@ jobs:
         with:
           go-version: '1.19.3'
           cache: true
-      - run: ./tools/version.sh
       - run: go build -o ipatool-$GOOS-$GOARCH
         env:
           GOOS: darwin
