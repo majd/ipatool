@@ -3,4 +3,3 @@
 .LSOverride
 .vscode/
 .idea/
-cmd/version.go

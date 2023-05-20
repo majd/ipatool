@@ -17,7 +17,6 @@ jobs:
         with:
           go-version: '1.19.3'
           cache: true
-      - run: ./tools/version.sh
       - run: go build -o ipatool
         env:
           CGO_CFLAGS: -mmacosx-version-min=10.15
