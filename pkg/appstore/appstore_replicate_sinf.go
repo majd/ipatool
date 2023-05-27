@@ -5,12 +5,13 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/majd/ipatool/pkg/util"
-	"howett.net/plist"
 	"io"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/majd/ipatool/pkg/util"
+	"howett.net/plist"
 )
 
 type Sinf struct {
@@ -32,6 +33,7 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 
 	tmpPath := fmt.Sprintf("%s.tmp", input.PackagePath)
 	tmpFile, err := t.os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY, 0644)
+
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
@@ -138,6 +140,7 @@ func (t *appstore) replicateZip(src *zip.ReadCloser, dst *zip.Writer) error {
 
 		header := file.FileHeader
 		dstFile, err := dst.CreateRaw(&header)
+
 		if err != nil {
 			return fmt.Errorf("failed to create raw file: %w", err)
 		}
@@ -161,12 +164,14 @@ func (*appstore) readInfoPlist(reader *zip.ReadCloser) (*packageInfo, error) {
 
 			data := new(bytes.Buffer)
 			_, err = io.Copy(data, src)
+
 			if err != nil {
 				return nil, fmt.Errorf("failed to copy data: %w", err)
 			}
 
 			var info packageInfo
 			_, err = plist.Unmarshal(data.Bytes(), &info)
+
 			if err != nil {
 				return nil, fmt.Errorf("failed to unmarshal data: %w", err)
 			}
@@ -188,11 +193,13 @@ func (*appstore) readManifestPlist(reader *zip.ReadCloser) (*packageManifest, er
 
 			data := new(bytes.Buffer)
 			_, err = io.Copy(data, src)
+
 			if err != nil {
 				return nil, fmt.Errorf("failed to copy data: %w", err)
 			}
 
 			var manifest packageManifest
+
 			_, err = plist.Unmarshal(data.Bytes(), &manifest)
 			if err != nil {
 				return nil, fmt.Errorf("failed to unmarshal data: %w", err)
@@ -211,6 +218,7 @@ func (*appstore) readBundleName(reader *zip.ReadCloser) (string, error) {
 	for _, file := range reader.File {
 		if strings.Contains(file.Name, ".app/Info.plist") && !strings.Contains(file.Name, "/Watch/") {
 			bundleName = filepath.Base(strings.TrimSuffix(file.Name, ".app/Info.plist"))
+
 			break
 		}
 	}

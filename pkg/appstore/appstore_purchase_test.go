@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"errors"
+
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
@@ -298,8 +299,7 @@ type pricingParametersMatcher struct {
 }
 
 func (p pricingParametersMatcher) Matches(in interface{}) bool {
-	request := in.(http.Request)
-	return request.Payload.(*http.XMLPayload).Content["pricingParameters"] == p.pricingParameters
+	return in.(http.Request).Payload.(*http.XMLPayload).Content["pricingParameters"] == p.pricingParameters
 }
 
 func (p pricingParametersMatcher) String() string {

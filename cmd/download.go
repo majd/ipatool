@@ -2,19 +2,23 @@ package cmd
 
 import (
 	"errors"
+	"os"
+	"time"
+
 	"github.com/99designs/keyring"
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/pkg/appstore"
 	"github.com/schollz/progressbar/v3"
 	"github.com/spf13/cobra"
-	"os"
-	"time"
 )
 
+// nolint:wrapcheck
 func downloadCmd() *cobra.Command {
-	var acquireLicense bool
-	var outputPath string
-	var bundleID string
+	var (
+		acquireLicense bool
+		outputPath     string
+		bundleID       string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "download",

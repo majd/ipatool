@@ -4,13 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
+
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
 	"github.com/majd/ipatool/pkg/util/machine"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"strings"
 )
 
 var _ = Describe("AppStore (Login)", func() {

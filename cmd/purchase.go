@@ -2,13 +2,15 @@ package cmd
 
 import (
 	"errors"
+	"time"
+
 	"github.com/99designs/keyring"
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/pkg/appstore"
 	"github.com/spf13/cobra"
-	"time"
 )
 
+// nolint:wrapcheck
 func purchaseCmd() *cobra.Command {
 	var bundleID string
 
@@ -47,6 +49,7 @@ func purchaseCmd() *cobra.Command {
 				}
 
 				dependencies.Logger.Log().Bool("success", true).Send()
+
 				return nil
 			},
 				retry.LastErrorOnly(true),
@@ -55,6 +58,7 @@ func purchaseCmd() *cobra.Command {
 				retry.Attempts(2),
 				retry.RetryIf(func(err error) bool {
 					lastErr = err
+
 					return errors.Is(err, appstore.ErrPasswordTokenExpired)
 				}),
 			)

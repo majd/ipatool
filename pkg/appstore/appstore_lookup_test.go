@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"errors"
+
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	. "github.com/onsi/ginkgo/v2"

@@ -16,6 +16,7 @@ func (t *appstore) AccountInfo() (AccountInfoOutput, error) {
 	}
 
 	var acc Account
+
 	err = json.Unmarshal(data, &acc)
 	if err != nil {
 		return AccountInfoOutput{}, fmt.Errorf("failed to unmarshal json: %w", err)

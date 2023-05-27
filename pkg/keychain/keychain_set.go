@@ -2,6 +2,7 @@ package keychain
 
 import (
 	"fmt"
+
 	"github.com/99designs/keyring"
 )
 

@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"howett.net/plist"
 	"io"
 	"net/http"
 	"strings"
+
+	"howett.net/plist"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -source=client.go -destination=client_mock.go -package=http
@@ -30,11 +31,17 @@ type AddHeaderTransport struct {
 	T http.RoundTripper
 }
 
-func (adt *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if req.Header.Get("User-Agent") == "" {
 		req.Header.Set("User-Agent", DefaultUserAgent)
 	}
-	return adt.T.RoundTrip(req)
+
+	res, err := t.T.RoundTrip(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make round trip: %w", err)
+	}
+
+	return res, nil
 }
 
 func NewClient[R interface{}](args Args) Client[R] {
@@ -49,8 +56,10 @@ func NewClient[R interface{}](args Args) Client[R] {
 }
 
 func (c *client[R]) Send(req Request) (Result[R], error) {
-	var data []byte
-	var err error
+	var (
+		data []byte
+		err  error
+	)
 
 	if req.Payload != nil {
 		data, err = req.Payload.data()
@@ -81,6 +90,7 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 	if req.ResponseFormat == ResponseFormatJSON {
 		return c.handleJSONResponse(res)
 	}
+
 	if req.ResponseFormat == ResponseFormatXML {
 		return c.handleXMLResponse(res)
 	}
@@ -89,11 +99,21 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 }
 
 func (c *client[R]) Do(req *http.Request) (*http.Response, error) {
-	return c.internalClient.Do(req)
+	res, err := c.internalClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("received error: %w", err)
+	}
+
+	return res, nil
 }
 
 func (*client[R]) NewRequest(method, url string, body io.Reader) (*http.Request, error) {
-	return http.NewRequest(method, url, body)
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	return req, nil
 }
 
 func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {
@@ -103,6 +123,7 @@ func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {
 	}
 
 	var data R
+
 	err = json.Unmarshal(body, &data)
 	if err != nil {
 		return Result[R]{}, fmt.Errorf("failed to unmarshal json: %w", err)
@@ -121,6 +142,7 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 	}
 
 	var data R
+
 	_, err = plist.Unmarshal(body, &data)
 	if err != nil {
 		return Result[R]{}, fmt.Errorf("failed to unmarshal xml: %w", err)

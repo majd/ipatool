@@ -3,8 +3,10 @@ package appstore
 import (
 	"errors"
 	"fmt"
-	"github.com/majd/ipatool/pkg/http"
+	gohttp "net/http"
 	"net/url"
+
+	"github.com/majd/ipatool/pkg/http"
 )
 
 type LookupInput struct {
@@ -29,7 +31,7 @@ func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
 		return LookupOutput{}, fmt.Errorf("request failed: %w", err)
 	}
 
-	if res.StatusCode != 200 {
+	if res.StatusCode != gohttp.StatusOK {
 		return LookupOutput{}, NewErrorWithMetadata(errors.New("invalid response"), res)
 	}
 

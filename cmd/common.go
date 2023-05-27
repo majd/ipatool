@@ -3,8 +3,13 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+
 	"github.com/99designs/keyring"
-	"github.com/juju/persistent-cookiejar"
+	cookiejar "github.com/juju/persistent-cookiejar"
 	"github.com/majd/ipatool/pkg/appstore"
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
@@ -16,10 +21,6 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
 	"golang.org/x/term"
-	"io"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 var dependencies = Dependencies{}
@@ -38,23 +39,25 @@ type Dependencies struct {
 // newLogger returns a new logger instance.
 func newLogger(format OutputFormat, verbose bool) log.Logger {
 	var writer io.Writer
+
 	switch format {
 	case OutputFormatJSON:
 		writer = zerolog.SyncWriter(os.Stdout)
 	case OutputFormatText:
 		writer = log.NewWriter()
 	}
+
 	return log.NewLogger(log.Args{
 		Verbose: verbose,
 		Writer:  writer,
-	})
+	},
+	)
 }
 
 // newCookieJar returns a new cookie jar instance.
 func newCookieJar(machine machine.Machine) http.CookieJar {
-	path := filepath.Join(machine.HomeDirectory(), ConfigDirectoryName, CookieJarFileName)
 	return util.Must(cookiejar.New(&cookiejar.Options{
-		Filename: path,
+		Filename: filepath.Join(machine.HomeDirectory(), ConfigDirectoryName, CookieJarFileName),
 	}))
 }
 
@@ -89,6 +92,7 @@ func newKeychain(machine machine.Machine, logger log.Logger, backendType keyring
 			return password, nil
 		},
 	}))
+
 	return keychain.New(keychain.Args{Keyring: ring})
 }
 
@@ -134,6 +138,7 @@ func initWithCommand(cmd *cobra.Command) {
 func createConfigDirectory() error {
 	configDirectoryPath := filepath.Join(dependencies.Machine.HomeDirectory(), ConfigDirectoryName)
 	_, err := dependencies.OS.Stat(configDirectoryPath)
+
 	if err != nil && dependencies.OS.IsNotExist(err) {
 		err = dependencies.OS.MkdirAll(configDirectoryPath, 0700)
 		if err != nil {

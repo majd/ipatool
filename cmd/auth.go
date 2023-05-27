@@ -4,15 +4,16 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"os"
+	"strings"
+	"time"
+
 	"github.com/99designs/keyring"
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/pkg/appstore"
 	"github.com/majd/ipatool/pkg/util"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"os"
-	"strings"
-	"time"
 )
 
 func authCmd() *cobra.Command {
@@ -34,10 +35,9 @@ func authCmd() *cobra.Command {
 
 func loginCmd() *cobra.Command {
 	promptForAuthCode := func() (string, error) {
-		reader := bufio.NewReader(os.Stdin)
-		authCode, err := reader.ReadString('\n')
+		authCode, err := bufio.NewReader(os.Stdin).ReadString('\n')
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf("failed to read string: %w", err)
 		}
 
 		authCode = strings.Trim(authCode, "\n")
@@ -46,9 +46,7 @@ func loginCmd() *cobra.Command {
 		return authCode, nil
 	}
 
-	var email string
-	var password string
-	var authCode string
+	var email, password, authCode string
 
 	cmd := &cobra.Command{
 		Use:   "login",
@@ -72,6 +70,7 @@ func loginCmd() *cobra.Command {
 
 			var lastErr error
 
+			// nolint:wrapcheck
 			return retry.Do(func() error {
 				if errors.Is(lastErr, appstore.ErrAuthCodeRequired) && interactive {
 					dependencies.Logger.Log().Msg("enter 2FA code:")
@@ -97,6 +96,7 @@ func loginCmd() *cobra.Command {
 				if err != nil {
 					if errors.Is(err, appstore.ErrAuthCodeRequired) && !interactive {
 						dependencies.Logger.Log().Msg("2FA code is required; run the command again and supply a code using the `--auth-code` flag")
+
 						return nil
 					}
 
@@ -117,6 +117,7 @@ func loginCmd() *cobra.Command {
 				retry.Attempts(2),
 				retry.RetryIf(func(err error) bool {
 					lastErr = err
+
 					return errors.Is(err, appstore.ErrAuthCodeRequired)
 				}),
 			)
@@ -132,6 +133,7 @@ func loginCmd() *cobra.Command {
 	return cmd
 }
 
+// nolint:wrapcheck
 func infoCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "info",
@@ -153,6 +155,7 @@ func infoCmd() *cobra.Command {
 	}
 }
 
+// nolint:wrapcheck
 func revokeCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "revoke",
@@ -164,6 +167,7 @@ func revokeCmd() *cobra.Command {
 			}
 
 			dependencies.Logger.Log().Bool("success", true).Send()
+
 			return nil
 		},
 	}

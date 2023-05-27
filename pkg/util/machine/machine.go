@@ -2,11 +2,12 @@ package machine
 
 import (
 	"fmt"
-	"github.com/majd/ipatool/pkg/util/operatingsystem"
-	"golang.org/x/term"
 	"net"
 	"path/filepath"
 	"runtime"
+
+	"github.com/majd/ipatool/pkg/util/operatingsystem"
+	"golang.org/x/term"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -source=machine.go -destination=machine_mock.go -package machine
@@ -59,5 +60,10 @@ func (m *machine) HomeDirectory() string {
 }
 
 func (*machine) ReadPassword(fd int) ([]byte, error) {
-	return term.ReadPassword(fd)
+	data, err := term.ReadPassword(fd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read password: %w", err)
+	}
+
+	return data, nil
 }

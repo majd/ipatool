@@ -3,6 +3,7 @@ package appstore
 import (
 	"errors"
 	"fmt"
+
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/keychain"
 	. "github.com/onsi/ginkgo/v2"

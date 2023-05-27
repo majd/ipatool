@@ -3,9 +3,10 @@ package http
 import (
 	"bytes"
 	"fmt"
-	"howett.net/plist"
 	"net/url"
 	"strconv"
+
+	"howett.net/plist"
 )
 
 type Payload interface {

@@ -1,4 +1,4 @@
-name: Unit Tests
+name: Lint
 
 on:
   pull_request:
@@ -6,9 +6,9 @@ on:
       - main
 
 jobs:
-  run_tests:
-    name: Run tests
-    runs-on: ubuntu-latest
+  lint:
+    name: Lint
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v3
@@ -16,4 +16,6 @@ jobs:
           go-version: '1.19.3'
           cache: true
       - run: go generate github.com/majd/ipatool/...
-      - run: go test -v github.com/majd/ipatool/...
+      - uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.52.2

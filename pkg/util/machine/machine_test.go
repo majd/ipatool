@@ -1,12 +1,13 @@
 package machine
 
 import (
+	"syscall"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/util/operatingsystem"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"syscall"
-	"testing"
 )
 
 func TestMachine(t *testing.T) {

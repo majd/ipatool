@@ -3,9 +3,11 @@ package appstore
 import (
 	"errors"
 	"fmt"
-	"github.com/majd/ipatool/pkg/http"
+	gohttp "net/http"
 	"net/url"
 	"strconv"
+
+	"github.com/majd/ipatool/pkg/http"
 )
 
 type SearchInput struct {
@@ -32,7 +34,7 @@ func (t *appstore) Search(input SearchInput) (SearchOutput, error) {
 		return SearchOutput{}, fmt.Errorf("request failed: %w", err)
 	}
 
-	if res.StatusCode != 200 {
+	if res.StatusCode != gohttp.StatusOK {
 		return SearchOutput{}, NewErrorWithMetadata(errors.New("request failed"), res)
 	}
 
