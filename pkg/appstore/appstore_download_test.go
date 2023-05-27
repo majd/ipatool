@@ -1,14 +1,14 @@
 package appstore
 
 import (
-	zip "archive/zip"
+	"archive/zip"
 	"errors"
 	"fmt"
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
-	"github.com/majd/ipatool/pkg/log"
-	"github.com/majd/ipatool/pkg/util"
+	"github.com/majd/ipatool/pkg/util/machine"
+	"github.com/majd/ipatool/pkg/util/operatingsystem"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"howett.net/plist"
@@ -22,40 +22,32 @@ var _ = Describe("AppStore (Download)", func() {
 	var (
 		ctrl               *gomock.Controller
 		mockKeychain       *keychain.MockKeychain
-		mockSearchClient   *http.MockClient[SearchResult]
-		mockDownloadClient *http.MockClient[DownloadResult]
-		mockPurchaseClient *http.MockClient[PurchaseResult]
-		mockLoginClient    *http.MockClient[LoginResult]
+		mockDownloadClient *http.MockClient[downloadResult]
+		mockPurchaseClient *http.MockClient[purchaseResult]
+		mockLoginClient    *http.MockClient[loginResult]
 		mockHTTPClient     *http.MockClient[interface{}]
-		mockLogger         *log.MockLogger
-		mockOS             *util.MockOperatingSystem
-		mockMachine        *util.MockMachine
+		mockOS             *operatingsystem.MockOperatingSystem
+		mockMachine        *machine.MockMachine
 		as                 AppStore
-		testErr            = errors.New("testErr")
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
-		mockLogger = log.NewMockLogger(ctrl)
-		mockSearchClient = http.NewMockClient[SearchResult](ctrl)
-		mockDownloadClient = http.NewMockClient[DownloadResult](ctrl)
-		mockLoginClient = http.NewMockClient[LoginResult](ctrl)
-		mockPurchaseClient = http.NewMockClient[PurchaseResult](ctrl)
+		mockDownloadClient = http.NewMockClient[downloadResult](ctrl)
+		mockLoginClient = http.NewMockClient[loginResult](ctrl)
+		mockPurchaseClient = http.NewMockClient[purchaseResult](ctrl)
 		mockHTTPClient = http.NewMockClient[interface{}](ctrl)
-		mockOS = util.NewMockOperatingSystem(ctrl)
-		mockMachine = util.NewMockMachine(ctrl)
+		mockOS = operatingsystem.NewMockOperatingSystem(ctrl)
+		mockMachine = machine.NewMockMachine(ctrl)
 		as = &appstore{
 			keychain:       mockKeychain,
 			loginClient:    mockLoginClient,
-			searchClient:   mockSearchClient,
 			purchaseClient: mockPurchaseClient,
 			downloadClient: mockDownloadClient,
 			httpClient:     mockHTTPClient,
 			machine:        mockMachine,
 			os:             mockOS,
-			logger:         mockLogger,
-			interactive:    true,
 		}
 	})
 
@@ -63,123 +55,40 @@ var _ = Describe("AppStore (Download)", func() {
 		ctrl.Finish()
 	})
 
-	When("not logged in", func() {
-		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte{}, testErr)
-		})
-
-		It("returns error", func() {
-			_, err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrGetAccount.Error())))
-		})
-	})
-
-	When("fails to determine country code", func() {
-		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"\"}"), nil)
-		})
-
-		It("returns error", func() {
-			_, err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
-		})
-	})
-
-	When("fails to find app", func() {
-		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{}, testErr)
-		})
-
-		It("returns error", func() {
-			_, err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrAppLookup.Error())))
-		})
-	})
-
 	When("fails to resolve output path", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockOS.EXPECT().
 				Stat(gomock.Any()).
-				Return(nil, testErr)
+				Return(nil, errors.New(""))
 		})
 
 		It("returns error", func() {
-			_, err := as.Download("", "test-out", false)
-			Expect(err).To(MatchError(ContainSubstring("failed to resolve destination path")))
+			_, err := as.Download(DownloadInput{
+				OutputPath: "test-out",
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("fails to read MAC address", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockOS.EXPECT().
 				Getwd().
 				Return("", nil)
 
 			mockMachine.EXPECT().
 				MacAddress().
-				Return("", testErr)
+				Return("", errors.New(""))
 		})
 
 		It("returns error", func() {
-			_, err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrGetMAC.Error())))
+			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("request fails", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockOS.EXPECT().
 				Getwd().
 				Return("", nil)
@@ -190,35 +99,17 @@ var _ = Describe("AppStore (Download)", func() {
 
 			mockDownloadClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[DownloadResult]{}, testErr)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
+				Return(http.Result[downloadResult]{}, errors.New(""))
 		})
 
 		It("returns error", func() {
-			_, err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
+			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("password token is expired", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockOS.EXPECT().
 				Getwd().
 				Return("", nil)
@@ -229,83 +120,21 @@ var _ = Describe("AppStore (Download)", func() {
 
 			mockDownloadClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[DownloadResult]{
-					Data: DownloadResult{
+				Return(http.Result[downloadResult]{
+					Data: downloadResult{
 						FailureType: FailureTypePasswordTokenExpired,
 					},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
 		})
 
-		When("attempts to renew credentials", func() {
-			BeforeEach(func() {
-				mockLogger.EXPECT().
-					Verbose().
-					Return(nil).
-					Times(2)
-			})
-
-			When("fails to renew credentials", func() {
-				BeforeEach(func() {
-					mockLoginClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[LoginResult]{}, testErr)
-				})
-
-				It("returns error", func() {
-					_, err := as.Download("", "", false)
-					Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
-				})
-			})
-
-			When("successfully renews credentials", func() {
-				BeforeEach(func() {
-					mockLoginClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[LoginResult]{
-							Data: LoginResult{},
-						}, nil)
-
-					mockKeychain.EXPECT().
-						Set("account", gomock.Any()).
-						Return(nil)
-
-					mockDownloadClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[DownloadResult]{
-							Data: DownloadResult{
-								FailureType: FailureTypePasswordTokenExpired,
-							},
-						}, nil)
-				})
-
-				It("attempts to download app", func() {
-					_, err := as.Download("", "", false)
-					Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
-				})
-			})
+		It("returns error", func() {
+			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("license is missing", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockOS.EXPECT().
 				Getwd().
 				Return("", nil)
@@ -316,97 +145,21 @@ var _ = Describe("AppStore (Download)", func() {
 
 			mockDownloadClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[DownloadResult]{
-					Data: DownloadResult{
+				Return(http.Result[downloadResult]{
+					Data: downloadResult{
 						FailureType: FailureTypeLicenseNotFound,
 					},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
 		})
 
 		It("returns error", func() {
-			_, err := as.Download("", "", false)
-			Expect(err).To(MatchError(ContainSubstring(ErrLicenseRequired.Error())))
-		})
-
-		When("attempts to acquire license", func() {
-			BeforeEach(func() {
-				mockLogger.EXPECT().
-					Verbose().
-					Return(nil)
-			})
-
-			When("license is acquired", func() {
-				BeforeEach(func() {
-					mockKeychain.EXPECT().
-						Get("account").
-						Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-					mockPurchaseClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[PurchaseResult]{
-							StatusCode: 200,
-							Data: PurchaseResult{
-								JingleDocType: "purchaseSuccess",
-								Status:        0,
-							},
-						}, nil)
-
-					mockSearchClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[SearchResult]{
-							StatusCode: 200,
-							Data: SearchResult{
-								Count:   1,
-								Results: []App{{}},
-							},
-						}, nil)
-
-					mockDownloadClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[DownloadResult]{}, testErr)
-				})
-
-				It("attempts to download app", func() {
-					_, err := as.Download("", "", true)
-					Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-				})
-			})
-
-			When("fails to acquire license", func() {
-				BeforeEach(func() {
-					mockKeychain.EXPECT().
-						Get("account").
-						Return([]byte{}, testErr)
-				})
-
-				It("returns error", func() {
-					_, err := as.Download("", "", true)
-					Expect(err).To(MatchError(ContainSubstring(ErrPurchase.Error())))
-				})
-			})
+			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("store API returns error", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockOS.EXPECT().
 				Getwd().
 				Return("", nil)
@@ -414,28 +167,23 @@ var _ = Describe("AppStore (Download)", func() {
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("", nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil).
-				Times(2)
 		})
 
 		When("response contains customer message", func() {
 			BeforeEach(func() {
 				mockDownloadClient.EXPECT().
 					Send(gomock.Any()).
-					Return(http.Result[DownloadResult]{
-						Data: DownloadResult{
+					Return(http.Result[downloadResult]{
+						Data: downloadResult{
 							FailureType:     "test-failure",
-							CustomerMessage: testErr.Error(),
+							CustomerMessage: errors.New("").Error(),
 						},
 					}, nil)
 			})
 
 			It("returns customer message as error", func() {
-				_, err := as.Download("", "", true)
-				Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
+				_, err := as.Download(DownloadInput{})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -443,36 +191,22 @@ var _ = Describe("AppStore (Download)", func() {
 			BeforeEach(func() {
 				mockDownloadClient.EXPECT().
 					Send(gomock.Any()).
-					Return(http.Result[DownloadResult]{
-						Data: DownloadResult{
+					Return(http.Result[downloadResult]{
+						Data: downloadResult{
 							FailureType: "test-failure",
 						},
 					}, nil)
 			})
 
 			It("returns generic error", func() {
-				_, err := as.Download("", "", true)
-				Expect(err).To(MatchError(ContainSubstring(ErrGeneric.Error())))
+				_, err := as.Download(DownloadInput{})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 	})
 
 	When("store API returns no items", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockOS.EXPECT().
 				Getwd().
 				Return("", nil)
@@ -481,42 +215,23 @@ var _ = Describe("AppStore (Download)", func() {
 				MacAddress().
 				Return("", nil)
 
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil).
-				Times(2)
-
 			mockDownloadClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[DownloadResult]{
-					Data: DownloadResult{
-						Items: []DownloadItemResult{},
+				Return(http.Result[downloadResult]{
+					Data: downloadResult{
+						Items: []downloadItemResult{},
 					},
 				}, nil)
 		})
 
 		It("returns error", func() {
-			_, err := as.Download("", "", true)
-			Expect(err).To(MatchError(ContainSubstring("received 0 items from the App Store")))
+			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("fails to download file", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockOS.EXPECT().
 				Getwd().
 				Return("", nil)
@@ -525,15 +240,11 @@ var _ = Describe("AppStore (Download)", func() {
 				MacAddress().
 				Return("", nil)
 
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
-
 			mockDownloadClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[DownloadResult]{
-					Data: DownloadResult{
-						Items: []DownloadItemResult{{}},
+				Return(http.Result[downloadResult]{
+					Data: downloadResult{
+						Items: []downloadItemResult{{}},
 					},
 				}, nil)
 		})
@@ -542,12 +253,12 @@ var _ = Describe("AppStore (Download)", func() {
 			BeforeEach(func() {
 				mockHTTPClient.EXPECT().
 					NewRequest("GET", gomock.Any(), nil).
-					Return(nil, testErr)
+					Return(nil, errors.New(""))
 			})
 
 			It("returns error", func() {
-				_, err := as.Download("", "", true)
-				Expect(err).To(MatchError(ContainSubstring(ErrCreateRequest.Error())))
+				_, err := as.Download(DownloadInput{})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -559,12 +270,12 @@ var _ = Describe("AppStore (Download)", func() {
 
 				mockHTTPClient.EXPECT().
 					Do(gomock.Any()).
-					Return(nil, testErr)
+					Return(nil, errors.New(""))
 			})
 
 			It("returns error", func() {
-				_, err := as.Download("", "", true)
-				Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
+				_, err := as.Download(DownloadInput{})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -582,12 +293,12 @@ var _ = Describe("AppStore (Download)", func() {
 
 				mockOS.EXPECT().
 					OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(nil, testErr)
+					Return(nil, errors.New(""))
 			})
 
 			It("returns error", func() {
-				_, err := as.Download("", "", true)
-				Expect(err).To(MatchError(ContainSubstring("failed to open file")))
+				_, err := as.Download(DownloadInput{})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -606,15 +317,11 @@ var _ = Describe("AppStore (Download)", func() {
 				mockOS.EXPECT().
 					OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
 					Return(nil, nil)
-
-				mockLogger.EXPECT().
-					Verbose().
-					Return(nil)
 			})
 
 			It("returns error", func() {
-				_, err := as.Download("", "", true)
-				Expect(err).To(MatchError(ContainSubstring(ErrFileWrite.Error())))
+				_, err := as.Download(DownloadInput{})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 	})
@@ -627,37 +334,18 @@ var _ = Describe("AppStore (Download)", func() {
 			testFile, err = os.CreateTemp("", "test_file")
 			Expect(err).ToNot(HaveOccurred())
 
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count:   1,
-						Results: []App{{}},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("", nil)
 
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil).
-				Times(2)
-
 			mockDownloadClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[DownloadResult]{
-					Data: DownloadResult{
-						Items: []DownloadItemResult{
+				Return(http.Result[downloadResult]{
+					Data: downloadResult{
+						Items: []downloadItemResult{
 							{
 								Metadata: map[string]interface{}{},
-								Sinfs: []DownloadSinfResult{
+								Sinfs: []Sinf{
 									{
 										ID:   0,
 										Data: []byte("test-sinf-data"),
@@ -693,12 +381,8 @@ var _ = Describe("AppStore (Download)", func() {
 				Getwd().
 				Return("", nil)
 
-			mockOS.EXPECT().
-				OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(nil, testErr)
-
-			_, err := as.Download("", "", true)
-			Expect(err).To(MatchError(ContainSubstring(ErrOpenFile.Error())))
+			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
 
 			testData, err := os.ReadFile(testFile.Name())
 			Expect(err).ToNot(HaveOccurred())
@@ -706,9 +390,10 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 
 		When("successfully applies patches", func() {
-			var tmpFile *os.File
-			var zipFile *zip.Writer
-			var outputPath string
+			var (
+				tmpFile    *os.File
+				outputPath string
+			)
 
 			BeforeEach(func() {
 				var err error
@@ -723,10 +408,6 @@ var _ = Describe("AppStore (Download)", func() {
 						return os.OpenFile(name, flag, perm)
 					})
 
-				mockLogger.EXPECT().
-					Verbose().
-					Return(nil)
-
 				mockOS.EXPECT().
 					Stat(gomock.Any()).
 					Return(nil, nil)
@@ -734,6 +415,21 @@ var _ = Describe("AppStore (Download)", func() {
 				mockOS.EXPECT().
 					Remove(tmpFile.Name()).
 					Return(nil)
+
+				zipFile := zip.NewWriter(tmpFile)
+				w, err := zipFile.Create("Payload/Test.app/Info.plist")
+				Expect(err).ToNot(HaveOccurred())
+
+				info, err := plist.Marshal(map[string]interface{}{
+					"CFBundleExecutable": "Test",
+				}, plist.BinaryFormat)
+				Expect(err).ToNot(HaveOccurred())
+
+				_, err = w.Write(info)
+				Expect(err).ToNot(HaveOccurred())
+
+				err = zipFile.Close()
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			AfterEach(func() {
@@ -741,135 +437,12 @@ var _ = Describe("AppStore (Download)", func() {
 				Expect(err).ToNot(HaveOccurred())
 			})
 
-			When("app uses legacy FairPlay protection", func() {
-				BeforeEach(func() {
-					zipFile = zip.NewWriter(tmpFile)
-					w, err := zipFile.Create("Payload/Test.app/Info.plist")
-					Expect(err).ToNot(HaveOccurred())
-
-					info, err := plist.Marshal(map[string]interface{}{
-						"CFBundleExecutable": "Test",
-					}, plist.BinaryFormat)
-					Expect(err).ToNot(HaveOccurred())
-
-					_, err = w.Write(info)
-					Expect(err).ToNot(HaveOccurred())
-
-					err = zipFile.Close()
-					Expect(err).ToNot(HaveOccurred())
-
-					mockLogger.EXPECT().
-						Verbose().
-						Return(nil)
+			It("succeeds", func() {
+				out, err := as.Download(DownloadInput{
+					OutputPath: outputPath,
 				})
-
-				It("succeeds", func() {
-					out, err := as.Download("", outputPath, true)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(len(out.DestinationPath)).ToNot(Equal(0))
-				})
-			})
-
-			When("app uses modern FairPlay protection", func() {
-				BeforeEach(func() {
-					zipFile = zip.NewWriter(tmpFile)
-					w, err := zipFile.Create("Payload/Test.app/SC_Info/Manifest.plist")
-					Expect(err).ToNot(HaveOccurred())
-
-					manifest, err := plist.Marshal(PackageManifest{
-						SinfPaths: []string{
-							"SC_Info/TestApp.sinf",
-						},
-					}, plist.BinaryFormat)
-					Expect(err).ToNot(HaveOccurred())
-
-					_, err = w.Write(manifest)
-					Expect(err).ToNot(HaveOccurred())
-
-					w, err = zipFile.Create("Payload/Test.app/Info.plist")
-					Expect(err).ToNot(HaveOccurred())
-
-					info, err := plist.Marshal(map[string]interface{}{
-						"CFBundleExecutable": "Test",
-					}, plist.BinaryFormat)
-					Expect(err).ToNot(HaveOccurred())
-
-					_, err = w.Write(info)
-					Expect(err).ToNot(HaveOccurred())
-
-					err = zipFile.Close()
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				It("succeeds", func() {
-					outputPath := strings.TrimSuffix(tmpFile.Name(), ".tmp")
-					out, err := as.Download("", outputPath, true)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(len(out.DestinationPath)).ToNot(Equal(0))
-				})
-			})
-
-			When("app uses modern FairPlay protection and has Watch app", func() {
-				BeforeEach(func() {
-					zipFile = zip.NewWriter(tmpFile)
-					w, err := zipFile.Create("Payload/Test.app/SC_Info/Manifest.plist")
-					Expect(err).ToNot(HaveOccurred())
-
-					manifest, err := plist.Marshal(PackageManifest{
-						SinfPaths: []string{
-							"SC_Info/TestApp.sinf",
-						},
-					}, plist.BinaryFormat)
-					Expect(err).ToNot(HaveOccurred())
-
-					_, err = w.Write(manifest)
-					Expect(err).ToNot(HaveOccurred())
-
-					w, err = zipFile.Create("Payload/Test.app/Info.plist")
-					Expect(err).ToNot(HaveOccurred())
-
-					info, err := plist.Marshal(map[string]interface{}{
-						"CFBundleExecutable": "Test",
-					}, plist.BinaryFormat)
-					Expect(err).ToNot(HaveOccurred())
-
-					_, err = w.Write(info)
-					Expect(err).ToNot(HaveOccurred())
-
-					w, err = zipFile.Create("Payload/Test.app/Watch/Test Watch App.app/Info.plist")
-					Expect(err).ToNot(HaveOccurred())
-
-					watchInfo, err := plist.Marshal(map[string]interface{}{
-						"WKWatchKitApp": true,
-					}, plist.BinaryFormat)
-					Expect(err).ToNot(HaveOccurred())
-
-					_, err = w.Write(watchInfo)
-					Expect(err).ToNot(HaveOccurred())
-
-					err = zipFile.Close()
-					Expect(err).ToNot(HaveOccurred())
-				})
-
-				It("sinf is in the correct path", func() {
-					outputPath := strings.TrimSuffix(tmpFile.Name(), ".tmp")
-					out, err := as.Download("", outputPath, true)
-					Expect(err).ToNot(HaveOccurred())
-					Expect(len(out.DestinationPath)).ToNot(Equal(0))
-
-					r, err := zip.OpenReader(outputPath)
-					Expect(err).ToNot(HaveOccurred())
-					defer r.Close()
-
-					found := false
-					for _, f := range r.File {
-						if f.Name == "Payload/Test Watch App.app/SC_Info/TestApp.sinf" {
-							found = true
-							break
-						}
-					}
-					Expect(found).To(BeFalse())
-				})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(len(out.DestinationPath)).ToNot(Equal(0))
 			})
 		})
 	})

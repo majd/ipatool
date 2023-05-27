@@ -1,10 +1,12 @@
 package cmd
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"github.com/majd/ipatool/pkg/appstore"
 	"github.com/spf13/cobra"
 	"github.com/thediveo/enumflag/v2"
 	"golang.org/x/net/context"
+	"reflect"
 )
 
 var version = "dev"
@@ -20,17 +22,10 @@ func rootCmd() *cobra.Command {
 		SilenceErrors: true,
 		SilenceUsage:  true,
 		Version:       version,
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			ctx := context.WithValue(context.Background(), "logger", newLogger(format, verbose))
-			ctx = context.WithValue(ctx, "interactive", nonInteractive == false)
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			ctx := context.WithValue(context.Background(), "interactive", nonInteractive == false)
 			cmd.SetContext(ctx)
-
-			err := configureConfigDirectory()
-			if err != nil {
-				return errors.Wrap(err, "failed to configure config directory")
-			}
-
-			return nil
+			initWithCommand(cmd)
 		},
 	}
 
@@ -57,17 +52,21 @@ func Execute() (exitCode int) {
 	if err != nil {
 		exitCode = 1
 
-		logger := newLogger(OutputFormatText, false)
-		outputFormat, parseErr := parseOutputFormat(cmd.Flag("format").Value.String())
-		if parseErr != nil {
-			logger.Error().Err(parseErr).Send()
-			return
+		if reflect.ValueOf(dependencies).IsZero() {
+			initWithCommand(cmd)
 		}
 
-		logger = newLogger(outputFormat, cmd.Flag("verbose").Value.String() == "true")
+		var appstoreErr *appstore.Error
+		if errors.As(err, &appstoreErr) {
+			dependencies.Logger.Verbose().Stack().
+				Err(err).
+				Interface("metadata", appstoreErr.Metadata).
+				Send()
+		} else {
+			dependencies.Logger.Verbose().Stack().Err(err).Send()
+		}
 
-		logger.Verbose().Stack().Err(err).Send()
-		logger.Error().
+		dependencies.Logger.Error().
 			Err(err).
 			Bool("success", false).
 			Send()

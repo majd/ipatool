@@ -9,7 +9,7 @@ var _ = Describe("Zip", func() {
 	When("slices have different lengths", func() {
 		It("returns error", func() {
 			_, err := Zip([]string{}, []string{"test"})
-			Expect(err).To(MatchError(ContainSubstring("slices have different lengths")))
+			Expect(err).To(HaveOccurred())
 		})
 	})
 

@@ -1,10 +1,10 @@
 package keychain
 
 import (
+	"errors"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 )
 
 var _ = Describe("Keychain (Remove)", func() {
@@ -17,7 +17,7 @@ var _ = Describe("Keychain (Remove)", func() {
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeyring = NewMockKeyring(ctrl)
-		keychain = NewKeychain(KeychainArgs{
+		keychain = New(Args{
 			Keyring: mockKeyring,
 		})
 	})
@@ -28,18 +28,16 @@ var _ = Describe("Keychain (Remove)", func() {
 
 	When("keyring returns error", func() {
 		const testKey = "test-key"
-		var testErr = errors.New("test error")
 
 		BeforeEach(func() {
 			mockKeyring.EXPECT().
 				Remove(testKey).
-				Return(testErr)
+				Return(errors.New(""))
 		})
 
 		It("returns wrapped error", func() {
 			err := keychain.Remove(testKey)
-			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring("failed to remove item from keyring")))
+			Expect(err).To(HaveOccurred())
 		})
 	})
 

@@ -3,61 +3,61 @@ package appstore
 import (
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
-	"github.com/majd/ipatool/pkg/log"
-	"github.com/majd/ipatool/pkg/util"
-	"io"
-	"os"
+	"github.com/majd/ipatool/pkg/util/machine"
+	"github.com/majd/ipatool/pkg/util/operatingsystem"
 )
 
 type AppStore interface {
-	Login(email, password, authCode string) (LoginOutput, error)
-	Info() (InfoOutput, error)
+	// Login authenticates with the App Store.
+	Login(input LoginInput) (LoginOutput, error)
+	// AccountInfo returns the information of the authenticated account.
+	AccountInfo() (AccountInfoOutput, error)
+	// Revoke revokes the active credentials.
 	Revoke() error
-	Lookup(bundleID string) (LookupOutput, error)
-	Search(term string, limit int64) (SearchOutput, error)
-	Purchase(bundleID string) error
-	Download(bundleID string, outputPath string, acquireLicense bool) (DownloadOutput, error)
+	// Lookup looks apps up based on the specified bundle identifier.
+	Lookup(input LookupInput) (LookupOutput, error)
+	// Search searches the App Store for apps matching the specified term.
+	Search(input SearchInput) (SearchOutput, error)
+	// Purchase acquires a license for the desired app.
+	// Note: only free apps are supported.
+	Purchase(input PurchaseInput) error
+	// Download downloads the IPA package from the App Store to the desired location.
+	Download(input DownloadInput) (DownloadOutput, error)
+	// ReplicateSinf replicates the sinf for the IPA package.
+	ReplicateSinf(input ReplicateSinfInput) error
 }
 
 type appstore struct {
 	keychain       keychain.Keychain
-	loginClient    http.Client[LoginResult]
-	searchClient   http.Client[SearchResult]
-	purchaseClient http.Client[PurchaseResult]
-	downloadClient http.Client[DownloadResult]
+	loginClient    http.Client[loginResult]
+	searchClient   http.Client[searchResult]
+	purchaseClient http.Client[purchaseResult]
+	downloadClient http.Client[downloadResult]
 	httpClient     http.Client[interface{}]
-	ioReader       io.Reader
-	machine        util.Machine
-	os             util.OperatingSystem
-	logger         log.Logger
-	interactive    bool
+	machine        machine.Machine
+	os             operatingsystem.OperatingSystem
 }
 
-type AppStoreArgs struct {
+type Args struct {
 	Keychain        keychain.Keychain
 	CookieJar       http.CookieJar
-	Logger          log.Logger
-	OperatingSystem util.OperatingSystem
-	Machine         util.Machine
-	Interactive     bool
+	OperatingSystem operatingsystem.OperatingSystem
+	Machine         machine.Machine
 }
 
-func NewAppStore(args AppStoreArgs) AppStore {
-	clientArgs := http.ClientArgs{
+func NewAppStore(args Args) AppStore {
+	clientArgs := http.Args{
 		CookieJar: args.CookieJar,
 	}
 
 	return &appstore{
 		keychain:       args.Keychain,
-		loginClient:    http.NewClient[LoginResult](clientArgs),
-		searchClient:   http.NewClient[SearchResult](clientArgs),
-		purchaseClient: http.NewClient[PurchaseResult](clientArgs),
-		downloadClient: http.NewClient[DownloadResult](clientArgs),
+		loginClient:    http.NewClient[loginResult](clientArgs),
+		searchClient:   http.NewClient[searchResult](clientArgs),
+		purchaseClient: http.NewClient[purchaseResult](clientArgs),
+		downloadClient: http.NewClient[downloadResult](clientArgs),
 		httpClient:     http.NewClient[interface{}](clientArgs),
-		ioReader:       os.Stdin,
 		machine:        args.Machine,
 		os:             args.OperatingSystem,
-		logger:         args.Logger,
-		interactive:    args.Interactive,
 	}
 }

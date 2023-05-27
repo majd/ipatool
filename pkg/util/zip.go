@@ -1,6 +1,6 @@
 package util
 
-import "github.com/pkg/errors"
+import "errors"
 
 type Pair[T, U any] struct {
 	First  T
@@ -9,7 +9,7 @@ type Pair[T, U any] struct {
 
 func Zip[T, U any](ts []T, us []U) ([]Pair[T, U], error) {
 	if len(ts) != len(us) {
-		return nil, errors.New(ErrSlicesLengthMismatch.Error())
+		return nil, errors.New("slices have different lengths")
 	}
 
 	pairs := make([]Pair[T, U], len(ts))

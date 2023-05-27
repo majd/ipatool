@@ -2,221 +2,143 @@ package appstore
 
 import (
 	"archive/zip"
-	"bytes"
+	"errors"
 	"fmt"
 	"github.com/majd/ipatool/pkg/http"
-	"github.com/majd/ipatool/pkg/util"
-	"github.com/pkg/errors"
 	"github.com/schollz/progressbar/v3"
 	"howett.net/plist"
 	"io"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 )
 
-type DownloadSinfResult struct {
-	ID   int64  `plist:"id,omitempty"`
-	Data []byte `plist:"sinf,omitempty"`
-}
+var (
+	ErrLicenseRequired = errors.New("license is required")
+)
 
-type DownloadItemResult struct {
-	HashMD5  string                 `plist:"md5,omitempty"`
-	URL      string                 `plist:"URL,omitempty"`
-	Sinfs    []DownloadSinfResult   `plist:"sinfs,omitempty"`
-	Metadata map[string]interface{} `plist:"metadata,omitempty"`
-}
-
-type DownloadResult struct {
-	FailureType     string               `plist:"failureType,omitempty"`
-	CustomerMessage string               `plist:"customerMessage,omitempty"`
-	Items           []DownloadItemResult `plist:"songList,omitempty"`
-}
-
-type PackageManifest struct {
-	SinfPaths []string `plist:"SinfPaths,omitempty"`
-}
-
-type PackageInfo struct {
-	BundleExecutable string `plist:"CFBundleExecutable,omitempty"`
+type DownloadInput struct {
+	Account    Account
+	App        App
+	OutputPath string
+	Progress   *progressbar.ProgressBar
 }
 
 type DownloadOutput struct {
 	DestinationPath string
+	Sinfs           []Sinf
 }
 
-func (a *appstore) Download(bundleID string, outputPath string, acquireLicense bool) (DownloadOutput, error) {
-	acc, err := a.account()
+func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
+	destination, err := t.resolveDestinationPath(input.App, input.OutputPath)
 	if err != nil {
-		return DownloadOutput{}, errors.Wrap(err, ErrGetAccount.Error())
+		return DownloadOutput{}, fmt.Errorf("failed to resolve destination path: %w", err)
 	}
 
-	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
+	macAddr, err := t.machine.MacAddress()
 	if err != nil {
-		return DownloadOutput{}, errors.Wrap(err, ErrInvalidCountryCode.Error())
-	}
-
-	app, err := a.lookup(bundleID, countryCode)
-	if err != nil {
-		return DownloadOutput{}, errors.Wrap(err, ErrAppLookup.Error())
-	}
-
-	destination, err := a.resolveDestinationPath(app, outputPath)
-	if err != nil {
-		return DownloadOutput{}, errors.Wrap(err, ErrResolveDestinationPath.Error())
-	}
-
-	macAddr, err := a.machine.MacAddress()
-	if err != nil {
-		return DownloadOutput{}, errors.Wrap(err, ErrGetMAC.Error())
+		return DownloadOutput{}, fmt.Errorf("failed to get mac address: %w", err)
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
-	a.logger.Verbose().Str("mac", macAddr).Str("guid", guid).Send()
 
-	err = a.download(acc, app, destination, guid, acquireLicense, true)
+	req := t.downloadRequest(input.Account, input.App, guid)
+
+	res, err := t.downloadClient.Send(req)
 	if err != nil {
-		return DownloadOutput{}, errors.Wrap(err, ErrDownloadFile.Error())
-	}
-
-	return DownloadOutput{
-		DestinationPath: destination,
-	}, nil
-}
-
-func (a *appstore) download(acc Account, app App, dst, guid string, acquireLicense, attemptToRenewCredentials bool) error {
-	req := a.downloadRequest(acc, app, guid)
-
-	res, err := a.downloadClient.Send(req)
-	if err != nil {
-		return errors.Wrap(err, ErrRequest.Error())
+		return DownloadOutput{}, fmt.Errorf("failed to send http request: %w", err)
 	}
 
 	if res.Data.FailureType == FailureTypePasswordTokenExpired {
-		if attemptToRenewCredentials {
-			a.logger.Verbose().Msg("retrieving new password token")
-			acc, err = a.login(acc.Email, acc.Password, "", guid, 0, true)
-			if err != nil {
-				return errors.Wrap(err, ErrPasswordTokenExpired.Error())
-			}
-
-			return a.download(acc, app, dst, guid, acquireLicense, false)
-		}
-
-		return ErrPasswordTokenExpired
-	}
-
-	if res.Data.FailureType == FailureTypeLicenseNotFound && acquireLicense {
-		a.logger.Verbose().Msg("attempting to acquire license")
-		err = a.purchase(app.BundleID, guid, true)
-		if err != nil {
-			return errors.Wrap(err, ErrPurchase.Error())
-		}
-
-		return a.download(acc, app, dst, guid, false, attemptToRenewCredentials)
+		return DownloadOutput{}, ErrPasswordTokenExpired
 	}
 
 	if res.Data.FailureType == FailureTypeLicenseNotFound {
-		return ErrLicenseRequired
+		return DownloadOutput{}, ErrLicenseRequired
 	}
 
 	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		a.logger.Verbose().Interface("response", res).Send()
-		return errors.New(res.Data.CustomerMessage)
+		return DownloadOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.CustomerMessage), res)
 	}
 
 	if res.Data.FailureType != "" {
-		a.logger.Verbose().Interface("response", res).Send()
-		return ErrGeneric
+		return DownloadOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.FailureType), res)
 	}
 
 	if len(res.Data.Items) == 0 {
-		a.logger.Verbose().Interface("response", res).Send()
-		return ErrInvalidResponse
+		return DownloadOutput{}, NewErrorWithMetadata(errors.New("invalid response"), res)
 	}
 
 	item := res.Data.Items[0]
 
-	err = a.downloadFile(fmt.Sprintf("%s.tmp", dst), item.URL)
+	err = t.downloadFile(item.URL, fmt.Sprintf("%s.tmp", destination), input.Progress)
 	if err != nil {
-		return errors.Wrap(err, ErrDownloadFile.Error())
+		return DownloadOutput{}, fmt.Errorf("failed to download file: %w", err)
 	}
 
-	err = a.applyPatches(item, acc, fmt.Sprintf("%s.tmp", dst), dst)
+	err = t.applyPatches(item, input.Account, fmt.Sprintf("%s.tmp", destination), destination)
 	if err != nil {
-		return errors.Wrap(err, ErrPatchApp.Error())
+		return DownloadOutput{}, fmt.Errorf("failed to apply patches: %w", err)
 	}
 
-	err = a.os.Remove(fmt.Sprintf("%s.tmp", dst))
+	err = t.os.Remove(fmt.Sprintf("%s.tmp", destination))
 	if err != nil {
-		return errors.Wrap(err, ErrRemoveTempFile.Error())
+		return DownloadOutput{}, fmt.Errorf("failed to remove file: %w", err)
 	}
 
-	return nil
+	return DownloadOutput{
+		DestinationPath: destination,
+		Sinfs:           item.Sinfs,
+	}, nil
 }
 
-func (a *appstore) downloadFile(dst, sourceURL string) (err error) {
-	req, err := a.httpClient.NewRequest("GET", sourceURL, nil)
+type downloadItemResult struct {
+	HashMD5  string                 `plist:"md5,omitempty"`
+	URL      string                 `plist:"URL,omitempty"`
+	Sinfs    []Sinf                 `plist:"sinfs,omitempty"`
+	Metadata map[string]interface{} `plist:"metadata,omitempty"`
+}
+
+type downloadResult struct {
+	FailureType     string               `plist:"failureType,omitempty"`
+	CustomerMessage string               `plist:"customerMessage,omitempty"`
+	Items           []downloadItemResult `plist:"songList,omitempty"`
+}
+
+func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressBar) (err error) {
+	req, err := t.httpClient.NewRequest("GET", src, nil)
 	if err != nil {
-		return errors.Wrap(err, ErrCreateRequest.Error())
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	res, err := a.httpClient.Do(req)
+	res, err := t.httpClient.Do(req)
 	if err != nil {
-		return errors.Wrap(err, ErrRequest.Error())
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	file, err := t.os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
 	}
 
-	defer func() {
-		if closeErr := res.Body.Close(); closeErr != err && err == nil {
-			err = closeErr
-		}
-	}()
+	defer file.Close()
 
-	file, err := a.os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return errors.Wrap(err, ErrOpenFile.Error())
-	}
-
-	defer func() {
-		if closeErr := file.Close(); closeErr != err && err == nil {
-			err = closeErr
-		}
-	}()
-
-	sizeMB := float64(res.ContentLength) / (1 << 20)
-	a.logger.Verbose().Str("size", fmt.Sprintf("%.2fMB", sizeMB)).Msg("downloading")
-
-	if a.interactive {
-		bar := progressbar.NewOptions64(res.ContentLength,
-			progressbar.OptionSetDescription("downloading"),
-			progressbar.OptionSetWriter(os.Stdout),
-			progressbar.OptionShowBytes(true),
-			progressbar.OptionSetWidth(20),
-			progressbar.OptionFullWidth(),
-			progressbar.OptionThrottle(65*time.Millisecond),
-			progressbar.OptionShowCount(),
-			progressbar.OptionClearOnFinish(),
-			progressbar.OptionSpinnerType(14),
-			progressbar.OptionSetRenderBlankState(true),
-			progressbar.OptionSetElapsedTime(false),
-			progressbar.OptionSetPredictTime(false),
-		)
-
-		_, err = io.Copy(io.MultiWriter(file, bar), res.Body)
+	if progress != nil {
+		progress.ChangeMax64(res.ContentLength)
+		_, err = io.Copy(io.MultiWriter(file, progress), res.Body)
 	} else {
 		_, err = io.Copy(file, res.Body)
 	}
 
 	if err != nil {
-		return errors.Wrap(err, ErrFileWrite.Error())
+		return fmt.Errorf("failed to write file: %w", err)
 	}
 
 	return nil
 }
 
 func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request {
-	host := fmt.Sprintf("%s-%s", PriavteAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
+	host := fmt.Sprintf("%s-%s", PrivateAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
 	return http.Request{
 		URL:            fmt.Sprintf("https://%s%s?guid=%s", host, PrivateAppStoreAPIPathDownload, guid),
 		Method:         http.MethodPOST,
@@ -243,21 +165,21 @@ func fileName(app App) string {
 		app.Version)
 }
 
-func (a *appstore) resolveDestinationPath(app App, path string) (string, error) {
+func (t *appstore) resolveDestinationPath(app App, path string) (string, error) {
 	file := fileName(app)
 
 	if path == "" {
-		workdir, err := a.os.Getwd()
+		workdir, err := t.os.Getwd()
 		if err != nil {
-			return "", errors.Wrap(err, ErrGetCurrentDirectory.Error())
+			return "", fmt.Errorf("failed to get current directory: %w", err)
 		}
 
 		return fmt.Sprintf("%s/%s", workdir, file), nil
 	}
 
-	isDir, err := a.isDirectory(path)
+	isDir, err := t.isDirectory(path)
 	if err != nil {
-		return "", errors.Wrap(err, ErrCheckDirectory.Error())
+		return "", fmt.Errorf("failed to determine whether path is a directory: %w", err)
 	}
 
 	if isDir {
@@ -267,10 +189,10 @@ func (a *appstore) resolveDestinationPath(app App, path string) (string, error) 
 	return path, nil
 }
 
-func (a *appstore) isDirectory(path string) (bool, error) {
-	info, err := a.os.Stat(path)
+func (t *appstore) isDirectory(path string) (bool, error) {
+	info, err := t.os.Stat(path)
 	if err != nil && !os.IsNotExist(err) {
-		return false, errors.Wrap(err, ErrGetFileMetadata.Error())
+		return false, fmt.Errorf("failed to read file metadata: %w", err)
 	}
 
 	if info == nil {
@@ -280,183 +202,51 @@ func (a *appstore) isDirectory(path string) (bool, error) {
 	return info.IsDir(), nil
 }
 
-func (a *appstore) applyPatches(item DownloadItemResult, acc Account, src, dst string) (err error) {
-	dstFile, err := a.os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return errors.Wrap(err, ErrOpenFile.Error())
-	}
-
+func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst string) error {
 	srcZip, err := zip.OpenReader(src)
 	if err != nil {
-		return errors.Wrap(err, ErrOpenZipFile.Error())
+		return fmt.Errorf("failed to open zip reader: %w", err)
 	}
-	defer func() {
-		if closeErr := srcZip.Close(); closeErr != err && err == nil {
-			err = closeErr
-		}
-	}()
+	defer srcZip.Close()
+
+	dstFile, err := t.os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
 
 	dstZip := zip.NewWriter(dstFile)
-	defer func() {
-		if closeErr := dstZip.Close(); closeErr != err && err == nil {
-			err = closeErr
-		}
-	}()
+	defer dstZip.Close()
 
-	manifestData := new(bytes.Buffer)
-	infoData := new(bytes.Buffer)
-
-	appBundle, err := a.replicateZip(srcZip, dstZip, infoData, manifestData)
+	err = t.replicateZip(srcZip, dstZip)
 	if err != nil {
-		return errors.Wrap(err, ErrReplicateZip.Error())
+		return fmt.Errorf("failed to replicate zip: %w", err)
 	}
 
-	err = a.writeMetadata(item.Metadata, acc, dstZip)
+	err = t.writeMetadata(item.Metadata, acc, dstZip)
 	if err != nil {
-		return errors.Wrap(err, ErrWriteMetadataFile.Error())
-	}
-
-	if manifestData.Len() > 0 {
-		err = a.applySinfPatches(item, dstZip, manifestData.Bytes(), appBundle)
-		if err != nil {
-			return errors.Wrap(err, ErrApplyPatches.Error())
-		}
-	} else {
-		err = a.applyLegacySinfPatches(item, dstZip, infoData.Bytes(), appBundle)
-		if err != nil {
-			return errors.Wrap(err, ErrApplyLegacyPatches.Error())
-		}
+		return fmt.Errorf("failed to write metadata: %w", err)
 	}
 
 	return nil
 }
 
-func (a *appstore) writeMetadata(metadata map[string]interface{}, acc Account, zip *zip.Writer) error {
+func (t *appstore) writeMetadata(metadata map[string]interface{}, acc Account, zip *zip.Writer) error {
 	metadata["apple-id"] = acc.Email
 	metadata["userName"] = acc.Email
 
 	metadataFile, err := zip.Create("iTunesMetadata.plist")
 	if err != nil {
-		return errors.Wrap(err, ErrCreateMetadataFile.Error())
+		return fmt.Errorf("failed to create file: %w", err)
 	}
 
 	data, err := plist.Marshal(metadata, plist.BinaryFormat)
 	if err != nil {
-		return errors.Wrap(err, ErrEncodeMetadataFile.Error())
+		return fmt.Errorf("failed to marshal data: %w", err)
 	}
 
 	_, err = metadataFile.Write(data)
 	if err != nil {
-		return errors.Wrap(err, ErrWriteMetadataFile.Error())
-	}
-
-	return nil
-}
-
-func (a *appstore) replicateZip(src *zip.ReadCloser, dst *zip.Writer, info *bytes.Buffer, manifest *bytes.Buffer) (appBundle string, err error) {
-	for _, file := range src.File {
-		srcFile, err := file.OpenRaw()
-		if err != nil {
-			return "", errors.Wrap(err, ErrOpenFile.Error())
-		}
-
-		if strings.HasSuffix(file.Name, ".app/SC_Info/Manifest.plist") {
-			srcFileD, err := file.Open()
-			if err != nil {
-				return "", errors.Wrap(err, ErrDecompressManifestFile.Error())
-			}
-
-			_, err = io.Copy(manifest, srcFileD)
-			if err != nil {
-				return "", errors.Wrap(err, ErrGetManifestFile.Error())
-			}
-		}
-
-		if strings.Contains(file.Name, ".app/Info.plist") {
-			srcFileD, err := file.Open()
-			if err != nil {
-				return "", errors.Wrap(err, ErrDecompressInfoFile.Error())
-			}
-
-			if !strings.Contains(file.Name, "/Watch/") {
-				appBundle = filepath.Base(strings.TrimSuffix(file.Name, ".app/Info.plist"))
-			}
-
-			_, err = io.Copy(info, srcFileD)
-			if err != nil {
-				return "", errors.Wrap(err, ErrGetInfoFile.Error())
-			}
-		}
-
-		header := file.FileHeader
-		dstFile, err := dst.CreateRaw(&header)
-		if err != nil {
-			return "", errors.Wrap(err, ErrCreateDestinationFile.Error())
-		}
-
-		_, err = io.Copy(dstFile, srcFile)
-		if err != nil {
-			return "", errors.Wrap(err, ErrFileWrite.Error())
-		}
-	}
-
-	if appBundle == "" {
-		return "", ErrGetBundleName
-	}
-
-	return appBundle, nil
-}
-
-func (a *appstore) applySinfPatches(item DownloadItemResult, zip *zip.Writer, manifestData []byte, appBundle string) error {
-	var manifest PackageManifest
-	_, err := plist.Unmarshal(manifestData, &manifest)
-	if err != nil {
-		return errors.Wrap(err, ErrUnmarshal.Error())
-	}
-
-	zipped, err := util.Zip(item.Sinfs, manifest.SinfPaths)
-	if err != nil {
-		return errors.Wrap(err, ErrZipSinfs.Error())
-	}
-
-	for _, pair := range zipped {
-		sp := fmt.Sprintf("Payload/%s.app/%s", appBundle, pair.Second)
-		a.logger.Verbose().Str("path", sp).Msg("writing sinf data")
-
-		file, err := zip.Create(sp)
-		if err != nil {
-			return errors.Wrap(err, ErrCreateSinfFile.Error())
-		}
-
-		_, err = file.Write(pair.First.Data)
-		if err != nil {
-			return errors.Wrap(err, ErrWriteSinfData.Error())
-		}
-	}
-
-	return nil
-}
-
-func (a *appstore) applyLegacySinfPatches(item DownloadItemResult, zip *zip.Writer, infoData []byte, appBundle string) error {
-	a.logger.Verbose().Msg("applying legacy sinf patches")
-
-	var info PackageInfo
-	_, err := plist.Unmarshal(infoData, &info)
-	if err != nil {
-		return errors.Wrap(err, ErrUnmarshal.Error())
-	}
-
-	sp := fmt.Sprintf("Payload/%s.app/SC_Info/%s.sinf", appBundle, info.BundleExecutable)
-	a.logger.Verbose().Str("path", sp).Msg("writing sinf data")
-
-	file, err := zip.Create(sp)
-	if err != nil {
-		return errors.Wrap(err, ErrCreateSinfFile.Error())
-	}
-
-	_, err = file.Write(item.Sinfs[0].Data)
-	if err != nil {
-		return errors.Wrap(err, ErrWriteSinfData.Error())
+		return fmt.Errorf("failed to write data: %w", err)
 	}
 
 	return nil

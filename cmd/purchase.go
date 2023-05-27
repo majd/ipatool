@@ -1,34 +1,63 @@
 package cmd
 
 import (
+	"errors"
 	"github.com/99designs/keyring"
-	"github.com/majd/ipatool/pkg/log"
-	"github.com/pkg/errors"
+	"github.com/avast/retry-go"
+	"github.com/majd/ipatool/pkg/appstore"
 	"github.com/spf13/cobra"
+	"time"
 )
 
 func purchaseCmd() *cobra.Command {
-	var keychainPassphrase string
 	var bundleID string
 
 	cmd := &cobra.Command{
 		Use:   "purchase",
 		Short: "Obtain a license for the app from the App Store",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			appstore, err := newAppStore(cmd, keychainPassphrase)
-			if err != nil {
-				return errors.Wrap(err, "failed to create appstore client")
-			}
+			var lastErr error
+			var acc appstore.Account
 
-			err = appstore.Purchase(bundleID)
-			if err != nil {
-				return err
-			}
+			return retry.Do(func() error {
+				infoResult, err := dependencies.AppStore.AccountInfo()
+				if err != nil {
+					return err
+				}
 
-			logger := cmd.Context().Value("logger").(log.Logger)
-			logger.Log().Bool("success", true).Send()
+				acc = infoResult.Account
 
-			return nil
+				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
+					loginResult, err := dependencies.AppStore.Login(appstore.LoginInput{Email: acc.Email, Password: acc.Password})
+					if err != nil {
+						return err
+					}
+
+					acc = loginResult.Account
+				}
+
+				lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{Account: acc, BundleID: bundleID})
+				if err != nil {
+					return err
+				}
+
+				err = dependencies.AppStore.Purchase(appstore.PurchaseInput{Account: acc, App: lookupResult.App})
+				if err != nil {
+					return err
+				}
+
+				dependencies.Logger.Log().Bool("success", true).Send()
+				return nil
+			},
+				retry.LastErrorOnly(true),
+				retry.DelayType(retry.FixedDelay),
+				retry.Delay(time.Millisecond),
+				retry.Attempts(2),
+				retry.RetryIf(func(err error) bool {
+					lastErr = err
+					return errors.Is(err, appstore.ErrPasswordTokenExpired)
+				}),
+			)
 		},
 	}
 

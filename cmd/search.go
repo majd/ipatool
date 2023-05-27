@@ -3,13 +3,10 @@ package cmd
 import (
 	"github.com/99designs/keyring"
 	"github.com/majd/ipatool/pkg/appstore"
-	"github.com/majd/ipatool/pkg/log"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
 func searchCmd() *cobra.Command {
-	var keychainPassphrase string
 	var limit int64
 
 	cmd := &cobra.Command{
@@ -17,18 +14,24 @@ func searchCmd() *cobra.Command {
 		Short: "Search for iOS apps available on the App Store",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			store, err := newAppStore(cmd, keychainPassphrase)
-			if err != nil {
-				return errors.Wrap(err, "failed to create appstore client")
-			}
-
-			out, err := store.Search(args[0], limit)
+			infoResult, err := dependencies.AppStore.AccountInfo()
 			if err != nil {
 				return err
 			}
 
-			logger := cmd.Context().Value("logger").(log.Logger)
-			logger.Log().Int("count", out.Count).Array("apps", appstore.Apps(out.Results)).Send()
+			output, err := dependencies.AppStore.Search(appstore.SearchInput{
+				Account: infoResult.Account,
+				Term:    args[0],
+				Limit:   limit,
+			})
+			if err != nil {
+				return err
+			}
+
+			dependencies.Logger.Log().
+				Int("count", output.Count).
+				Array("apps", appstore.Apps(output.Results)).
+				Send()
 
 			return nil
 		},

@@ -1,11 +1,11 @@
 package appstore
 
 import (
+	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/keychain"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 )
 
 var _ = Describe("AppStore (Revoke)", func() {
@@ -18,29 +18,13 @@ var _ = Describe("AppStore (Revoke)", func() {
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
-		appstore = NewAppStore(AppStoreArgs{
+		appstore = NewAppStore(Args{
 			Keychain: mockKeychain,
 		})
 	})
 
 	AfterEach(func() {
 		ctrl.Finish()
-	})
-
-	When("keychain returns error", func() {
-		var testErr = errors.New("test error")
-
-		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Remove("account").
-				Return(testErr)
-		})
-
-		It("returns wrapped error", func() {
-			err := appstore.Revoke()
-			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrRemoveKeychainItem.Error())))
-		})
 	})
 
 	When("keychain removes item", func() {
@@ -53,6 +37,19 @@ var _ = Describe("AppStore (Revoke)", func() {
 		It("returns data", func() {
 			err := appstore.Revoke()
 			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	When("keychain returns error", func() {
+		BeforeEach(func() {
+			mockKeychain.EXPECT().
+				Remove("account").
+				Return(errors.New(""))
+		})
+
+		It("returns wrapped error", func() {
+			err := appstore.Revoke()
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })

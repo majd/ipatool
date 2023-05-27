@@ -1,55 +1,61 @@
 package appstore
 
 import (
+	"errors"
 	"fmt"
 	"github.com/majd/ipatool/pkg/http"
-	"github.com/pkg/errors"
 	"net/url"
 	"strconv"
 )
 
-type SearchResult struct {
+type SearchInput struct {
+	Account Account
+	Term    string
+	Limit   int64
+}
+
+type SearchOutput struct {
+	Count   int
+	Results []App
+}
+
+func (t *appstore) Search(input SearchInput) (SearchOutput, error) {
+	countryCode, err := countryCodeFromStoreFront(input.Account.StoreFront)
+	if err != nil {
+		return SearchOutput{}, fmt.Errorf("country code is invalid: %w", err)
+	}
+
+	request := t.searchRequest(input.Term, countryCode, input.Limit)
+
+	res, err := t.searchClient.Send(request)
+	if err != nil {
+		return SearchOutput{}, fmt.Errorf("request failed: %w", err)
+	}
+
+	if res.StatusCode != 200 {
+		return SearchOutput{}, NewErrorWithMetadata(errors.New("request failed"), res)
+	}
+
+	return SearchOutput{
+		Count:   res.Data.Count,
+		Results: res.Data.Results,
+	}, nil
+}
+
+type searchResult struct {
 	Count   int   `json:"resultCount,omitempty"`
 	Results []App `json:"results,omitempty"`
 }
 
-type SearchOutput = SearchResult
-
-func (a *appstore) Search(term string, limit int64) (SearchOutput, error) {
-	acc, err := a.account()
-	if err != nil {
-		return SearchOutput{}, errors.Wrap(err, ErrGetAccount.Error())
-	}
-
-	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
-	if err != nil {
-		return SearchOutput{}, errors.Wrap(err, ErrInvalidCountryCode.Error())
-	}
-
-	request := a.searchRequest(term, countryCode, limit)
-
-	res, err := a.searchClient.Send(request)
-	if err != nil {
-		return SearchOutput{}, errors.Wrap(err, ErrRequest.Error())
-	}
-
-	if res.StatusCode != 200 {
-		a.logger.Verbose().Interface("data", res.Data).Int("status", res.StatusCode).Send()
-		return SearchOutput{}, ErrRequest
-	}
-
-	return res.Data, nil
-}
-
-func (a *appstore) searchRequest(term, countryCode string, limit int64) http.Request {
+func (t *appstore) searchRequest(term, countryCode string, limit int64) http.Request {
 	return http.Request{
-		URL:            a.searchURL(term, countryCode, limit),
+		URL:            t.searchURL(term, countryCode, limit),
 		Method:         http.MethodGET,
 		ResponseFormat: http.ResponseFormatJSON,
 	}
 }
 
-func (a *appstore) searchURL(term, countryCode string, limit int64) string {
+func (t *appstore) searchURL(term, countryCode string, limit int64) string {
 	params := url.Values{}
 	params.Add("entity", "software,iPadSoftware")
 	params.Add("limit", strconv.Itoa(int(limit)))

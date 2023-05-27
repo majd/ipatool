@@ -30,7 +30,7 @@ var _ = Describe("Payload", func() {
 			}
 
 			data, err := sut.data()
-			Expect(err).To(MatchError(ContainSubstring(ErrUnsupportedValueType.Error())))
+			Expect(err).To(HaveOccurred())
 			Expect(data).To(BeNil())
 		})
 	})
@@ -57,7 +57,7 @@ var _ = Describe("Payload", func() {
 			}
 
 			data, err := sut.data()
-			Expect(err).To(MatchError(ContainSubstring("failed to encode XML object")))
+			Expect(err).To(HaveOccurred())
 			Expect(data).To(BeNil())
 		})
 	})

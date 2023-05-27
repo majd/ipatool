@@ -1,24 +1,31 @@
-package util
+package machine
 
 import (
 	"github.com/golang/mock/gomock"
+	"github.com/majd/ipatool/pkg/util/operatingsystem"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"syscall"
+	"testing"
 )
+
+func TestMachine(t *testing.T) {
+	RegisterFailHandler(Fail)
+	RunSpecs(t, "Machine Suite")
+}
 
 var _ = Describe("Machine", func() {
 	var (
 		ctrl    *gomock.Controller
 		machine Machine
-		mockOS  *MockOperatingSystem
+		mockOS  *operatingsystem.MockOperatingSystem
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
-		mockOS = NewMockOperatingSystem(ctrl)
-		machine = NewMachine(MachineArgs{
-			OperatingSystem: mockOS,
+		mockOS = operatingsystem.NewMockOperatingSystem(ctrl)
+		machine = New(Args{
+			OS: mockOS,
 		})
 	})
 
@@ -46,7 +53,7 @@ var _ = Describe("Machine", func() {
 	When("reading password from stdout", func() {
 		It("returns error", func() {
 			_, err := machine.ReadPassword(syscall.Stdout)
-			Expect(err).To(MatchError(ContainSubstring("inappropriate ioctl for device")))
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })

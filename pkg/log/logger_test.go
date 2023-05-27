@@ -22,7 +22,7 @@ var _ = Describe("Logger", func() {
 
 	Context("Verbose logger", func() {
 		BeforeEach(func() {
-			logger = NewLogger(LoggerArgs{
+			logger = NewLogger(Args{
 				Verbose: true,
 				Writer:  mockWriter,
 			})
@@ -44,7 +44,7 @@ var _ = Describe("Logger", func() {
 
 	Context("Non-verbose logger", func() {
 		BeforeEach(func() {
-			logger = NewLogger(LoggerArgs{
+			logger = NewLogger(Args{
 				Verbose: false,
 				Writer:  mockWriter,
 			})
