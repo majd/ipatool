@@ -1,9 +1,10 @@
 package http
 
 import (
+	"testing"
+
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"testing"
 )
 
 func TestHTTP(t *testing.T) {

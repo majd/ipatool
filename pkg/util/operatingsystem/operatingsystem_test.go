@@ -1,15 +1,17 @@
 package operatingsystem
 
 import (
+	"errors"
 	"fmt"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"io/fs"
 	"math/rand"
 	"os"
 	"path"
 	"testing"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 func TestOS(t *testing.T) {
@@ -68,7 +70,7 @@ var _ = Describe("OperatingSystem", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = sut.Stat(file.Name())
-			Expect(os.IsNotExist(err)).To(BeTrue())
+			Expect(os.IsNotExist(errors.Unwrap(err))).To(BeTrue())
 		})
 
 		It("renames file", func() {
@@ -76,7 +78,9 @@ var _ = Describe("OperatingSystem", func() {
 			newPath := fmt.Sprintf("%s/%d", os.TempDir(), r.Intn(100))
 
 			err := sut.Rename(file.Name(), newPath)
-			defer sut.Remove(newPath)
+			defer func() {
+				_ = sut.Remove(newPath)
+			}()
 
 			Expect(err).ToNot(HaveOccurred())
 		})

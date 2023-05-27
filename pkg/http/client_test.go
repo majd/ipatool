@@ -2,11 +2,12 @@ package http
 
 import (
 	"errors"
+	"net/http"
+	"net/http/httptest"
+
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"net/http"
-	"net/http/httptest"
 )
 
 var _ = Describe("Client", Ordered, func() {
@@ -50,7 +51,7 @@ var _ = Describe("Client", Ordered, func() {
 	})
 
 	It("returns response", func() {
-		mockHandler = func(w http.ResponseWriter, r *http.Request) {
+		mockHandler = func(_w http.ResponseWriter, r *http.Request) {
 			defer GinkgoRecover()
 			Expect(r.Header.Get("User-Agent")).To(Equal(DefaultUserAgent))
 		}
@@ -95,7 +96,7 @@ var _ = Describe("Client", Ordered, func() {
 			})
 
 			It("decodes JSON response", func() {
-				mockHandler = func(w http.ResponseWriter, r *http.Request) {
+				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
 					w.Header().Add("Content-Type", "application/json")
 					_, err := w.Write([]byte("{\"foo\":\"bar\"}"))
 					Expect(err).ToNot(HaveOccurred())
@@ -123,7 +124,7 @@ var _ = Describe("Client", Ordered, func() {
 			})
 
 			It("decodes XML response", func() {
-				mockHandler = func(w http.ResponseWriter, r *http.Request) {
+				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
 					w.Header().Add("Content-Type", "application/xml")
 					_, err := w.Write([]byte("<dict><key>foo</key><string>bar</string></dict>"))
 					Expect(err).ToNot(HaveOccurred())
@@ -143,7 +144,7 @@ var _ = Describe("Client", Ordered, func() {
 			})
 
 			It("returns error when content type is not supported", func() {
-				mockHandler = func(w http.ResponseWriter, r *http.Request) {
+				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
 					w.Header().Add("Content-Type", "application/xyz")
 				}
 

@@ -2,19 +2,22 @@ package cmd
 
 import (
 	"errors"
+	"reflect"
+
 	"github.com/majd/ipatool/pkg/appstore"
 	"github.com/spf13/cobra"
 	"github.com/thediveo/enumflag/v2"
 	"golang.org/x/net/context"
-	"reflect"
 )
 
 var version = "dev"
 
 func rootCmd() *cobra.Command {
-	var verbose bool
-	var nonInteractive bool
-	var format OutputFormat
+	var (
+		verbose        bool
+		nonInteractive bool
+		format         OutputFormat
+	)
 
 	cmd := &cobra.Command{
 		Use:           "ipatool",
@@ -23,7 +26,7 @@ func rootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		Version:       version,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			ctx := context.WithValue(context.Background(), "interactive", nonInteractive == false)
+			ctx := context.WithValue(context.Background(), "interactive", !nonInteractive)
 			cmd.SetContext(ctx)
 			initWithCommand(cmd)
 		},
@@ -46,12 +49,11 @@ func rootCmd() *cobra.Command {
 }
 
 // Execute runs the program and returns the appropriate exit status code.
-func Execute() (exitCode int) {
+func Execute() int {
 	cmd := rootCmd()
 	err := cmd.Execute()
-	if err != nil {
-		exitCode = 1
 
+	if err != nil {
 		if reflect.ValueOf(dependencies).IsZero() {
 			initWithCommand(cmd)
 		}
@@ -70,7 +72,9 @@ func Execute() (exitCode int) {
 			Err(err).
 			Bool("success", false).
 			Send()
+
+		return 1
 	}
 
-	return
+	return 0
 }

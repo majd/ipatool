@@ -4,6 +4,11 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"io"
+	gohttp "net/http"
+	"os"
+	"strings"
+
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
@@ -12,10 +17,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"howett.net/plist"
-	"io"
-	gohttp "net/http"
-	"os"
-	"strings"
 )
 
 var _ = Describe("AppStore (Download)", func() {
@@ -404,9 +405,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 				mockOS.EXPECT().
 					OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
-					DoAndReturn(func(name string, flag int, perm os.FileMode) (*os.File, error) {
-						return os.OpenFile(name, flag, perm)
-					})
+					DoAndReturn(os.OpenFile)
 
 				mockOS.EXPECT().
 					Stat(gomock.Any()).
@@ -442,7 +441,7 @@ var _ = Describe("AppStore (Download)", func() {
 					OutputPath: outputPath,
 				})
 				Expect(err).ToNot(HaveOccurred())
-				Expect(len(out.DestinationPath)).ToNot(Equal(0))
+				Expect(out.DestinationPath).ToNot(BeEmpty())
 			})
 		})
 	})

@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"errors"
+
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	. "github.com/onsi/ginkgo/v2"
@@ -64,7 +65,7 @@ var _ = Describe("AppStore (Search)", func() {
 			})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out.Count).To(Equal(1))
-			Expect(len(out.Results)).To(Equal(1))
+			Expect(out.Results).To(HaveLen(1))
 			Expect(out.Results[0]).To(Equal(App{
 				ID:       testID,
 				BundleID: testBundleID,

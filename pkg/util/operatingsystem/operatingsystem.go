@@ -1,6 +1,9 @@
 package operatingsystem
 
-import "os"
+import (
+	"fmt"
+	"os"
+)
 
 //go:generate go run github.com/golang/mock/mockgen -source=operatingsystem.go -destination=operatingsystem_mock.go -package operatingsystem
 type OperatingSystem interface {
@@ -11,7 +14,7 @@ type OperatingSystem interface {
 	Remove(name string) error
 	IsNotExist(err error) bool
 	MkdirAll(path string, perm os.FileMode) error
-	Rename(old, new string) error
+	Rename(oldPath, newPath string) error
 }
 
 type operatingSystem struct{}
@@ -25,19 +28,39 @@ func (operatingSystem) Getenv(key string) string {
 }
 
 func (operatingSystem) Stat(name string) (os.FileInfo, error) {
-	return os.Stat(name)
+	info, err := os.Stat(name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to describe file '%s': %w", name, err)
+	}
+
+	return info, nil
 }
 
 func (operatingSystem) Getwd() (string, error) {
-	return os.Getwd()
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	return wd, nil
 }
 
 func (operatingSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	return os.OpenFile(name, flag, perm)
+	file, err := os.OpenFile(name, flag, perm)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open file '%s': %w", name, err)
+	}
+
+	return file, nil
 }
 
 func (operatingSystem) Remove(name string) error {
-	return os.Remove(name)
+	err := os.Remove(name)
+	if err != nil {
+		return fmt.Errorf("failed to remove file '%s': %w", name, err)
+	}
+
+	return nil
 }
 
 func (operatingSystem) IsNotExist(err error) bool {
@@ -45,9 +68,19 @@ func (operatingSystem) IsNotExist(err error) bool {
 }
 
 func (operatingSystem) MkdirAll(path string, perm os.FileMode) error {
-	return os.MkdirAll(path, perm)
+	err := os.MkdirAll(path, perm)
+	if err != nil {
+		return fmt.Errorf("failed to create directory '%s': %w", path, err)
+	}
+
+	return nil
 }
 
-func (operatingSystem) Rename(old, new string) error {
-	return os.Rename(old, new)
+func (operatingSystem) Rename(oldPath, newPath string) error {
+	err := os.Rename(oldPath, newPath)
+	if err != nil {
+		return fmt.Errorf("failed to rename '%s' to '%s': %w", oldPath, newPath, err)
+	}
+
+	return nil
 }

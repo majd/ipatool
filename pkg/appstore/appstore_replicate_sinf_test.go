@@ -4,6 +4,8 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"os"
+
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
@@ -12,7 +14,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"howett.net/plist"
-	"os"
 )
 
 var _ = Describe("AppStore (ReplicateSinf)", func() {
@@ -71,9 +72,7 @@ var _ = Describe("AppStore (ReplicateSinf)", func() {
 		BeforeEach(func() {
 			mockOS.EXPECT().
 				OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(name string, flag int, perm os.FileMode) (*os.File, error) {
-					return os.OpenFile(name, flag, perm)
-				})
+				DoAndReturn(os.OpenFile)
 
 			mockOS.EXPECT().
 				Remove(testFile.Name()).
@@ -137,9 +136,7 @@ var _ = Describe("AppStore (ReplicateSinf)", func() {
 		BeforeEach(func() {
 			mockOS.EXPECT().
 				OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
-				DoAndReturn(func(name string, flag int, perm os.FileMode) (*os.File, error) {
-					return os.OpenFile(name, flag, perm)
-				})
+				DoAndReturn(os.OpenFile)
 
 			mockOS.EXPECT().
 				Remove(testFile.Name()).

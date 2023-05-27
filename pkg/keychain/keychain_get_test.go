@@ -2,6 +2,7 @@ package keychain
 
 import (
 	"errors"
+
 	"github.com/99designs/keyring"
 	"github.com/golang/mock/gomock"
 	. "github.com/onsi/ginkgo/v2"

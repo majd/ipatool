@@ -4,12 +4,13 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
-	"github.com/majd/ipatool/pkg/http"
-	"github.com/schollz/progressbar/v3"
-	"howett.net/plist"
 	"io"
 	"os"
 	"strings"
+
+	"github.com/majd/ipatool/pkg/http"
+	"github.com/schollz/progressbar/v3"
+	"howett.net/plist"
 )
 
 var (
@@ -104,7 +105,7 @@ type downloadResult struct {
 	Items           []downloadItemResult `plist:"songList,omitempty"`
 }
 
-func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressBar) (err error) {
+func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressBar) error {
 	req, err := t.httpClient.NewRequest("GET", src, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -139,6 +140,7 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 
 func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request {
 	host := fmt.Sprintf("%s-%s", PrivateAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
+
 	return http.Request{
 		URL:            fmt.Sprintf("https://%s%s?guid=%s", host, PrivateAppStoreAPIPathDownload, guid),
 		Method:         http.MethodPOST,

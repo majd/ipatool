@@ -1,0 +1,22 @@
+linters:
+  enable:
+    - errcheck
+    - govet
+    - goimports
+    - gofmt
+    - unused
+    - ginkgolinter
+    - godot
+    - godox
+    - importas
+    - nlreturn
+    - nonamedreturns
+    - prealloc
+    - predeclared
+    - tenv
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - wastedassign
+    - wrapcheck
+    - wsl

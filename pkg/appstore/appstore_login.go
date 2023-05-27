@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/majd/ipatool/pkg/http"
 	"strings"
+
+	"github.com/majd/ipatool/pkg/http"
 )
 
 var (
@@ -61,6 +62,7 @@ type loginResult struct {
 func (t *appstore) login(email, password, authCode, guid string, attempt int) (Account, error) {
 	request := t.loginRequest(email, password, authCode, guid)
 	res, err := t.loginClient.Send(request)
+
 	if err != nil {
 		return Account{}, fmt.Errorf("request failed: %w", err)
 	}

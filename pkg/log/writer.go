@@ -1,9 +1,11 @@
 package log
 
 import (
-	"github.com/rs/zerolog"
+	"fmt"
 	"io"
 	"os"
+
+	"github.com/rs/zerolog"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -source=writer.go -destination=writer_mock.go -package log
@@ -24,16 +26,31 @@ func NewWriter() Writer {
 	}
 }
 
-func (l *writer) Write(p []byte) (n int, err error) {
-	return l.stdOutWriter.Write(p)
+func (l *writer) Write(p []byte) (int, error) {
+	n, err := l.stdOutWriter.Write(p)
+	if err != nil {
+		return 0, fmt.Errorf("failed to write data: %w", err)
+	}
+
+	return n, nil
 }
 
-func (l *writer) WriteLevel(level zerolog.Level, p []byte) (n int, err error) {
+func (l *writer) WriteLevel(level zerolog.Level, p []byte) (int, error) {
 	switch level {
 	case zerolog.DebugLevel, zerolog.InfoLevel, zerolog.WarnLevel:
-		return l.stdOutWriter.Write(p)
+		n, err := l.stdOutWriter.Write(p)
+		if err != nil {
+			return 0, fmt.Errorf("failed to write data: %w", err)
+		}
+
+		return n, nil
 	case zerolog.ErrorLevel:
-		return l.stdErrWriter.Write(p)
+		n, err := l.stdErrWriter.Write(p)
+		if err != nil {
+			return 0, fmt.Errorf("failed to write data: %w", err)
+		}
+
+		return n, nil
 	default:
 		return len(p), nil
 	}

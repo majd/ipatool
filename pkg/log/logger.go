@@ -1,10 +1,11 @@
 package log
 
 import (
+	"io"
+
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/rs/zerolog/pkgerrors"
-	"io"
 )
 
 //go:generate go run github.com/golang/mock/mockgen -source=logger.go -destination=logger_mock.go -package log

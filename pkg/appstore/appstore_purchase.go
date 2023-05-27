@@ -3,8 +3,10 @@ package appstore
 import (
 	"errors"
 	"fmt"
-	"github.com/majd/ipatool/pkg/http"
+	gohttp "net/http"
 	"strings"
+
+	"github.com/majd/ipatool/pkg/http"
 )
 
 var (
@@ -57,6 +59,7 @@ type purchaseResult struct {
 func (t *appstore) purchaseWithParams(acc Account, app App, guid string, pricingParameters string) error {
 	req := t.purchaseRequest(acc, app, acc.StoreFront, guid, pricingParameters)
 	res, err := t.purchaseClient.Send(req)
+
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
@@ -81,7 +84,7 @@ func (t *appstore) purchaseWithParams(acc Account, app App, guid string, pricing
 		return NewErrorWithMetadata(errors.New("something went wrong"), res)
 	}
 
-	if res.StatusCode == 500 {
+	if res.StatusCode == gohttp.StatusInternalServerError {
 		return fmt.Errorf("license already exists")
 	}
 

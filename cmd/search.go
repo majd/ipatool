@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// nolint:wrapcheck
 func searchCmd() *cobra.Command {
 	var limit int64
 
