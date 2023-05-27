@@ -1,70 +1,56 @@
 package appstore
 
 import (
+	"errors"
 	"fmt"
 	"github.com/majd/ipatool/pkg/http"
-	"github.com/pkg/errors"
 	"net/url"
 )
+
+type LookupInput struct {
+	Account  Account
+	BundleID string
+}
 
 type LookupOutput struct {
 	App App
 }
 
-func (a *appstore) Lookup(bundleID string) (LookupOutput, error) {
-	acc, err := a.account()
+func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
+	countryCode, err := countryCodeFromStoreFront(input.Account.StoreFront)
 	if err != nil {
-		return LookupOutput{}, errors.Wrap(err, ErrGetAccount.Error())
+		return LookupOutput{}, fmt.Errorf("failed to reoslve the country code: %w", err)
 	}
 
-	countryCode, err := a.countryCodeFromStoreFront(acc.StoreFront)
+	request := t.lookupRequest(input.BundleID, countryCode)
+
+	res, err := t.searchClient.Send(request)
 	if err != nil {
-		return LookupOutput{}, errors.Wrap(err, ErrInvalidCountryCode.Error())
-	}
-
-	app, err := a.lookup(bundleID, countryCode)
-	if err != nil {
-		return LookupOutput{}, err
-	}
-
-	return LookupOutput{
-		App: app,
-	}, nil
-}
-
-func (a *appstore) lookup(bundleID, countryCode string) (App, error) {
-	if StoreFronts[countryCode] == "" {
-		return App{}, ErrInvalidCountryCode
-	}
-
-	request := a.lookupRequest(bundleID, countryCode)
-
-	res, err := a.searchClient.Send(request)
-	if err != nil {
-		return App{}, errors.Wrap(err, ErrRequest.Error())
+		return LookupOutput{}, fmt.Errorf("request failed: %w", err)
 	}
 
 	if res.StatusCode != 200 {
-		a.logger.Verbose().Interface("data", res.Data).Int("status", res.StatusCode).Send()
-		return App{}, ErrRequest
+		return LookupOutput{}, NewErrorWithMetadata(errors.New("invalid response"), res)
 	}
 
 	if len(res.Data.Results) == 0 {
-		return App{}, ErrAppNotFound
+		return LookupOutput{}, errors.New("app not found")
 	}
 
-	return res.Data.Results[0], nil
+	return LookupOutput{
+		App: res.Data.Results[0],
+	}, nil
 }
 
-func (a *appstore) lookupRequest(bundleID, countryCode string) http.Request {
+func (t *appstore) lookupRequest(bundleID, countryCode string) http.Request {
 	return http.Request{
-		URL:            a.lookupURL(bundleID, countryCode),
+		URL:            t.lookupURL(bundleID, countryCode),
 		Method:         http.MethodGET,
 		ResponseFormat: http.ResponseFormatJSON,
 	}
 }
 
-func (a *appstore) lookupURL(bundleID, countryCode string) string {
+func (t *appstore) lookupURL(bundleID, countryCode string) string {
 	params := url.Values{}
 	params.Add("entity", "software,iPadSoftware")
 	params.Add("limit", "1")

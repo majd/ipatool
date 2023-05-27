@@ -1,13 +1,13 @@
 package appstore
 
 import (
-	"github.com/pkg/errors"
+	"fmt"
 )
 
-func (a *appstore) Revoke() error {
-	err := a.keychain.Remove("account")
+func (t *appstore) Revoke() error {
+	err := t.keychain.Remove("account")
 	if err != nil {
-		return errors.Wrap(err, ErrRemoveKeychainItem.Error())
+		return fmt.Errorf("failed to remove account from keychain: %w", err)
 	}
 
 	return nil

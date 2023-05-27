@@ -1,11 +1,11 @@
 package appstore
 
 import (
+	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
-	"github.com/majd/ipatool/pkg/log"
-	"github.com/majd/ipatool/pkg/util"
+	"github.com/majd/ipatool/pkg/util/machine"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -14,29 +14,23 @@ var _ = Describe("AppStore (Purchase)", func() {
 	var (
 		ctrl               *gomock.Controller
 		mockKeychain       *keychain.MockKeychain
-		mockMachine        *util.MockMachine
-		mockLogger         *log.MockLogger
-		mockPurchaseClient *http.MockClient[PurchaseResult]
-		mockSearchClient   *http.MockClient[SearchResult]
-		mockLoginClient    *http.MockClient[LoginResult]
+		mockMachine        *machine.MockMachine
+		mockPurchaseClient *http.MockClient[purchaseResult]
+		mockLoginClient    *http.MockClient[loginResult]
 		as                 *appstore
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
+		mockPurchaseClient = http.NewMockClient[purchaseResult](ctrl)
+		mockLoginClient = http.NewMockClient[loginResult](ctrl)
 		mockKeychain = keychain.NewMockKeychain(ctrl)
-		mockPurchaseClient = http.NewMockClient[PurchaseResult](ctrl)
-		mockSearchClient = http.NewMockClient[SearchResult](ctrl)
-		mockLoginClient = http.NewMockClient[LoginResult](ctrl)
-		mockMachine = util.NewMockMachine(ctrl)
-		mockLogger = log.NewMockLogger(ctrl)
+		mockMachine = machine.NewMockMachine(ctrl)
 		as = &appstore{
 			keychain:       mockKeychain,
 			purchaseClient: mockPurchaseClient,
-			searchClient:   mockSearchClient,
 			loginClient:    mockLoginClient,
 			machine:        mockMachine,
-			logger:         mockLogger,
 		}
 	})
 
@@ -48,435 +42,167 @@ var _ = Describe("AppStore (Purchase)", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
 				MacAddress().
-				Return("", ErrGetMAC)
+				Return("", errors.New(""))
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrGetMAC.Error())))
-		})
-	})
-
-	When("not logged in", func() {
-		BeforeEach(func() {
-			mockMachine.EXPECT().
-				MacAddress().
-				Return("00:00:00:00:00:00", nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
-
-			mockKeychain.EXPECT().
-				Get("account").
-				Return(nil, ErrGetKeychainItem)
-		})
-
-		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrGetKeychainItem.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrGetAccount.Error())))
-		})
-	})
-
-	When("country code is invalid", func() {
-		BeforeEach(func() {
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
-
-			mockMachine.EXPECT().
-				MacAddress().
-				Return("00:00:00:00:00:00", nil)
-
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{}"), nil)
-		})
-
-		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrInvalidCountryCode.Error())))
-		})
-	})
-
-	When("app lookup fails", func() {
-		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{}, ErrRequest)
-
-			mockMachine.EXPECT().
-				MacAddress().
-				Return("00:00:00:00:00:00", nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
-		})
-
-		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrAppLookup.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
+			err := as.Purchase(PurchaseInput{})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("app is paid", func() {
 		BeforeEach(func() {
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
-
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								Price: 0.99,
-							},
-						},
-					},
-				}, nil)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrPaidApp.Error())))
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+				App: App{
+					Price: 0.99,
+				},
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("purchase request fails", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								ID:       0,
-								BundleID: "",
-								Name:     "",
-								Version:  "",
-								Price:    0,
-							},
-						},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[PurchaseResult]{}, ErrRequest)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
+				Return(http.Result[purchaseResult]{}, errors.New(""))
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrRequest.Error())))
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("password token is expired", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								ID:       0,
-								BundleID: "",
-								Name:     "",
-								Version:  "",
-								Price:    0,
-							},
-						},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[PurchaseResult]{
-					Data: PurchaseResult{
+				Return(http.Result[purchaseResult]{
+					Data: purchaseResult{
 						FailureType: FailureTypePasswordTokenExpired,
 					},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
 		})
 
-		When("renewing credentials fails", func() {
-			BeforeEach(func() {
-				mockLoginClient.EXPECT().
-					Send(gomock.Any()).
-					Return(http.Result[LoginResult]{
-						Data: LoginResult{
-							FailureType:     "",
-							CustomerMessage: CustomerMessageBadLogin,
-						},
-					}, nil)
-
-				mockLogger.EXPECT().
-					Verbose().
-					Return(nil).
-					Times(2)
+		It("returns error", func() {
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
 			})
-
-			It("returns error", func() {
-				err := as.Purchase("")
-				Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
-			})
-		})
-
-		When("renewing credentials succeeds", func() {
-			BeforeEach(func() {
-				mockLoginClient.EXPECT().
-					Send(gomock.Any()).
-					Return(http.Result[LoginResult]{
-						Data: LoginResult{},
-					}, nil)
-
-				mockLogger.EXPECT().
-					Verbose().
-					Return(nil).
-					Times(2)
-
-				mockKeychain.EXPECT().
-					Set("account", gomock.Any()).
-					Return(nil)
-
-				mockPurchaseClient.EXPECT().
-					Send(gomock.Any()).
-					Return(http.Result[PurchaseResult]{
-						Data: PurchaseResult{
-							FailureType: FailureTypePasswordTokenExpired,
-						},
-					}, nil)
-			})
-
-			It("attempts to purchase app", func() {
-				err := as.Purchase("")
-				Expect(err).To(MatchError(ContainSubstring(ErrPasswordTokenExpired.Error())))
-			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("store API returns customer error message", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								ID:       0,
-								BundleID: "",
-								Name:     "",
-								Version:  "",
-								Price:    0,
-							},
-						},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[PurchaseResult]{
-					Data: PurchaseResult{
+				Return(http.Result[purchaseResult]{
+					Data: purchaseResult{
 						FailureType:     "failure",
 						CustomerMessage: CustomerMessageBadLogin,
 					},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil).
-				Times(2)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(CustomerMessageBadLogin)))
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("store API returns unknown error", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								ID:       0,
-								BundleID: "",
-								Name:     "",
-								Version:  "",
-								Price:    0,
-							},
-						},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[PurchaseResult]{
-					Data: PurchaseResult{
+				Return(http.Result[purchaseResult]{
+					Data: purchaseResult{
 						FailureType: "failure",
 					},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil).
-				Times(2)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrGeneric.Error())))
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("account already has a license for the app", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								ID:       0,
-								BundleID: "",
-								Name:     "",
-								Version:  "",
-								Price:    0,
-							},
-						},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[PurchaseResult]{
+				Return(http.Result[purchaseResult]{
 					StatusCode: 500,
-					Data:       PurchaseResult{},
+					Data:       purchaseResult{},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrLicenseExists.Error())))
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("subscription is required", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								ID:       0,
-								BundleID: "",
-								Name:     "",
-								Version:  "",
-								Price:    0,
-							},
-						},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
 				Send(pricingParametersMatcher{"STDQ"}).
-				Return(http.Result[PurchaseResult]{
+				Return(http.Result[purchaseResult]{
 					StatusCode: 200,
-					Data: PurchaseResult{
+					Data: purchaseResult{
 						CustomerMessage: "This item is temporarily unavailable.",
 						FailureType:     FailureTypeTemporarilyUnavailable,
 					},
@@ -484,58 +210,35 @@ var _ = Describe("AppStore (Purchase)", func() {
 
 			mockPurchaseClient.EXPECT().
 				Send(pricingParametersMatcher{"GAME"}).
-				Return(http.Result[PurchaseResult]{
+				Return(http.Result[purchaseResult]{
 					StatusCode: 200,
-					Data: PurchaseResult{
+					Data: purchaseResult{
 						CustomerMessage: CustomerMessageSubscriptionRequired,
 					},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil).
-				Times(2)
 		})
 
 		It("returns error", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrSubscriptionRequired.Error())))
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
 	When("successfully purchases the app", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								ID:       0,
-								BundleID: "",
-								Name:     "",
-								Version:  "",
-								Price:    0,
-							},
-						},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
 				Send(pricingParametersMatcher{"STDQ"}).
-				Return(http.Result[PurchaseResult]{
+				Return(http.Result[purchaseResult]{
 					StatusCode: 200,
-					Data: PurchaseResult{
+					Data: purchaseResult{
 						CustomerMessage: "This item is temporarily unavailable.",
 						FailureType:     FailureTypeTemporarilyUnavailable,
 					},
@@ -543,72 +246,49 @@ var _ = Describe("AppStore (Purchase)", func() {
 
 			mockPurchaseClient.EXPECT().
 				Send(pricingParametersMatcher{"GAME"}).
-				Return(http.Result[PurchaseResult]{
+				Return(http.Result[purchaseResult]{
 					StatusCode: 200,
-					Data: PurchaseResult{
+					Data: purchaseResult{
 						JingleDocType: "purchaseSuccess",
 						Status:        0,
 					},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil)
 		})
 
 		It("returns nil", func() {
-			err := as.Purchase("")
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
 			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
 	When("purchasing the app fails", func() {
 		BeforeEach(func() {
-			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("{\"storeFront\":\"143441\"}"), nil)
-
-			mockSearchClient.EXPECT().
-				Send(gomock.Any()).
-				Return(http.Result[SearchResult]{
-					StatusCode: 200,
-					Data: SearchResult{
-						Count: 1,
-						Results: []App{
-							{
-								ID:       0,
-								BundleID: "",
-								Name:     "",
-								Version:  "",
-								Price:    0,
-							},
-						},
-					},
-				}, nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("00:00:00:00:00:00", nil)
 
 			mockPurchaseClient.EXPECT().
 				Send(gomock.Any()).
-				Return(http.Result[PurchaseResult]{
+				Return(http.Result[purchaseResult]{
 					StatusCode: 200,
-					Data: PurchaseResult{
+					Data: purchaseResult{
 						JingleDocType: "failure",
 						Status:        -1,
 					},
 				}, nil)
-
-			mockLogger.EXPECT().
-				Verbose().
-				Return(nil).
-				Times(2)
 		})
 
 		It("returns nil", func() {
-			err := as.Purchase("")
-			Expect(err).To(MatchError(ContainSubstring(ErrPurchase.Error())))
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 })

@@ -13,8 +13,8 @@ const (
 	iTunesAPIPathSearch = "/search"
 	iTunesAPIPathLookup = "/lookup"
 
-	PriavteAppStoreAPIDomainPrefixWithoutAuthCode = "p25"
-	PriavteAppStoreAPIDomainPrefixWithAuthCode    = "p71"
+	PrivateAppStoreAPIDomainPrefixWithoutAuthCode = "p25"
+	PrivateAppStoreAPIDomainPrefixWithAuthCode    = "p71"
 	PrivateAppStoreAPIDomain                      = "buy." + iTunesAPIDomain
 	PrivateAppStoreAPIPathAuthenticate            = "/WebObjects/MZFinance.woa/wa/authenticate"
 	PrivateAppStoreAPIPathPurchase                = "/WebObjects/MZBuy.woa/wa/buyProduct"

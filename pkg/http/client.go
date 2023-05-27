@@ -3,14 +3,14 @@ package http
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/pkg/errors"
+	"fmt"
 	"howett.net/plist"
 	"io"
 	"net/http"
 	"strings"
 )
 
-//go:generate mockgen -source=client.go -destination=client_mock.go -package=http
+//go:generate go run github.com/golang/mock/mockgen -source=client.go -destination=client_mock.go -package=http
 type Client[R interface{}] interface {
 	Send(request Request) (Result[R], error)
 	Do(req *http.Request) (*http.Response, error)
@@ -22,7 +22,7 @@ type client[R interface{}] struct {
 	cookieJar      CookieJar
 }
 
-type ClientArgs struct {
+type Args struct {
 	CookieJar CookieJar
 }
 
@@ -37,7 +37,7 @@ func (adt *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, err
 	return adt.T.RoundTrip(req)
 }
 
-func NewClient[R interface{}](args ClientArgs) Client[R] {
+func NewClient[R interface{}](args Args) Client[R] {
 	return &client[R]{
 		internalClient: http.Client{
 			Timeout:   0,
@@ -55,13 +55,13 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 	if req.Payload != nil {
 		data, err = req.Payload.data()
 		if err != nil {
-			return Result[R]{}, errors.Wrap(err, ErrGetPayloadData.Error())
+			return Result[R]{}, fmt.Errorf("failed to get payload data: %w", err)
 		}
 	}
 
 	request, err := http.NewRequest(req.Method, req.URL, bytes.NewReader(data))
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, ErrCreateRequest.Error())
+		return Result[R]{}, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	for key, val := range req.Headers {
@@ -70,12 +70,12 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 
 	res, err := c.internalClient.Do(request)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, ErrRequest.Error())
+		return Result[R]{}, fmt.Errorf("request failed: %w", err)
 	}
 
 	err = c.cookieJar.Save()
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, ErrSaveCookie.Error())
+		return Result[R]{}, fmt.Errorf("failed to save cookies: %w", err)
 	}
 
 	if req.ResponseFormat == ResponseFormatJSON {
@@ -85,7 +85,7 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 		return c.handleXMLResponse(res)
 	}
 
-	return Result[R]{}, errors.Errorf("%s: %s", ErrUnsupportedContentType.Error(), req.ResponseFormat)
+	return Result[R]{}, fmt.Errorf("content type is not supported (%s)", req.ResponseFormat)
 }
 
 func (c *client[R]) Do(req *http.Request) (*http.Response, error) {
@@ -99,13 +99,13 @@ func (*client[R]) NewRequest(method, url string, body io.Reader) (*http.Request,
 func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, ErrGetResponseBody.Error())
+		return Result[R]{}, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var data R
 	err = json.Unmarshal(body, &data)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, ErrUnmarshalJSON.Error())
+		return Result[R]{}, fmt.Errorf("failed to unmarshal json: %w", err)
 	}
 
 	return Result[R]{
@@ -117,13 +117,13 @@ func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {
 func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, ErrGetResponseBody.Error())
+		return Result[R]{}, fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	var data R
 	_, err = plist.Unmarshal(body, &data)
 	if err != nil {
-		return Result[R]{}, errors.Wrap(err, ErrUnmarshalXML.Error())
+		return Result[R]{}, fmt.Errorf("failed to unmarshal xml: %w", err)
 	}
 
 	headers := map[string]string{}

@@ -2,18 +2,15 @@ package appstore
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/pkg/http"
 	"github.com/majd/ipatool/pkg/keychain"
-	"github.com/majd/ipatool/pkg/log"
-	"github.com/majd/ipatool/pkg/util"
+	"github.com/majd/ipatool/pkg/util/machine"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
-	"os"
 	"strings"
-	"syscall"
 )
 
 var _ = Describe("AppStore (Login)", func() {
@@ -28,101 +25,42 @@ var _ = Describe("AppStore (Login)", func() {
 		ctrl         *gomock.Controller
 		as           AppStore
 		mockKeychain *keychain.MockKeychain
-		mockClient   *http.MockClient[LoginResult]
-		mockMachine  *util.MockMachine
-		mockLogger   *log.MockLogger
-		testErr      = errors.New("test")
+		mockClient   *http.MockClient[loginResult]
+		mockMachine  *machine.MockMachine
 	)
 
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
-		mockClient = http.NewMockClient[LoginResult](ctrl)
-		mockMachine = util.NewMockMachine(ctrl)
-		mockLogger = log.NewMockLogger(ctrl)
+		mockClient = http.NewMockClient[loginResult](ctrl)
+		mockMachine = machine.NewMockMachine(ctrl)
 		as = &appstore{
 			keychain:    mockKeychain,
 			loginClient: mockClient,
-			ioReader:    os.Stdin,
 			machine:     mockMachine,
-			logger:      mockLogger,
-			interactive: true,
 		}
-
-		mockLogger.EXPECT().
-			Verbose().
-			Return(nil).
-			MaxTimes(4)
 	})
 
 	AfterEach(func() {
 		ctrl.Finish()
 	})
 
-	When("not running in interactive mode and password is not supplied", func() {
-		BeforeEach(func() {
-			as.(*appstore).interactive = false
-		})
-
-		It("returns error", func() {
-			_, err := as.Login("", "", "")
-			Expect(err).To(MatchError(ContainSubstring("password is required")))
-		})
-	})
-
-	When("prompts user for password", func() {
-		BeforeEach(func() {
-			mockLogger.EXPECT().
-				Log().
-				Return(nil)
-		})
-
-		When("user enters password", func() {
-			BeforeEach(func() {
-				mockMachine.EXPECT().
-					MacAddress().
-					Return("", errors.New("success"))
-
-				mockMachine.EXPECT().
-					ReadPassword(syscall.Stdin).
-					Return([]byte(testPassword), nil)
-			})
-
-			It("succeeds", func() {
-				_, err := as.Login("", "", "")
-				Expect(err).To(MatchError(ContainSubstring("success")))
-			})
-		})
-
-		When("fails to read password from stdin", func() {
-			BeforeEach(func() {
-				mockMachine.EXPECT().
-					ReadPassword(syscall.Stdin).
-					Return(nil, testErr)
-			})
-
-			It("returns error", func() {
-				_, err := as.Login("", "", "")
-				Expect(err).To(MatchError(ContainSubstring(ErrGetData.Error())))
-			})
-		})
-	})
-
 	When("fails to read Machine's MAC address", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
 				MacAddress().
-				Return("", testErr)
+				Return("", errors.New(""))
 		})
 
 		It("returns error", func() {
-			_, err := as.Login("", testPassword, "")
-			Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-			Expect(err).To(MatchError(ContainSubstring(ErrGetMAC.Error())))
+			_, err := as.Login(LoginInput{
+				Password: testPassword,
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
-	When("sucessfully reads machine's MAC address", func() {
+	When("successfully reads machine's MAC address", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
 				MacAddress().
@@ -133,23 +71,23 @@ var _ = Describe("AppStore (Login)", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
-					Return(http.Result[LoginResult]{}, testErr)
+					Return(http.Result[loginResult]{}, errors.New(""))
 			})
 
 			It("returns wrapped error", func() {
-				_, err := as.Login("", testPassword, "")
-				Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
 		When("store API returns invalid first response", func() {
-			const testCustomerMessage = "test"
-
 			BeforeEach(func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
-					Return(http.Result[LoginResult]{
-						Data: LoginResult{
+					Return(http.Result[loginResult]{
+						Data: loginResult{
 							FailureType:     FailureTypeInvalidCredentials,
 							CustomerMessage: "test",
 						},
@@ -158,8 +96,10 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 
 			It("retries one more time", func() {
-				_, err := as.Login("", testPassword, "")
-				Expect(err).To(MatchError(ContainSubstring(testCustomerMessage)))
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -167,108 +107,38 @@ var _ = Describe("AppStore (Login)", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
-					Return(http.Result[LoginResult]{
-						Data: LoginResult{
+					Return(http.Result[loginResult]{
+						Data: loginResult{
 							FailureType: "random-error",
 						},
 					}, nil)
 			})
 
 			It("returns error", func() {
-				_, err := as.Login("", testPassword, "")
-				Expect(err).To(MatchError(ContainSubstring(ErrGeneric.Error())))
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
 		When("store API requires 2FA code", func() {
-			When("not running in interactive mode", func() {
-				BeforeEach(func() {
-					as.(*appstore).interactive = false
-
-					mockClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[LoginResult]{
-							Data: LoginResult{
-								FailureType:     "",
-								CustomerMessage: CustomerMessageBadLogin,
-							},
-						}, nil)
-				})
-
-				It("returns error", func() {
-					_, err := as.Login("", testPassword, "")
-					Expect(err).To(MatchError(ContainSubstring(ErrAuthCodeRequired.Error())))
-				})
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						Data: loginResult{
+							FailureType:     "",
+							CustomerMessage: CustomerMessageBadLogin,
+						},
+					}, nil)
 			})
 
-			When("user enters 2FA code", func() {
-				BeforeEach(func() {
-					mockLogger.EXPECT().
-						Log().
-						Return(nil)
-
-					mockKeychain.EXPECT().
-						Set("account", gomock.Any()).
-						Return(nil)
-
-					gomock.InOrder(
-						mockClient.EXPECT().
-							Send(gomock.Any()).
-							Return(http.Result[LoginResult]{
-								Data: LoginResult{
-									FailureType:     "",
-									CustomerMessage: CustomerMessageBadLogin,
-								},
-							}, nil),
-						mockClient.EXPECT().
-							Send(gomock.Any()).
-							Return(http.Result[LoginResult]{
-								Data: LoginResult{
-									Account: LoginAccountResult{
-										Email: testEmail,
-										Address: LoginAddressResult{
-											FirstName: testFirstName,
-											LastName:  testLastName,
-										},
-									},
-								},
-							}, nil),
-					)
-
-					as.(*appstore).ioReader = strings.NewReader("123456\n")
+			It("returns error", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
 				})
-
-				It("successfully authenticates", func() {
-					out, err := as.Login("", testPassword, "")
-					Expect(err).ToNot(HaveOccurred())
-					Expect(out.Email).To(Equal(testEmail))
-					Expect(out.Name).To(Equal(strings.Join([]string{testFirstName, testLastName}, " ")))
-
-				})
-			})
-
-			When("prompts user for 2FA code", func() {
-				BeforeEach(func() {
-					mockLogger.EXPECT().
-						Log().
-						Return(nil)
-
-					mockClient.EXPECT().
-						Send(gomock.Any()).
-						Return(http.Result[LoginResult]{
-							Data: LoginResult{
-								FailureType:     "",
-								CustomerMessage: CustomerMessageBadLogin,
-							},
-						}, nil)
-
-					as.(*appstore).ioReader = strings.NewReader("123456")
-				})
-
-				It("fails to read 2FA code from stdin", func() {
-					_, err := as.Login("", testPassword, "")
-					Expect(err).To(MatchError(ContainSubstring(ErrGetData.Error())))
-				})
+				Expect(err).To(HaveOccurred())
 			})
 		})
 
@@ -281,13 +151,13 @@ var _ = Describe("AppStore (Login)", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
-					Return(http.Result[LoginResult]{
-						Data: LoginResult{
+					Return(http.Result[loginResult]{
+						Data: loginResult{
 							PasswordToken:       testPasswordToken,
 							DirectoryServicesID: testDirectoryServicesID,
-							Account: LoginAccountResult{
+							Account: loginAccountResult{
 								Email: testEmail,
-								Address: LoginAddressResult{
+								Address: loginAddressResult{
 									FirstName: testFirstName,
 									LastName:  testLastName,
 								},
@@ -314,13 +184,14 @@ var _ = Describe("AppStore (Login)", func() {
 							Expect(err).ToNot(HaveOccurred())
 							Expect(got).To(Equal(want))
 						}).
-						Return(testErr)
+						Return(errors.New(""))
 				})
 
 				It("returns error", func() {
-					_, err := as.Login("", testPassword, "")
-					Expect(err).To(MatchError(ContainSubstring(testErr.Error())))
-					Expect(err).To(MatchError(ContainSubstring(ErrSetKeychainItem.Error())))
+					_, err := as.Login(LoginInput{
+						Password: testPassword,
+					})
+					Expect(err).To(HaveOccurred())
 				})
 			})
 
@@ -346,10 +217,12 @@ var _ = Describe("AppStore (Login)", func() {
 				})
 
 				It("returns nil", func() {
-					out, err := as.Login("", testPassword, "")
+					out, err := as.Login(LoginInput{
+						Password: testPassword,
+					})
 					Expect(err).ToNot(HaveOccurred())
-					Expect(out.Email).To(Equal(testEmail))
-					Expect(out.Name).To(Equal(strings.Join([]string{testFirstName, testLastName}, " ")))
+					Expect(out.Account.Email).To(Equal(testEmail))
+					Expect(out.Account.Name).To(Equal(strings.Join([]string{testFirstName, testLastName}, " ")))
 				})
 			})
 		})

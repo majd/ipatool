@@ -1,8 +1,8 @@
 package keychain
 
 import (
+	"fmt"
 	"github.com/99designs/keyring"
-	"github.com/pkg/errors"
 )
 
 func (k *keychain) Set(key string, data []byte) error {
@@ -11,7 +11,7 @@ func (k *keychain) Set(key string, data []byte) error {
 		Data: data,
 	})
 	if err != nil {
-		return errors.Wrap(err, ErrSetKeychainItem.Error())
+		return fmt.Errorf("failed to set item: %w", err)
 	}
 
 	return nil
