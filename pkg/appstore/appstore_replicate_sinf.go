@@ -59,7 +59,6 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 		return fmt.Errorf("failed to read info plist: %w", err)
 	}
 
-	fmt.Println(manifest != nil)
 	if manifest != nil {
 		err = t.replicateSinfFromManifest(*manifest, zipWriter, input.Sinfs, bundleName)
 	} else {
