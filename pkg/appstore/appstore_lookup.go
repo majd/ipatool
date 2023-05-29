@@ -6,7 +6,7 @@ import (
 	gohttp "net/http"
 	"net/url"
 
-	"github.com/majd/ipatool/pkg/http"
+	"github.com/majd/ipatool/v2/pkg/http"
 )
 
 type LookupInput struct {

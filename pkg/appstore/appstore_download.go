@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/majd/ipatool/pkg/http"
+	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/schollz/progressbar/v3"
 	"howett.net/plist"
 )

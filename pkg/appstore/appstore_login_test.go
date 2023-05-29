@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/golang/mock/gomock"
-	"github.com/majd/ipatool/pkg/http"
-	"github.com/majd/ipatool/pkg/keychain"
-	"github.com/majd/ipatool/pkg/util/machine"
+	"github.com/majd/ipatool/v2/pkg/http"
+	"github.com/majd/ipatool/v2/pkg/keychain"
+	"github.com/majd/ipatool/v2/pkg/util/machine"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

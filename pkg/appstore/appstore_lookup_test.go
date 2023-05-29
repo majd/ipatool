@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/golang/mock/gomock"
-	"github.com/majd/ipatool/pkg/http"
+	"github.com/majd/ipatool/v2/pkg/http"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

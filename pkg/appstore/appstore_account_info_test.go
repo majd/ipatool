@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/golang/mock/gomock"
-	"github.com/majd/ipatool/pkg/keychain"
+	"github.com/majd/ipatool/v2/pkg/keychain"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

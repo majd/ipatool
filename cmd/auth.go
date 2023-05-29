@@ -10,8 +10,8 @@ import (
 
 	"github.com/99designs/keyring"
 	"github.com/avast/retry-go"
-	"github.com/majd/ipatool/pkg/appstore"
-	"github.com/majd/ipatool/pkg/util"
+	"github.com/majd/ipatool/v2/pkg/appstore"
+	"github.com/majd/ipatool/v2/pkg/util"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
