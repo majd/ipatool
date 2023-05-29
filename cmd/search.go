@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/99designs/keyring"
-	"github.com/majd/ipatool/pkg/appstore"
+	"github.com/majd/ipatool/v2/pkg/appstore"
 	"github.com/spf13/cobra"
 )
 

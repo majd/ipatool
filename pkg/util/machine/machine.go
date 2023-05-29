@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/majd/ipatool/pkg/util/operatingsystem"
+	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 	"golang.org/x/term"
 )
 

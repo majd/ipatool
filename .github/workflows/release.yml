@@ -35,27 +35,27 @@ jobs:
         with:
           go-version: '1.19.3'
           cache: true
-      - run: go build -ldflags="-X github.com/majd/ipatool/cmd.version=$VERSION" -o ipatool-$VERSION-windows-arm64.exe
+      - run: go build -ldflags="-X github.com/majd/ipatool/v2/cmd.version=$VERSION" -o ipatool-$VERSION-windows-arm64.exe
         env:
           GOOS: windows
           GOARCH: arm64
           VERSION: ${{ needs.get_version.outputs.version }}
-      - run: go build -ldflags="-X github.com/majd/ipatool/cmd.version=$VERSION" -o ipatool-$VERSION-windows-amd64.exe
+      - run: go build -ldflags="-X github.com/majd/ipatool/v2/cmd.version=$VERSION" -o ipatool-$VERSION-windows-amd64.exe
         env:
           GOOS: windows
           GOARCH: amd64
           VERSION: ${{ needs.get_version.outputs.version }}
-      - run: go build -ldflags="-X github.com/majd/ipatool/cmd.version=$VERSION" -o ipatool-$VERSION-linux-arm64
+      - run: go build -ldflags="-X github.com/majd/ipatool/v2/cmd.version=$VERSION" -o ipatool-$VERSION-linux-arm64
         env:
           GOOS: linux
           GOARCH: arm64
           VERSION: ${{ needs.get_version.outputs.version }}
-      - run: go build -ldflags="-X github.com/majd/ipatool/cmd.version=$VERSION" -o ipatool-$VERSION-linux-amd64
+      - run: go build -ldflags="-X github.com/majd/ipatool/v2/cmd.version=$VERSION" -o ipatool-$VERSION-linux-amd64
         env:
           GOOS: linux
           GOARCH: amd64
           VERSION: ${{ needs.get_version.outputs.version }}
-      - run: go build -ldflags="-X github.com/majd/ipatool/cmd.version=$VERSION" -o ipatool-$VERSION-macos-arm64
+      - run: go build -ldflags="-X github.com/majd/ipatool/v2/cmd.version=$VERSION" -o ipatool-$VERSION-macos-arm64
         env:
           GOOS: darwin
           GOARCH: arm64
@@ -63,7 +63,7 @@ jobs:
           CGO_CFLAGS: -mmacosx-version-min=10.15
           CGO_LDFLAGS: -mmacosx-version-min=10.15
           CGO_ENABLED: 1
-      - run: go build -ldflags="-X github.com/majd/ipatool/cmd.version=$VERSION" -o ipatool-$VERSION-macos-amd64
+      - run: go build -ldflags="-X github.com/majd/ipatool/v2/cmd.version=$VERSION" -o ipatool-$VERSION-macos-amd64
         env:
           GOOS: darwin
           GOARCH: amd64
