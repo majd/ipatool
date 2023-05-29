@@ -1,5 +1,17 @@
 ## Changelog
 
+### Version [2.1.0](https://github.com/majd/ipatool/releases/tag/v2.1.0)
+
+- Implemented `Lookup` API.
+- Implemented `AccountInfo` API.
+- Implemented `ReplicateSinf` API.
+- Added storefront code for Georgia (GE).
+- Build version is now set using linker flags.
+- Refactored API interfaces.
+- Improved tests for http package.
+- Integrated `golangci-lint` linter.
+- Added v2 suffix to module path.
+
 ### Version [2.0.3](https://github.com/majd/ipatool/releases/tag/v2.0.3)
 
 - Added support for downloading Apple Arcade games.
