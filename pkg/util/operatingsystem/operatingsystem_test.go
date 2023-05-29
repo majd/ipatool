@@ -1,7 +1,6 @@
 package operatingsystem
 
 import (
-	"errors"
 	"fmt"
 	"io/fs"
 	"math/rand"
@@ -70,7 +69,7 @@ var _ = Describe("OperatingSystem", func() {
 			Expect(err).ToNot(HaveOccurred())
 
 			_, err = sut.Stat(file.Name())
-			Expect(os.IsNotExist(errors.Unwrap(err))).To(BeTrue())
+			Expect(os.IsNotExist(err)).To(BeTrue())
 		})
 
 		It("renames file", func() {
