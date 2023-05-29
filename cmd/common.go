@@ -131,16 +131,16 @@ func initWithCommand(cmd *cobra.Command) {
 		Machine:         dependencies.Machine,
 	})
 
-	util.Must("", createConfigDirectory())
+	util.Must("", createConfigDirectory(dependencies.OS, dependencies.Machine))
 }
 
 // createConfigDirectory creates the configuration directory for the CLI tool, if needed.
-func createConfigDirectory() error {
-	configDirectoryPath := filepath.Join(dependencies.Machine.HomeDirectory(), ConfigDirectoryName)
-	_, err := dependencies.OS.Stat(configDirectoryPath)
+func createConfigDirectory(os operatingsystem.OperatingSystem, machine machine.Machine) error {
+	configDirectoryPath := filepath.Join(machine.HomeDirectory(), ConfigDirectoryName)
+	_, err := os.Stat(configDirectoryPath)
 
-	if err != nil && dependencies.OS.IsNotExist(err) {
-		err = dependencies.OS.MkdirAll(configDirectoryPath, 0700)
+	if err != nil && os.IsNotExist(err) {
+		err = os.MkdirAll(configDirectoryPath, 0700)
 		if err != nil {
 			return fmt.Errorf("failed to create config directory: %w", err)
 		}

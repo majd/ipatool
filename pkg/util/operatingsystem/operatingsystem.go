@@ -1,7 +1,6 @@
 package operatingsystem
 
 import (
-	"fmt"
 	"os"
 )
 
@@ -27,60 +26,37 @@ func (operatingSystem) Getenv(key string) string {
 	return os.Getenv(key)
 }
 
+// nolint:wrapcheck
 func (operatingSystem) Stat(name string) (os.FileInfo, error) {
-	info, err := os.Stat(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to describe file '%s': %w", name, err)
-	}
-
-	return info, nil
+	return os.Stat(name)
 }
 
+// nolint:wrapcheck
 func (operatingSystem) Getwd() (string, error) {
-	wd, err := os.Getwd()
-	if err != nil {
-		return "", fmt.Errorf("failed to get current directory: %w", err)
-	}
-
-	return wd, nil
+	return os.Getwd()
 }
 
+// nolint:wrapcheck
 func (operatingSystem) OpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
-	file, err := os.OpenFile(name, flag, perm)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open file '%s': %w", name, err)
-	}
-
-	return file, nil
+	return os.OpenFile(name, flag, perm)
 }
 
+// nolint:wrapcheck
 func (operatingSystem) Remove(name string) error {
-	err := os.Remove(name)
-	if err != nil {
-		return fmt.Errorf("failed to remove file '%s': %w", name, err)
-	}
-
-	return nil
+	return os.Remove(name)
 }
 
+// nolint:wrapcheck
 func (operatingSystem) IsNotExist(err error) bool {
 	return os.IsNotExist(err)
 }
 
+// nolint:wrapcheck
 func (operatingSystem) MkdirAll(path string, perm os.FileMode) error {
-	err := os.MkdirAll(path, perm)
-	if err != nil {
-		return fmt.Errorf("failed to create directory '%s': %w", path, err)
-	}
-
-	return nil
+	return os.MkdirAll(path, perm)
 }
 
+// nolint:wrapcheck
 func (operatingSystem) Rename(oldPath, newPath string) error {
-	err := os.Rename(oldPath, newPath)
-	if err != nil {
-		return fmt.Errorf("failed to rename '%s' to '%s': %w", oldPath, newPath, err)
-	}
-
-	return nil
+	return os.Rename(oldPath, newPath)
 }
