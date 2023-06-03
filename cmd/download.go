@@ -5,7 +5,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/99designs/keyring"
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/v2/pkg/appstore"
 	"github.com/schollz/progressbar/v3"
@@ -112,11 +111,6 @@ func downloadCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (required)")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "The destination path of the downloaded app package")
 	cmd.Flags().BoolVar(&acquireLicense, "purchase", false, "Obtain a license for the app if needed")
-
-	if keyringBackendType() == keyring.FileBackend {
-		cmd.Flags().StringVar(&keychainPassphrase, "keychain-passphrase", "", "passphrase for unlocking keychain")
-	}
-
 	_ = cmd.MarkFlagRequired("bundle-identifier")
 
 	return cmd

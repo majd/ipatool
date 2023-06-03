@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/99designs/keyring"
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/v2/pkg/appstore"
 	"github.com/majd/ipatool/v2/pkg/util"
@@ -20,10 +19,6 @@ func authCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "auth",
 		Short: "Authenticate with the App Store",
-	}
-
-	if keyringBackendType() == keyring.FileBackend {
-		cmd.PersistentFlags().StringVar(&keychainPassphrase, "keychain-passphrase", "", "passphrase for unlocking keychain")
 	}
 
 	cmd.AddCommand(loginCmd())
