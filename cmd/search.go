@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"github.com/99designs/keyring"
 	"github.com/majd/ipatool/v2/pkg/appstore"
 	"github.com/spf13/cobra"
 )
@@ -39,10 +38,6 @@ func searchCmd() *cobra.Command {
 	}
 
 	cmd.Flags().Int64VarP(&limit, "limit", "l", 5, "maximum amount of search results to retrieve")
-
-	if keyringBackendType() == keyring.FileBackend {
-		cmd.PersistentFlags().StringVar(&keychainPassphrase, "keychain-passphrase", "", "passphrase for unlocking keychain")
-	}
 
 	return cmd
 }

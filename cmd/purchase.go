@@ -4,7 +4,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/99designs/keyring"
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/v2/pkg/appstore"
 	"github.com/spf13/cobra"
@@ -66,11 +65,6 @@ func purchaseCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "Bundle identifier of the target iOS app (required)")
-
-	if keyringBackendType() == keyring.FileBackend {
-		cmd.Flags().StringVar(&keychainPassphrase, "keychain-passphrase", "", "passphrase for unlocking keychain")
-	}
-
 	_ = cmd.MarkFlagRequired("bundle-identifier")
 
 	return cmd

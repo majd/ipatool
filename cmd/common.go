@@ -19,7 +19,6 @@ import (
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"golang.org/x/exp/slices"
 	"golang.org/x/term"
 )
 
@@ -27,13 +26,12 @@ var dependencies = Dependencies{}
 var keychainPassphrase string
 
 type Dependencies struct {
-	Logger             log.Logger
-	OS                 operatingsystem.OperatingSystem
-	Machine            machine.Machine
-	CookieJar          http.CookieJar
-	Keychain           keychain.Keychain
-	AppStore           appstore.AppStore
-	KeyringBackendType keyring.BackendType
+	Logger    log.Logger
+	OS        operatingsystem.OperatingSystem
+	Machine   machine.Machine
+	CookieJar http.CookieJar
+	Keychain  keychain.Keychain
+	AppStore  appstore.AppStore
 }
 
 // newLogger returns a new logger instance.
@@ -62,10 +60,12 @@ func newCookieJar(machine machine.Machine) http.CookieJar {
 }
 
 // newKeychain returns a new keychain instance.
-func newKeychain(machine machine.Machine, logger log.Logger, backendType keyring.BackendType, interactive bool) keychain.Keychain {
+func newKeychain(machine machine.Machine, logger log.Logger, interactive bool) keychain.Keychain {
 	ring := util.Must(keyring.Open(keyring.Config{
 		AllowedBackends: []keyring.BackendType{
-			backendType,
+			keyring.KeychainBackend,
+			keyring.SecretServiceBackend,
+			keyring.FileBackend,
 		},
 		ServiceName: KeychainServiceName,
 		FileDir:     filepath.Join(machine.HomeDirectory(), ConfigDirectoryName),
@@ -96,22 +96,6 @@ func newKeychain(machine machine.Machine, logger log.Logger, backendType keyring
 	return keychain.New(keychain.Args{Keyring: ring})
 }
 
-// keyringBackendType returns the backend type for the keyring.
-func keyringBackendType() keyring.BackendType {
-	allowedBackends := []keyring.BackendType{
-		keyring.KeychainBackend,
-		keyring.SecretServiceBackend,
-	}
-
-	for _, backend := range allowedBackends {
-		if slices.Contains(keyring.AvailableBackends(), backend) {
-			return backend
-		}
-	}
-
-	return keyring.FileBackend
-}
-
 // initWithCommand initializes the dependencies of the command.
 func initWithCommand(cmd *cobra.Command) {
 	verbose := cmd.Flag("verbose").Value.String() == "true"
@@ -122,8 +106,7 @@ func initWithCommand(cmd *cobra.Command) {
 	dependencies.OS = operatingsystem.New()
 	dependencies.Machine = machine.New(machine.Args{OS: dependencies.OS})
 	dependencies.CookieJar = newCookieJar(dependencies.Machine)
-	dependencies.KeyringBackendType = keyringBackendType()
-	dependencies.Keychain = newKeychain(dependencies.Machine, dependencies.Logger, dependencies.KeyringBackendType, interactive)
+	dependencies.Keychain = newKeychain(dependencies.Machine, dependencies.Logger, interactive)
 	dependencies.AppStore = appstore.NewAppStore(appstore.Args{
 		CookieJar:       dependencies.CookieJar,
 		OperatingSystem: dependencies.OS,
