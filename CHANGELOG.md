@@ -1,5 +1,9 @@
 ## Changelog
 
+### Version [2.1.2](https://github.com/majd/ipatool/releases/tag/v2.1.2)
+
+- `FileBackend` keyring is now used when other options are not available.
+
 ### Version [2.1.1](https://github.com/majd/ipatool/releases/tag/v2.1.1)
 
 - Fixed an issue when creating the config directory for the tool.
