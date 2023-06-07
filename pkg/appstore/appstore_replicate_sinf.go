@@ -29,7 +29,6 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	if err != nil {
 		return errors.New("failed to open zip reader")
 	}
-	defer zipReader.Close()
 
 	tmpPath := fmt.Sprintf("%s.tmp", input.PackagePath)
 	tmpFile, err := t.os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY, 0644)
@@ -70,6 +69,8 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	if err != nil {
 		return fmt.Errorf("failed to replicate sinf: %w", err)
 	}
+
+	zipReader.Close()
 
 	err = t.os.Remove(input.PackagePath)
 	if err != nil {
