@@ -1,5 +1,10 @@
 ## Changelog
 
+### Version [2.1.3](https://github.com/majd/ipatool/releases/tag/v2.1.3)
+
+- Fixed a bug where temporary files were not removed after downloading the app package.
+- Fixed a bug where the `--keychain-passphrase` flag was marked as invalid.
+
 ### Version [2.1.2](https://github.com/majd/ipatool/releases/tag/v2.1.2)
 
 - `FileBackend` keyring is now used when other options are not available.
