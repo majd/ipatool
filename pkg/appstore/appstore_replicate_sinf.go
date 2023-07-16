@@ -38,7 +38,6 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	}
 
 	zipWriter := zip.NewWriter(tmpFile)
-	defer zipWriter.Close()
 
 	err = t.replicateZip(zipReader, zipWriter)
 	if err != nil {
@@ -71,6 +70,7 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	}
 
 	zipReader.Close()
+	zipWriter.Close()
 
 	err = t.os.Remove(input.PackagePath)
 	if err != nil {
