@@ -55,20 +55,24 @@ func downloadCmd() *cobra.Command {
 					}
 				}
 
-				progress := progressbar.NewOptions64(1,
-					progressbar.OptionSetDescription("downloading"),
-					progressbar.OptionSetWriter(os.Stdout),
-					progressbar.OptionShowBytes(true),
-					progressbar.OptionSetWidth(20),
-					progressbar.OptionFullWidth(),
-					progressbar.OptionThrottle(65*time.Millisecond),
-					progressbar.OptionShowCount(),
-					progressbar.OptionClearOnFinish(),
-					progressbar.OptionSpinnerType(14),
-					progressbar.OptionSetRenderBlankState(true),
-					progressbar.OptionSetElapsedTime(false),
-					progressbar.OptionSetPredictTime(false),
-				)
+				interactive, _ := cmd.Context().Value("interactive").(bool)
+				var progress *progressbar.ProgressBar
+				if interactive {
+					progress = progressbar.NewOptions64(1,
+						progressbar.OptionSetDescription("downloading"),
+						progressbar.OptionSetWriter(os.Stdout),
+						progressbar.OptionShowBytes(true),
+						progressbar.OptionSetWidth(20),
+						progressbar.OptionFullWidth(),
+						progressbar.OptionThrottle(65*time.Millisecond),
+						progressbar.OptionShowCount(),
+						progressbar.OptionClearOnFinish(),
+						progressbar.OptionSpinnerType(14),
+						progressbar.OptionSetRenderBlankState(true),
+						progressbar.OptionSetElapsedTime(false),
+						progressbar.OptionSetPredictTime(false),
+					)
+				}
 
 				out, err := dependencies.AppStore.Download(appstore.DownloadInput{Account: acc, App: lookupResult.App, OutputPath: outputPath, Progress: progress})
 				if err != nil {
