@@ -196,7 +196,7 @@ var _ = Describe("AppStore (Login)", func() {
 				})
 			})
 
-			When("sucessfully saves account in keychain", func() {
+			When("successfully saves account in keychain", func() {
 				BeforeEach(func() {
 					mockKeychain.EXPECT().
 						Set("account", gomock.Any()).
