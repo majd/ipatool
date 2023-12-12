@@ -71,7 +71,8 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 
 	zipReader.Close()
 	zipWriter.Close()
-
+	tmpFile.Close()
+	
 	err = t.os.Remove(input.PackagePath)
 	if err != nil {
 		return fmt.Errorf("failed to remove original file: %w", err)
