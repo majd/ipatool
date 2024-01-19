@@ -10,7 +10,7 @@ import (
 	"golang.org/x/term"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -source=machine.go -destination=machine_mock.go -package machine
+//go:generate go run go.uber.org/mock/mockgen -source=machine.go -destination=machine_mock.go -package machine
 type Machine interface {
 	MacAddress() (string, error)
 	HomeDirectory() string

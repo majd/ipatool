@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog/pkgerrors"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -source=logger.go -destination=logger_mock.go -package log
+//go:generate go run go.uber.org/mock/mockgen -source=logger.go -destination=logger_mock.go -package log
 type Logger interface {
 	Verbose() *zerolog.Event
 	Log() *zerolog.Event

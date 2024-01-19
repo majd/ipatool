@@ -4,7 +4,7 @@ import (
 	"os"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -source=operatingsystem.go -destination=operatingsystem_mock.go -package operatingsystem
+//go:generate go run go.uber.org/mock/mockgen -source=operatingsystem.go -destination=operatingsystem_mock.go -package operatingsystem
 type OperatingSystem interface {
 	Getenv(key string) string
 	Stat(name string) (os.FileInfo, error)
