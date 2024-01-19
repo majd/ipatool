@@ -11,7 +11,7 @@ import (
 	"howett.net/plist"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -source=client.go -destination=client_mock.go -package=http
+//go:generate go run go.uber.org/mock/mockgen -source=client.go -destination=client_mock.go -package=http
 type Client[R interface{}] interface {
 	Send(request Request) (Result[R], error)
 	Do(req *http.Request) (*http.Response, error)

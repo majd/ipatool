@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/golang/mock/gomock"
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/mock/gomock"
 )
 
 var _ = Describe("AppStore (AccountInfo)", func() {
