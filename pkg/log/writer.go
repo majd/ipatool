@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
-//go:generate go run github.com/golang/mock/mockgen -source=writer.go -destination=writer_mock.go -package log
+//go:generate go run go.uber.org/mock/mockgen -source=writer.go -destination=writer_mock.go -package log
 type Writer interface {
 	Write(p []byte) (n int, err error)
 	WriteLevel(level zerolog.Level, p []byte) (n int, err error)
