@@ -71,6 +71,7 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 
 	zipReader.Close()
 	zipWriter.Close()
+	tmpFile.Close()
 
 	err = t.os.Remove(input.PackagePath)
 	if err != nil {
