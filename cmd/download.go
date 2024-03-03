@@ -16,6 +16,7 @@ func downloadCmd() *cobra.Command {
 	var (
 		acquireLicense bool
 		outputPath     string
+		appID          int64
 		bundleID       string
 	)
 
@@ -23,6 +24,10 @@ func downloadCmd() *cobra.Command {
 		Use:   "download",
 		Short: "Download (encrypted) iOS app packages from the App Store",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if appID == 0 && bundleID == "" {
+				return errors.New("either the app ID or the bundle identifier must be specified")
+			}
+
 			var lastErr error
 			var acc appstore.Account
 
@@ -43,13 +48,18 @@ func downloadCmd() *cobra.Command {
 					acc = loginResult.Account
 				}
 
-				lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{Account: acc, BundleID: bundleID})
-				if err != nil {
-					return err
+				app := appstore.App{ID: appID}
+				if bundleID != "" {
+					lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{Account: acc, BundleID: bundleID})
+					if err != nil {
+						return err
+					}
+
+					app = lookupResult.App
 				}
 
 				if errors.Is(lastErr, appstore.ErrLicenseRequired) {
-					err := dependencies.AppStore.Purchase(appstore.PurchaseInput{Account: acc, App: lookupResult.App})
+					err := dependencies.AppStore.Purchase(appstore.PurchaseInput{Account: acc, App: app})
 					if err != nil {
 						return err
 					}
@@ -74,7 +84,7 @@ func downloadCmd() *cobra.Command {
 					)
 				}
 
-				out, err := dependencies.AppStore.Download(appstore.DownloadInput{Account: acc, App: lookupResult.App, OutputPath: outputPath, Progress: progress})
+				out, err := dependencies.AppStore.Download(appstore.DownloadInput{Account: acc, App: app, OutputPath: outputPath, Progress: progress})
 				if err != nil {
 					return err
 				}
@@ -112,10 +122,10 @@ func downloadCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (required)")
+	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target iOS app (required)")
+	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (overrides the app ID)")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "The destination path of the downloaded app package")
 	cmd.Flags().BoolVar(&acquireLicense, "purchase", false, "Obtain a license for the app if needed")
-	_ = cmd.MarkFlagRequired("bundle-identifier")
 
 	return cmd
 }
