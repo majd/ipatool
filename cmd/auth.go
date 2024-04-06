@@ -120,7 +120,7 @@ func loginCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&email, "email", "e", "", "email address for the Apple ID (required)")
-	cmd.Flags().StringVarP(&password, "password", "p", "", "password for the Apple ID (required")
+	cmd.Flags().StringVarP(&password, "password", "p", "", "password for the Apple ID (required)")
 	cmd.Flags().StringVar(&authCode, "auth-code", "", "2FA code for the Apple ID")
 
 	_ = cmd.MarkFlagRequired("email")
