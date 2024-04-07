@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/majd/ipatool/v2/pkg/http"
@@ -161,10 +162,21 @@ func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request
 }
 
 func fileName(app App) string {
-	return fmt.Sprintf("%s_%d_%s.ipa",
-		app.BundleID,
-		app.ID,
-		app.Version)
+	var parts []string
+
+	if app.BundleID != "" {
+		parts = append(parts, app.BundleID)
+	}
+
+	if app.ID != 0 {
+		parts = append(parts, strconv.FormatInt(app.ID, 10))
+	}
+
+	if app.Version != "" {
+		parts = append(parts, app.Version)
+	}
+
+	return fmt.Sprintf("%s.ipa", strings.Join(parts, "_"))
 }
 
 func (t *appstore) resolveDestinationPath(app App, path string) (string, error) {
