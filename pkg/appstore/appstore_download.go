@@ -163,12 +163,15 @@ func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request
 
 func fileName(app App) string {
 	var parts []string
+
 	if app.BundleID != "" {
 		parts = append(parts, app.BundleID)
 	}
+
 	if app.ID != 0 {
 		parts = append(parts, strconv.FormatInt(app.ID, 10))
 	}
+
 	if app.Version != "" {
 		parts = append(parts, app.Version)
 	}
