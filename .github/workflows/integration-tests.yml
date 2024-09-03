@@ -35,7 +35,7 @@ jobs:
       matrix:
         command: [auth, download, purchase, search]
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: ipatool
           path: build
