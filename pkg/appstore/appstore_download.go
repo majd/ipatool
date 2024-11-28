@@ -140,10 +140,8 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 }
 
 func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request {
-	host := fmt.Sprintf("%s-%s", PrivateAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
-
 	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s?guid=%s", host, PrivateAppStoreAPIPathDownload, guid),
+		URL:            fmt.Sprintf("https://%s%s?guid=%s", PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{

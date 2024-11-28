@@ -134,11 +134,6 @@ func (t *appstore) loginRequest(email, password, authCode, guid string) http.Req
 }
 
 func (*appstore) authDomain(authCode, guid string) string {
-	prefix := PrivateAppStoreAPIDomainPrefixWithoutAuthCode
-	if authCode != "" {
-		prefix = PrivateAppStoreAPIDomainPrefixWithAuthCode
-	}
-
 	return fmt.Sprintf(
-		"https://%s-%s%s?guid=%s", prefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathAuthenticate, guid)
+		"https://%s%s?guid=%s", PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathAuthenticate, guid)
 }
