@@ -135,11 +135,66 @@ var _ = Describe("AppStore (Login)", func() {
 					}, nil)
 			})
 
-			It("returns error", func() {
+			It("returns ErrAuthCodeRequired error", func() {
 				_, err := as.Login(LoginInput{
 					Password: testPassword,
 				})
-				Expect(err).To(HaveOccurred())
+				Expect(err).To(Equal(ErrAuthCodeRequired))
+			})
+		})
+
+		When("store API redirects", func() {
+			const (
+				testRedirectLocation = "https://" + PrivateAppStoreAPIDomain + PrivateAppStoreAPIPathAuthenticate + "?PRH=31&Pod=31"
+			)
+
+			BeforeEach(func() {
+				firstCall := mockClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.Payload).To(BeAssignableToTypeOf(&http.XMLPayload{}))
+						x := req.Payload.(*http.XMLPayload)
+						Expect(x.Content).To(HaveKeyWithValue("attempt", "1"))
+					}).
+					Return(http.Result[loginResult]{
+						StatusCode: 302,
+						Headers:    map[string]string{"Location": testRedirectLocation},
+					}, nil)
+				secondCall := mockClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(Equal(testRedirectLocation))
+						Expect(req.Payload).To(BeAssignableToTypeOf(&http.XMLPayload{}))
+						x := req.Payload.(*http.XMLPayload)
+						Expect(x.Content).To(HaveKeyWithValue("attempt", "2"))
+					}).
+					Return(http.Result[loginResult]{}, errors.New("test complete"))
+				gomock.InOrder(firstCall, secondCall)
+			})
+
+			It("follows the redirect and increments attempt", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(MatchError("request failed: test complete"))
+			})
+		})
+
+		When("store API redirects too much", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						StatusCode: 302,
+						Headers:    map[string]string{"Location": "hello"},
+					}, nil).
+					Times(4)
+			})
+			It("bails out", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(MatchError("too many attempts"))
 			})
 		})
 
@@ -147,12 +202,15 @@ var _ = Describe("AppStore (Login)", func() {
 			const (
 				testPasswordToken       = "test-password-token"
 				testDirectoryServicesID = "directory-services-id"
+				testStoreFront          = "test-storefront"
 			)
 
 			BeforeEach(func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
 					Return(http.Result[loginResult]{
+						StatusCode: 200,
+						Headers:    map[string]string{HTTPHeaderStoreFront: testStoreFront},
 						Data: loginResult{
 							PasswordToken:       testPasswordToken,
 							DirectoryServicesID: testDirectoryServicesID,
@@ -178,6 +236,7 @@ var _ = Describe("AppStore (Login)", func() {
 								PasswordToken:       testPasswordToken,
 								Password:            testPassword,
 								DirectoryServicesID: testDirectoryServicesID,
+								StoreFront:          testStoreFront,
 							}
 
 							var got Account
@@ -207,6 +266,7 @@ var _ = Describe("AppStore (Login)", func() {
 								PasswordToken:       testPasswordToken,
 								Password:            testPassword,
 								DirectoryServicesID: testDirectoryServicesID,
+								StoreFront:          testStoreFront,
 							}
 
 							var got Account
