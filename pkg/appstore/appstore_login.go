@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/majd/ipatool/v2/pkg/http"
+	"github.com/majd/ipatool/v2/pkg/util"
 )
 
 var (
@@ -31,7 +33,7 @@ func (t *appstore) Login(input LoginInput) (LoginOutput, error) {
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	acc, err := t.login(input.Email, input.Password, input.AuthCode, guid, 0)
+	acc, err := t.login(input.Email, input.Password, input.AuthCode, guid)
 	if err != nil {
 		return LoginOutput{}, err
 	}
@@ -59,28 +61,36 @@ type loginResult struct {
 	PasswordToken       string             `plist:"passwordToken,omitempty"`
 }
 
-func (t *appstore) login(email, password, authCode, guid string, attempt int) (Account, error) {
-	request := t.loginRequest(email, password, authCode, guid)
-	res, err := t.loginClient.Send(request)
+func (t *appstore) login(email, password, authCode, guid string) (Account, error) {
+	redirect := ""
+	var err error
+	retry := true
+	var res http.Result[loginResult]
 
+	for attempt := 1; retry && attempt <= 4; attempt++ {
+		ac := authCode
+		if attempt == 1 {
+			ac = ""
+		}
+		request := t.loginRequest(email, password, ac, guid, attempt)
+		request.URL, redirect = util.IfEmpty(redirect, request.URL), ""
+		res, err = t.loginClient.Send(request)
+		if err != nil {
+			return Account{}, fmt.Errorf("request failed: %w", err)
+		}
+
+		if retry, redirect, err = t.parseLoginResponse(&res, attempt, authCode); err != nil {
+			return Account{}, err
+		}
+	}
+
+	if retry {
+		return Account{}, NewErrorWithMetadata(errors.New("too many attempts"), res)
+	}
+
+	sf, err := res.GetHeader(HTTPHeaderStoreFront)
 	if err != nil {
-		return Account{}, fmt.Errorf("request failed: %w", err)
-	}
-
-	if attempt == 0 && res.Data.FailureType == FailureTypeInvalidCredentials {
-		return t.login(email, password, authCode, guid, 1)
-	}
-
-	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		return Account{}, NewErrorWithMetadata(errors.New(res.Data.CustomerMessage), res)
-	}
-
-	if res.Data.FailureType != "" {
-		return Account{}, NewErrorWithMetadata(errors.New("something went wrong"), res)
-	}
-
-	if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
-		return Account{}, ErrAuthCodeRequired
+		return Account{}, NewErrorWithMetadata(fmt.Errorf("failed to get storefront header: %w", err), res)
 	}
 
 	addr := res.Data.Account.Address
@@ -89,7 +99,7 @@ func (t *appstore) login(email, password, authCode, guid string, attempt int) (A
 		Email:               res.Data.Account.Email,
 		PasswordToken:       res.Data.PasswordToken,
 		DirectoryServicesID: res.Data.DirectoryServicesID,
-		StoreFront:          res.Headers[HTTPHeaderStoreFront],
+		StoreFront:          sf,
 		Password:            password,
 	}
 
@@ -106,39 +116,46 @@ func (t *appstore) login(email, password, authCode, guid string, attempt int) (A
 	return acc, nil
 }
 
-func (t *appstore) loginRequest(email, password, authCode, guid string) http.Request {
-	attempt := "4"
-	if authCode != "" {
-		attempt = "2"
+func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int, authCode string) (retry bool, redirect string, err error) {
+	if res.StatusCode == 302 {
+		if redirect, err = res.GetHeader("location"); err != nil {
+			err = fmt.Errorf("failed to retrieve redirect location: %w", err)
+		} else {
+			retry = true
+		}
+	} else if attempt == 1 && res.Data.FailureType == FailureTypeInvalidCredentials {
+		retry = true
+	} else if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
+		err = ErrAuthCodeRequired
+	} else if res.Data.FailureType != "" {
+		if res.Data.CustomerMessage != "" {
+			err = NewErrorWithMetadata(errors.New(res.Data.CustomerMessage), res)
+		} else {
+			err = NewErrorWithMetadata(errors.New("something went wrong"), res)
+		}
+	} else if res.StatusCode != 200 || res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
+		err = NewErrorWithMetadata(errors.New("something went wrong"), res)
 	}
+	return
+}
 
+func (t *appstore) loginRequest(email, password, authCode, guid string, attempt int) http.Request {
 	return http.Request{
 		Method:         http.MethodPOST,
-		URL:            t.authDomain(authCode, guid),
+		URL:            fmt.Sprintf("https://%s%s", PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathAuthenticate),
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",
 		},
 		Payload: &http.XMLPayload{
 			Content: map[string]interface{}{
-				"appleId":       email,
-				"attempt":       attempt,
-				"createSession": "true",
-				"guid":          guid,
-				"password":      fmt.Sprintf("%s%s", password, authCode),
-				"rmp":           "0",
-				"why":           "signIn",
+				"appleId":  email,
+				"attempt":  strconv.Itoa(attempt),
+				"guid":     guid,
+				"password": fmt.Sprintf("%s%s", password, authCode),
+				"rmp":      "0",
+				"why":      "signIn",
 			},
 		},
 	}
-}
-
-func (*appstore) authDomain(authCode, guid string) string {
-	prefix := PrivateAppStoreAPIDomainPrefixWithoutAuthCode
-	if authCode != "" {
-		prefix = PrivateAppStoreAPIDomainPrefixWithAuthCode
-	}
-
-	return fmt.Sprintf(
-		"https://%s-%s%s?guid=%s", prefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathAuthenticate, guid)
 }
