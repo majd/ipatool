@@ -61,6 +61,29 @@ var _ = Describe("AppStore (Login)", func() {
 		})
 	})
 
+	When("user provides GUID", func() {
+		BeforeEach(func() {
+			as.(*appstore).guid = "GUID"
+			mockMachine.EXPECT().MacAddress().Times(0)
+			mockClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					Expect(req.Payload).To(BeAssignableToTypeOf(&http.XMLPayload{}))
+					x := req.Payload.(*http.XMLPayload)
+					Expect(x.Content).To(HaveKeyWithValue("guid", "GUID"))
+				}).
+				Return(http.Result[loginResult]{}, errors.New(""))
+		})
+		AfterEach(func() {
+			as.(*appstore).guid = ""
+		})
+
+		It("sends the HTTP request with the specified GUID", func() {
+			_, err := as.Login(LoginInput{})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	When("successfully reads machine's MAC address", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
