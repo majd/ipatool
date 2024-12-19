@@ -101,6 +101,7 @@ func initWithCommand(cmd *cobra.Command) {
 	verbose := cmd.Flag("verbose").Value.String() == "true"
 	interactive, _ := cmd.Context().Value("interactive").(bool)
 	format := util.Must(OutputFormatFromString(cmd.Flag("format").Value.String()))
+	guid := cmd.Flag("guid").Value.String()
 
 	dependencies.Logger = newLogger(format, verbose)
 	dependencies.OS = operatingsystem.New()
@@ -112,6 +113,7 @@ func initWithCommand(cmd *cobra.Command) {
 		OperatingSystem: dependencies.OS,
 		Keychain:        dependencies.Keychain,
 		Machine:         dependencies.Machine,
+		Guid:            guid,
 	})
 
 	util.Must("", createConfigDirectory(dependencies.OS, dependencies.Machine))

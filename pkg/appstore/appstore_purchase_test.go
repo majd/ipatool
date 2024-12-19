@@ -52,6 +52,29 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 	})
 
+	When("user provides GUID", func() {
+		BeforeEach(func() {
+			as.guid = "GUID"
+			mockMachine.EXPECT().MacAddress().Times(0)
+			mockPurchaseClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					Expect(req.Payload).To(BeAssignableToTypeOf(&http.XMLPayload{}))
+					x := req.Payload.(*http.XMLPayload)
+					Expect(x.Content).To(HaveKeyWithValue("guid", "GUID"))
+				}).
+				Return(http.Result[purchaseResult]{}, errors.New(""))
+		})
+		AfterEach(func() {
+			as.guid = ""
+		})
+
+		It("sends the HTTP request with the specified GUID", func() {
+			err := as.Purchase(PurchaseInput{})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	When("app is paid", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
