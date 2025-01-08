@@ -68,11 +68,7 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 	var res http.Result[loginResult]
 
 	for attempt := 1; retry && attempt <= 4; attempt++ {
-		ac := authCode
-		if attempt == 1 {
-			ac = ""
-		}
-		request := t.loginRequest(email, password, ac, guid, attempt)
+		request := t.loginRequest(email, password, authCode, guid, attempt)
 		request.URL, redirect = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
 		if err != nil {
