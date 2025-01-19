@@ -22,5 +22,6 @@ func (c *Result[R]) GetHeader(key string) (string, error) {
 			return v, nil
 		}
 	}
+
 	return "", ErrHeaderNotFound
 }

@@ -57,6 +57,7 @@ func NewClient[R interface{}](args Args) Client[R] {
 				if req.Referer() == appStoreAuthURL {
 					return http.ErrUseLastResponse
 				}
+
 				return nil
 			},
 			Transport: &AddHeaderTransport{http.DefaultTransport},
