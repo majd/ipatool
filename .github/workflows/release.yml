@@ -71,32 +71,32 @@ jobs:
           CGO_CFLAGS: -mmacosx-version-min=10.15
           CGO_LDFLAGS: -mmacosx-version-min=10.15
           CGO_ENABLED: 1
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-windows-arm64.exe
           path: ipatool-${{ needs.get_version.outputs.version }}-windows-arm64.exe
           if-no-files-found: error
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-windows-amd64.exe
           path: ipatool-${{ needs.get_version.outputs.version }}-windows-amd64.exe
           if-no-files-found: error
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-linux-arm64
           path: ipatool-${{ needs.get_version.outputs.version }}-linux-arm64
           if-no-files-found: error
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-linux-amd64
           path: ipatool-${{ needs.get_version.outputs.version }}-linux-amd64
           if-no-files-found: error
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-macos-arm64
           path: ipatool-${{ needs.get_version.outputs.version }}-macos-arm64
           if-no-files-found: error
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-macos-amd64
           path: ipatool-${{ needs.get_version.outputs.version }}-macos-amd64
@@ -111,7 +111,7 @@ jobs:
         arch: [ arm64, amd64 ]
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-windows-${{ matrix.arch }}.exe
           path: bin
@@ -138,7 +138,7 @@ jobs:
         arch: [ arm64, amd64 ]
     steps:
       - uses: actions/checkout@v2
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-linux-${{ matrix.arch }}
           path: bin
@@ -163,14 +163,14 @@ jobs:
       - uses: actions/checkout@v2
         with:
           path: ./ipatool
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-macos-arm64
           path: bin
       - run: tar -czvf $BIN.tar.gz bin/$BIN && rm -rf bin/
         env:
           BIN: ipatool-${{ needs.get_version.outputs.version }}-macos-arm64
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-macos-amd64
           path: bin

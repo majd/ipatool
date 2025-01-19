@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	gohttp "net/http"
 	"strconv"
 	"strings"
 
@@ -63,14 +64,19 @@ type loginResult struct {
 
 func (t *appstore) login(email, password, authCode, guid string) (Account, error) {
 	redirect := ""
-	var err error
+
+	var (
+		err error
+		res http.Result[loginResult]
+	)
+
 	retry := true
-	var res http.Result[loginResult]
 
 	for attempt := 1; retry && attempt <= 4; attempt++ {
 		request := t.loginRequest(email, password, authCode, guid, attempt)
-		request.URL, redirect = util.IfEmpty(redirect, request.URL), ""
+		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
+
 		if err != nil {
 			return Account{}, fmt.Errorf("request failed: %w", err)
 		}
@@ -112,8 +118,14 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 	return acc, nil
 }
 
-func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int, authCode string) (retry bool, redirect string, err error) {
-	if res.StatusCode == 302 {
+func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int, authCode string) (bool, string, error) {
+	var (
+		retry    bool
+		redirect string
+		err      error
+	)
+
+	if res.StatusCode == gohttp.StatusFound {
 		if redirect, err = res.GetHeader("location"); err != nil {
 			err = fmt.Errorf("failed to retrieve redirect location: %w", err)
 		} else {
@@ -129,10 +141,11 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		} else {
 			err = NewErrorWithMetadata(errors.New("something went wrong"), res)
 		}
-	} else if res.StatusCode != 200 || res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
+	} else if res.StatusCode != gohttp.StatusOK || res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
 		err = NewErrorWithMetadata(errors.New("something went wrong"), res)
 	}
-	return
+
+	return retry, redirect, err
 }
 
 func (t *appstore) loginRequest(email, password, authCode, guid string, attempt int) http.Request {
