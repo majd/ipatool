@@ -21,7 +21,7 @@ jobs:
         env:
           CGO_CFLAGS: -mmacosx-version-min=10.15
           CGO_LDFLAGS: -mmacosx-version-min=10.15
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: ipatool
           path: ipatool
@@ -35,7 +35,7 @@ jobs:
       matrix:
         command: [auth, download, purchase, search]
     steps:
-      - uses: actions/download-artifact@v2
+      - uses: actions/download-artifact@v4
         with:
           name: ipatool
           path: build
