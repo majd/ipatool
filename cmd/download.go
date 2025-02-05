@@ -30,6 +30,7 @@ func downloadCmd() *cobra.Command {
 
 			var lastErr error
 			var acc appstore.Account
+			var purchased bool = false
 
 			return retry.Do(func() error {
 				infoResult, err := dependencies.AppStore.AccountInfo()
@@ -63,6 +64,10 @@ func downloadCmd() *cobra.Command {
 					if err != nil {
 						return err
 					}
+					purchased = true
+					dependencies.Logger.Verbose().
+						Bool("success", true).
+						Msg("purchase")
 				}
 
 				interactive, _ := cmd.Context().Value("interactive").(bool)
@@ -96,6 +101,7 @@ func downloadCmd() *cobra.Command {
 
 				dependencies.Logger.Log().
 					Str("output", out.DestinationPath).
+					Bool("purchased", purchased).
 					Bool("success", true).
 					Send()
 
