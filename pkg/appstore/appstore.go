@@ -1,6 +1,9 @@
 package appstore
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	"github.com/majd/ipatool/v2/pkg/util/machine"
@@ -36,6 +39,7 @@ type appstore struct {
 	httpClient     http.Client[interface{}]
 	machine        machine.Machine
 	os             operatingsystem.OperatingSystem
+	guid           string
 }
 
 type Args struct {
@@ -43,6 +47,7 @@ type Args struct {
 	CookieJar       http.CookieJar
 	OperatingSystem operatingsystem.OperatingSystem
 	Machine         machine.Machine
+	Guid            string
 }
 
 func NewAppStore(args Args) AppStore {
@@ -59,5 +64,17 @@ func NewAppStore(args Args) AppStore {
 		httpClient:     http.NewClient[interface{}](clientArgs),
 		machine:        args.Machine,
 		os:             args.OperatingSystem,
+		guid:           args.Guid,
 	}
+}
+
+func (t *appstore) getGuid() (string, error) {
+	if t.guid == "" {
+		if macAddr, err := t.machine.MacAddress(); err != nil {
+			return "", fmt.Errorf("failed to get mac address: %w", err)
+		} else {
+			t.guid = strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
+		}
+	}
+	return t.guid, nil
 }

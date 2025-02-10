@@ -36,12 +36,10 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		return DownloadOutput{}, fmt.Errorf("failed to resolve destination path: %w", err)
 	}
 
-	macAddr, err := t.machine.MacAddress()
+	guid, err := t.getGuid()
 	if err != nil {
-		return DownloadOutput{}, fmt.Errorf("failed to get mac address: %w", err)
+		return DownloadOutput{}, fmt.Errorf("failed to get GUID: %w", err)
 	}
-
-	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
 	req := t.downloadRequest(input.Account, input.App, guid)
 
