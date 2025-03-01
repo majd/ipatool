@@ -14,7 +14,7 @@
 - [Usage](#usage)
 - [Compiling](#compiling)
 - [License](#license)
-- [Changelog](https://github.com/majd/ipatool/blob/main/CHANGELOG.md)
+- [Releases](https://github.com/majd/ipatool/releases)
 - [FAQ](https://github.com/majd/ipatool/wiki/FAQ)
 
 ## Requirements
