@@ -40,6 +40,7 @@ func rootCmd() *cobra.Command {
 	cmd.PersistentFlags().BoolVar(&verbose, "verbose", false, "enables verbose logs")
 	cmd.PersistentFlags().BoolVarP(&nonInteractive, "non-interactive", "", false, "run in non-interactive session")
 	cmd.PersistentFlags().StringVar(&keychainPassphrase, "keychain-passphrase", "", "passphrase for unlocking keychain")
+	cmd.PersistentFlags().String("guid", "", "GUID used in HTTP requests")
 
 	cmd.AddCommand(authCmd())
 	cmd.AddCommand(downloadCmd())
