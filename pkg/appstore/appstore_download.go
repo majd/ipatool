@@ -111,6 +111,15 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
+	
+	file, err := t.os.OpenFile(dst, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open file: %w", err)
+	}
+
+	defer file.Close()
+	stat, _ := file.Stat()
+	req.Header.Add("range", fmt.Sprintf("bytes=%d-", stat.Size()))
 
 	res, err := t.httpClient.Do(req)
 	if err != nil {
@@ -118,15 +127,11 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	}
 	defer res.Body.Close()
 
-	file, err := t.os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open file: %w", err)
-	}
-
-	defer file.Close()
 
 	if progress != nil {
-		progress.ChangeMax64(res.ContentLength)
+		progress.ChangeMax64(res.ContentLength + stat.Size())
+		progress.Set64(stat.Size())
+		file.Seek(0, io.SeekEnd)
 		_, err = io.Copy(io.MultiWriter(file, progress), res.Body)
 	} else {
 		_, err = io.Copy(file, res.Body)
