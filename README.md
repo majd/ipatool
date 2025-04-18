@@ -32,7 +32,6 @@ You can grab the latest version of `ipatool` from [GitHub releases](https://gith
 You can install `ipatool` using [Homebrew](https://brew.sh).
 
 ```shell
-$ brew tap majd/repo
 $ brew install ipatool
 ```
 
