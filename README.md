@@ -5,7 +5,19 @@
 
 `ipatool` is a command line tool that allows you to search for iOS apps on the [App Store](https://apps.apple.com) and download a copy of the app package, known as an _ipa_ file.
 
-![Demo](./demo.gif)
+
+First login with your Apple ID.
+
+    ipatool auth login -e you@example.com
+
+Find the application with a query.
+
+    ipatool search --limit 1 TestFlight
+
+Use the `"id"` property from the `search` output to retrieve the ipa file.
+
+    ipatool download -i 899247664 -o TestFlight.ipa
+
 
 - [Requirements](#requirements)
 - [Installation](#installation)
