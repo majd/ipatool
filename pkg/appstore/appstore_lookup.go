@@ -21,7 +21,7 @@ type LookupOutput struct {
 func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
 	countryCode, err := countryCodeFromStoreFront(input.Account.StoreFront)
 	if err != nil {
-		return LookupOutput{}, fmt.Errorf("failed to reoslve the country code: %w", err)
+		return LookupOutput{}, fmt.Errorf("failed to resolve the country code: %w", err)
 	}
 
 	request := t.lookupRequest(input.BundleID, countryCode)
