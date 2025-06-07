@@ -18,6 +18,7 @@ func downloadCmd() *cobra.Command {
 		outputPath     string
 		appID          int64
 		bundleID       string
+		versionID      string
 	)
 
 	cmd := &cobra.Command{
@@ -59,6 +60,12 @@ func downloadCmd() *cobra.Command {
 					app = lookupResult.App
 				}
 
+				if versionID != "" {
+					dependencies.Logger.Verbose().
+						Str("versionId", versionID).
+						Msg("downloading specific version")
+				}
+
 				if errors.Is(lastErr, appstore.ErrLicenseRequired) {
 					err := dependencies.AppStore.Purchase(appstore.PurchaseInput{Account: acc, App: app})
 					if err != nil {
@@ -89,7 +96,7 @@ func downloadCmd() *cobra.Command {
 					)
 				}
 
-				out, err := dependencies.AppStore.Download(appstore.DownloadInput{Account: acc, App: app, OutputPath: outputPath, Progress: progress})
+				out, err := dependencies.AppStore.Download(appstore.DownloadInput{Account: acc, App: app, OutputPath: outputPath, Progress: progress, VersionID: versionID})
 				if err != nil {
 					return err
 				}
@@ -131,6 +138,7 @@ func downloadCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target iOS app (required)")
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (overrides the app ID)")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "The destination path of the downloaded app package")
+	cmd.Flags().StringVar(&versionID, "version-id", "", "Version ID of the app to download (leave empty for latest version)")
 	cmd.Flags().BoolVar(&acquireLicense, "purchase", false, "Obtain a license for the app if needed")
 
 	return cmd

@@ -12,6 +12,19 @@ type App struct {
 	Price    float64 `json:"price,omitempty"`
 }
 
+type VersionHistoryInfo struct {
+	App                App
+	LatestVersion      string
+	VersionIdentifiers []string
+}
+
+type VersionDetails struct {
+	VersionID     string
+	VersionString string
+	Success       bool
+	Error         string
+}
+
 type Apps []App
 
 func (apps Apps) MarshalZerologArray(a *zerolog.Array) {
