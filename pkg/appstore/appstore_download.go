@@ -74,6 +74,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	item := res.Data.Items[0]
 
 	updatedApp := input.App
+
 	if input.VersionID != "" && item.Metadata != nil {
 		if bundleVersion, ok := item.Metadata["bundleShortVersionString"].(string); ok && bundleVersion != "" {
 			updatedApp.Version = bundleVersion

@@ -58,9 +58,9 @@ var _ = Describe("AppStore (VersionHistory)", func() {
 						Items: []downloadItemResult{
 							{
 								Metadata: map[string]interface{}{
-									"bundleDisplayName":                     testAppName,
-									"bundleIdentifier":                      testBundleID,
-									"bundleShortVersionString":              testLatestVersion,
+									"bundleDisplayName":                  testAppName,
+									"bundleIdentifier":                   testBundleID,
+									"bundleShortVersionString":           testLatestVersion,
 									"softwareVersionExternalIdentifiers": []interface{}{testVersionID1, testVersionID2},
 								},
 							},
@@ -223,4 +223,4 @@ var _ = Describe("AppStore (VersionHistory)", func() {
 			Expect(err.Error()).To(ContainSubstring("no app data found"))
 		})
 	})
-}) 
+})

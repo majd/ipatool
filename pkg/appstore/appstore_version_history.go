@@ -33,6 +33,7 @@ func (t *appstore) VersionHistory(input VersionHistoryInput) (VersionHistoryOutp
 
 	req := t.versionHistoryRequest(input.Account, input.App, guid, "")
 	res, err := t.downloadClient.Send(req)
+
 	if err != nil {
 		return VersionHistoryOutput{}, fmt.Errorf("failed to send http request: %w", err)
 	}
@@ -54,10 +55,10 @@ func (t *appstore) VersionHistory(input VersionHistoryInput) (VersionHistoryOutp
 	}
 
 	item := res.Data.Items[0]
-	
+
 	appInfo := VersionHistoryInfo{
 		App: App{
-			ID: input.App.ID,
+			ID:       input.App.ID,
 			BundleID: input.App.BundleID,
 		},
 	}
@@ -65,9 +66,11 @@ func (t *appstore) VersionHistory(input VersionHistoryInput) (VersionHistoryOutp
 	if name, ok := item.Metadata["bundleDisplayName"].(string); ok {
 		appInfo.App.Name = name
 	}
+
 	if bundleID, ok := item.Metadata["bundleIdentifier"].(string); ok && bundleID != "" {
 		appInfo.App.BundleID = bundleID
 	}
+
 	if version, ok := item.Metadata["bundleShortVersionString"].(string); ok {
 		appInfo.LatestVersion = version
 	}
@@ -78,6 +81,7 @@ func (t *appstore) VersionHistory(input VersionHistoryInput) (VersionHistoryOutp
 	}
 
 	var versionIdentifiers []string
+
 	for _, v := range versionIdentifiersRaw {
 		if versionInt, ok := v.(uint64); ok {
 			versionIdentifiers = append(versionIdentifiers, fmt.Sprintf("%d", versionInt))
@@ -103,6 +107,7 @@ func (t *appstore) VersionHistory(input VersionHistoryInput) (VersionHistoryOutp
 	}
 
 	var selectedVersionIds []string
+
 	if input.OldestFirst {
 		if len(versionIdentifiers) <= maxCount {
 			selectedVersionIds = versionIdentifiers
@@ -117,7 +122,7 @@ func (t *appstore) VersionHistory(input VersionHistoryInput) (VersionHistoryOutp
 			selectedVersionIds = make([]string, maxCount)
 			copy(selectedVersionIds, versionIdentifiers[len(versionIdentifiers)-maxCount:])
 		}
-		
+
 		for i, j := 0, len(selectedVersionIds)-1; i < j; i, j = i+1, j-1 {
 			selectedVersionIds[i], selectedVersionIds[j] = selectedVersionIds[j], selectedVersionIds[i]
 		}
@@ -133,7 +138,7 @@ func (t *appstore) VersionHistory(input VersionHistoryInput) (VersionHistoryOutp
 
 func (t *appstore) fetchVersionDetails(account Account, app App, guid string, versionIds []string, progressCallback func(index int, detail VersionDetails)) []VersionDetails {
 	const maxConcurrent = 5
-	
+
 	type result struct {
 		index   int
 		details VersionDetails
@@ -142,14 +147,15 @@ func (t *appstore) fetchVersionDetails(account Account, app App, guid string, ve
 	results := make([]VersionDetails, len(versionIds))
 	resultChan := make(chan result, len(versionIds))
 	semaphore := make(chan struct{}, maxConcurrent)
-	
+
 	var wg sync.WaitGroup
 
 	for i, versionId := range versionIds {
 		wg.Add(1)
+
 		go func(index int, id string) {
 			defer wg.Done()
-			
+
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
@@ -160,7 +166,7 @@ func (t *appstore) fetchVersionDetails(account Account, app App, guid string, ve
 
 			req := t.versionHistoryRequest(account, app, guid, id)
 			res, err := t.downloadClient.Send(req)
-			
+
 			if err != nil {
 				details.Error = fmt.Sprintf("request failed: %v", err)
 			} else if res.Data.FailureType != "" {
@@ -191,7 +197,7 @@ func (t *appstore) fetchVersionDetails(account Account, app App, guid string, ve
 
 	for result := range resultChan {
 		results[result.index] = result.details
-		
+
 		if progressCallback != nil {
 			progressCallback(result.index, result.details)
 		}
@@ -226,4 +232,4 @@ func (t *appstore) versionHistoryRequest(acc Account, app App, guid string, vers
 			Content: payload,
 		},
 	}
-} 
+}

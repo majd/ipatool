@@ -64,7 +64,7 @@ func versionHistoryCmd() *cobra.Command {
 
 				appInfoCallback := func(info appstore.VersionHistoryInfo) {
 					appInfo = &info
-					
+
 					fmt.Printf("App: %s", info.App.Name)
 					if info.App.BundleID != "" {
 						fmt.Printf(" (%s)", info.App.BundleID)
@@ -72,15 +72,15 @@ func versionHistoryCmd() *cobra.Command {
 					fmt.Printf("\nApp ID: %d\n", info.App.ID)
 					fmt.Printf("Latest version: %s\n", info.LatestVersion)
 					fmt.Printf("Total versions available: %d\n", len(info.VersionIdentifiers))
-					
+
 					orderDesc := "newest first"
 					if oldestFirst {
 						orderDesc = "oldest first"
 					}
-					
+
 					fmt.Printf("\nFetching version details (%s)...\n", orderDesc)
 				}
-				
+
 				progressCallback := func(index int, detail appstore.VersionDetails) {
 					if !headerPrinted {
 						fmt.Println("┌─────────────────┬─────────────────┐")
@@ -88,20 +88,20 @@ func versionHistoryCmd() *cobra.Command {
 						fmt.Println("├─────────────────┼─────────────────┤")
 						headerPrinted = true
 					}
-					
+
 					resultBuffer[index] = detail
-					
+
 					for i := displayedUpTo + 1; ; i++ {
 						if bufferedDetail, exists := resultBuffer[i]; exists {
 							version := bufferedDetail.VersionString
 							if version == "" {
 								version = "Unknown"
 							}
-							
-							fmt.Printf("│ %-15s │ %-15s │\n", 
+
+							fmt.Printf("│ %-15s │ %-15s │\n",
 								truncateString(version, 15),
 								truncateString(bufferedDetail.VersionID, 15))
-							
+
 							displayedUpTo = i
 							delete(resultBuffer, i)
 						} else {
@@ -124,19 +124,19 @@ func versionHistoryCmd() *cobra.Command {
 
 				if len(out.VersionDetails) > 0 && headerPrinted {
 					fmt.Println("└─────────────────┴─────────────────┘")
-					
+
 					successCount := 0
 					for _, detail := range out.VersionDetails {
 						if detail.Success {
 							successCount++
 						}
 					}
-					
+
 					orderDesc := "oldest first"
 					if !oldestFirst {
 						orderDesc = "newest first"
 					}
-					
+
 					fmt.Printf("\nSummary: %d/%d versions retrieved successfully (%s)\n", successCount, len(out.VersionDetails), orderDesc)
 				} else if appInfo != nil && len(out.VersionDetails) == 0 {
 					fmt.Println("\nNo version details available.")
@@ -170,6 +170,7 @@ func versionHistoryCmd() *cobra.Command {
 				retry.Attempts(2),
 				retry.RetryIf(func(err error) bool {
 					lastErr = err
+
 					return errors.Is(err, appstore.ErrPasswordTokenExpired)
 				}),
 			)
@@ -188,8 +189,10 @@ func truncateString(s string, maxLen int) string {
 	if len(s) <= maxLen {
 		return s
 	}
+
 	if maxLen <= 3 {
 		return s[:maxLen]
 	}
+
 	return s[:maxLen-3] + "..."
-} 
+}
