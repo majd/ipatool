@@ -98,6 +98,27 @@ Global Flags:
       --verbose           enables verbose logs
 ```
 
+To obtain version history for an app, use the `version-history` command.
+
+```
+Get version history for an iOS app from the App Store
+
+Usage:
+  ipatool version-history [flags]
+
+Flags:
+  -i, --app-id int                 ID of the target iOS app (required)
+  -b, --bundle-identifier string   The bundle identifier of the target iOS app (overrides the app ID)
+  -h, --help                       help for version-history
+  -m, --max-versions int           Maximum number of recent versions to fetch details for (default 50)
+      --oldest-first               Show oldest versions first instead of newest first
+
+Global Flags:
+      --format format     sets output format for command; can be 'text', 'json' (default text)
+      --non-interactive   run in non-interactive session
+      --verbose           enables verbose logs
+```
+
 To download a copy of the ipa file, use the `download` command.
 
 ```
@@ -112,12 +133,20 @@ Flags:
   -h, --help                       help for download
   -o, --output string              The destination path of the downloaded app package
       --purchase                   Obtain a license for the app if needed
+      --version-id string          Version ID of the app to download (leave empty for latest version)
 
 Global Flags:
       --format format                sets output format for command; can be 'text', 'json' (default text)
       --keychain-passphrase string   passphrase for unlocking keychain
       --non-interactive              run in non-interactive session
       --verbose                      enables verbose logs
+```
+
+To download a specific version of an app, first obtain the version history to identify available versions, then use the version ID with the download command.
+
+```bash
+ipatool version-history --app-id 544007664
+ipatool download --app-id 544007664 --version-id 866031654
 ```
 
 **Note:** the tool runs in interactive mode by default. Use the `--non-interactive` flag
