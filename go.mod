@@ -1,8 +1,6 @@
 module github.com/majd/ipatool/v2
 
-go 1.23.0
-
-toolchain go1.23.6
+go 1.19
 
 require (
 	github.com/99designs/keyring v1.2.1
