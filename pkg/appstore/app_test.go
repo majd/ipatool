@@ -74,6 +74,6 @@ var _ = Describe("App", func() {
 			Price:    0,
 		}
 
-		Expect(fileName(app)).To(Equal("app.bundle-id1_42_1.0.ipa"))
+		Expect(fileName(app, "1.0")).To(Equal("app.bundle-id1_42_1.0.ipa"))
 	})
 })
