@@ -23,6 +23,7 @@ type DownloadInput struct {
 	App        App
 	OutputPath string
 	Progress   *progressbar.ProgressBar
+	VersionID  string
 }
 
 type DownloadOutput struct {
@@ -43,7 +44,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.downloadRequest(input.Account, input.App, guid)
+	req := t.downloadRequest(input.Account, input.App, guid, input.VersionID)
 
 	res, err := t.downloadClient.Send(req)
 	if err != nil {
@@ -71,6 +72,21 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	}
 
 	item := res.Data.Items[0]
+
+	updatedApp := input.App
+
+	if input.VersionID != "" && item.Metadata != nil {
+		if bundleVersion, ok := item.Metadata["bundleShortVersionString"].(string); ok && bundleVersion != "" {
+			updatedApp.Version = bundleVersion
+		}
+	}
+
+	if input.VersionID != "" {
+		destination, err = t.resolveDestinationPath(updatedApp, input.OutputPath)
+		if err != nil {
+			return DownloadOutput{}, fmt.Errorf("failed to resolve destination path: %w", err)
+		}
+	}
 
 	err = t.downloadFile(item.URL, fmt.Sprintf("%s.tmp", destination), input.Progress)
 	if err != nil {
@@ -139,8 +155,18 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	return nil
 }
 
-func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request {
+func (*appstore) downloadRequest(acc Account, app App, guid string, versionID string) http.Request {
 	host := fmt.Sprintf("%s-%s", PrivateAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
+
+	payload := map[string]interface{}{
+		"creditDisplay": "",
+		"guid":          guid,
+		"salableAdamId": app.ID,
+	}
+
+	if versionID != "" {
+		payload["externalVersionId"] = versionID
+	}
 
 	return http.Request{
 		URL:            fmt.Sprintf("https://%s%s?guid=%s", host, PrivateAppStoreAPIPathDownload, guid),
@@ -152,11 +178,7 @@ func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request
 			"X-Dsid":       acc.DirectoryServicesID,
 		},
 		Payload: &http.XMLPayload{
-			Content: map[string]interface{}{
-				"creditDisplay": "",
-				"guid":          guid,
-				"salableAdamId": app.ID,
-			},
+			Content: payload,
 		},
 	}
 }
