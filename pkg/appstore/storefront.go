@@ -14,6 +14,10 @@ func countryCodeFromStoreFront(storeFront string) (string, error) {
 		}
 	}
 
+	if storeFront == "" {
+		return "", nil
+	}
+
 	return "", fmt.Errorf("country code mapping for store front (%s) was not found", storeFront)
 }
 
