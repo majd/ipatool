@@ -25,8 +25,8 @@ type AppStore interface {
 	Download(input DownloadInput) (DownloadOutput, error)
 	// ReplicateSinf replicates the sinf for the IPA package.
 	ReplicateSinf(input ReplicateSinfInput) error
-	// VersionHistory retrieves version history information for the specified app.
-	VersionHistory(input VersionHistoryInput) (VersionHistoryOutput, error)
+	// VersionHistory lists the available versions of the specified app.
+	ListVersions(input ListVersionsInput) (ListVersionsOutput, error)
 }
 
 type appstore struct {
