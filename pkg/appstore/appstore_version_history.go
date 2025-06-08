@@ -14,6 +14,7 @@ type VersionHistoryInput struct {
 	App              App
 	MaxCount         int
 	OldestFirst      bool
+	AllVersions      bool
 	AppInfoCallback  func(info VersionHistoryInfo)
 	ProgressCallback func(index int, detail VersionDetails)
 }
@@ -101,30 +102,46 @@ func (t *appstore) VersionHistory(input VersionHistoryInput) (VersionHistoryOutp
 		}, nil
 	}
 
-	maxCount := input.MaxCount
-	if maxCount <= 0 {
-		maxCount = 10
-	}
-
 	var selectedVersionIds []string
 
-	if input.OldestFirst {
-		if len(versionIdentifiers) <= maxCount {
+	if input.AllVersions {
+		// Fetch all versions
+		if input.OldestFirst {
 			selectedVersionIds = versionIdentifiers
 		} else {
-			selectedVersionIds = versionIdentifiers[:maxCount]
-		}
-	} else {
-		if len(versionIdentifiers) <= maxCount {
+			// Reverse the order for newest first
 			selectedVersionIds = make([]string, len(versionIdentifiers))
 			copy(selectedVersionIds, versionIdentifiers)
-		} else {
-			selectedVersionIds = make([]string, maxCount)
-			copy(selectedVersionIds, versionIdentifiers[len(versionIdentifiers)-maxCount:])
+
+			for i, j := 0, len(selectedVersionIds)-1; i < j; i, j = i+1, j-1 {
+				selectedVersionIds[i], selectedVersionIds[j] = selectedVersionIds[j], selectedVersionIds[i]
+			}
+		}
+	} else {
+		// Use maxCount limit
+		maxCount := input.MaxCount
+		if maxCount <= 0 {
+			maxCount = 10
 		}
 
-		for i, j := 0, len(selectedVersionIds)-1; i < j; i, j = i+1, j-1 {
-			selectedVersionIds[i], selectedVersionIds[j] = selectedVersionIds[j], selectedVersionIds[i]
+		if input.OldestFirst {
+			if len(versionIdentifiers) <= maxCount {
+				selectedVersionIds = versionIdentifiers
+			} else {
+				selectedVersionIds = versionIdentifiers[:maxCount]
+			}
+		} else {
+			if len(versionIdentifiers) <= maxCount {
+				selectedVersionIds = make([]string, len(versionIdentifiers))
+				copy(selectedVersionIds, versionIdentifiers)
+			} else {
+				selectedVersionIds = make([]string, maxCount)
+				copy(selectedVersionIds, versionIdentifiers[len(versionIdentifiers)-maxCount:])
+			}
+
+			for i, j := 0, len(selectedVersionIds)-1; i < j; i, j = i+1, j-1 {
+				selectedVersionIds[i], selectedVersionIds[j] = selectedVersionIds[j], selectedVersionIds[i]
+			}
 		}
 	}
 

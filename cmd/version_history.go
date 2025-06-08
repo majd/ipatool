@@ -17,6 +17,7 @@ func versionHistoryCmd() *cobra.Command {
 		bundleID    string
 		maxCount    int
 		oldestFirst bool
+		allVersions bool
 	)
 
 	cmd := &cobra.Command{
@@ -78,7 +79,11 @@ func versionHistoryCmd() *cobra.Command {
 						orderDesc = "oldest first"
 					}
 
-					fmt.Printf("\nFetching version details (%s)...\n", orderDesc)
+					if allVersions {
+						fmt.Printf("\nFetching ALL version details (%s)...\n", orderDesc)
+					} else {
+						fmt.Printf("\nFetching version details (%s)...\n", orderDesc)
+					}
 				}
 
 				progressCallback := func(index int, detail appstore.VersionDetails) {
@@ -115,6 +120,7 @@ func versionHistoryCmd() *cobra.Command {
 					App:              app,
 					MaxCount:         maxCount,
 					OldestFirst:      oldestFirst,
+					AllVersions:      allVersions,
 					AppInfoCallback:  appInfoCallback,
 					ProgressCallback: progressCallback,
 				})
@@ -159,6 +165,7 @@ func versionHistoryCmd() *cobra.Command {
 					Int("totalVersions", len(out.VersionHistory.VersionIdentifiers)).
 					Int("detailedVersions", len(out.VersionDetails)).
 					Bool("oldestFirst", oldestFirst).
+					Bool("allVersions", allVersions).
 					Bool("success", true).
 					Send()
 
@@ -179,8 +186,9 @@ func versionHistoryCmd() *cobra.Command {
 
 	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target iOS app (required)")
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (overrides the app ID)")
-	cmd.Flags().IntVarP(&maxCount, "max-versions", "m", 10, "Maximum number of recent versions to fetch details for")
+	cmd.Flags().IntVarP(&maxCount, "max-versions", "m", 10, "Maximum number of recent versions to fetch details for (ignored when --all-versions is used)")
 	cmd.Flags().BoolVar(&oldestFirst, "oldest-first", false, "Show oldest versions first instead of newest first")
+	cmd.Flags().BoolVar(&allVersions, "all-versions", false, "Fetch details for all available versions (overrides --max-versions)")
 
 	return cmd
 }
