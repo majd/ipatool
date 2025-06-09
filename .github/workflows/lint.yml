@@ -16,6 +16,6 @@ jobs:
           go-version: "1.23.0"
           cache: true
       - run: go generate github.com/majd/ipatool/...
-      - uses: golangci/golangci-lint-action@v3
+      - uses: golangci/golangci-lint-action@v8
         with:
-          version: v1.52.2
+          version: v2.1

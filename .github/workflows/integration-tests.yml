@@ -9,8 +9,6 @@ jobs:
   build:
     name: Build
     runs-on: macos-latest
-    strategy:
-      fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v3
