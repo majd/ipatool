@@ -163,7 +163,7 @@ func (t *appstore) loginRequest(email, password, authCode, guid string, attempt 
 				"appleId":  email,
 				"attempt":  strconv.Itoa(attempt),
 				"guid":     guid,
-				"password": fmt.Sprintf("%s%s", password, authCode),
+				"password": fmt.Sprintf("%s%s", password, strings.ReplaceAll(authCode, " ", "")),
 				"rmp":      "0",
 				"why":      "signIn",
 			},
