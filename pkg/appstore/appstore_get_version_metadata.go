@@ -66,7 +66,6 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 		DisplayVersion: fmt.Sprintf("%v", item.Metadata["bundleShortVersionString"]),
 		ReleaseDate:    releaseDate,
 	}, nil
-
 }
 
 func (t *appstore) getVersionMetadataRequest(acc Account, app App, guid string, version string) http.Request {
