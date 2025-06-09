@@ -120,7 +120,7 @@ Global Flags:
 
 To download a copy of the ipa file, use the `download` command.
 
-````
+```
 Download (encrypted) iOS app packages from the App Store
 
 Usage:
@@ -142,6 +142,7 @@ Global Flags:
 ```
 
 To resolve an external version identifier, returned by the `list-versions` command, use the `get-version-metadata` command.
+
 ```
 Retrieves the metadata for a specific version of an app
 
@@ -170,7 +171,7 @@ The tool can be compiled using the Go toolchain.
 
 ```shell
 $ go build -o ipatool
-````
+```
 
 Unit tests can be executed with the following commands.
 
