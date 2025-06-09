@@ -14,11 +14,11 @@ import (
 // nolint:wrapcheck
 func downloadCmd() *cobra.Command {
 	var (
-		acquireLicense bool
-		outputPath     string
-		appID          int64
-		bundleID       string
-		version        string
+		acquireLicense    bool
+		outputPath        string
+		appID             int64
+		bundleID          string
+		externalVersionID string
 	)
 
 	cmd := &cobra.Command{
@@ -91,7 +91,7 @@ func downloadCmd() *cobra.Command {
 				}
 
 				out, err := dependencies.AppStore.Download(appstore.DownloadInput{
-					Account: acc, App: app, OutputPath: outputPath, Progress: progress, Version: version})
+					Account: acc, App: app, OutputPath: outputPath, Progress: progress, ExternalVersionID: externalVersionID})
 				if err != nil {
 					return err
 				}
@@ -133,7 +133,7 @@ func downloadCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target iOS app (required)")
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (overrides the app ID)")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "The destination path of the downloaded app package")
-	cmd.Flags().StringVar(&version, "version", "", "Version of the app to download (defaults to latest version when not specified)")
+	cmd.Flags().StringVar(&externalVersionID, "external-version-id", "", "External version identifier of the target iOS app (defaults to latest version when not specified)")
 	cmd.Flags().BoolVar(&acquireLicense, "purchase", false, "Obtain a license for the app if needed")
 
 	return cmd
