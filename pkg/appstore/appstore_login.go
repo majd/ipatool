@@ -90,7 +90,7 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 		return Account{}, NewErrorWithMetadata(errors.New("too many attempts"), res)
 	}
 
-	storeFront, err := res.GetHeader(HTTPHeaderStoreFront)
+	sf, err := res.GetHeader(HTTPHeaderStoreFront)
 	if err != nil {
 		return Account{}, NewErrorWithMetadata(fmt.Errorf("failed to get storefront header: %w", err), res)
 	}
@@ -101,7 +101,7 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 		Email:               res.Data.Account.Email,
 		PasswordToken:       res.Data.PasswordToken,
 		DirectoryServicesID: res.Data.DirectoryServicesID,
-		StoreFront:          storeFront,
+		StoreFront:          sf,
 		Password:            password,
 	}
 
@@ -135,6 +135,8 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		retry = true
 	} else if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
 		err = ErrAuthCodeRequired
+	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageAccountDisabled {
+		err = NewErrorWithMetadata(errors.New("account is disabled"), res)
 	} else if res.Data.FailureType != "" {
 		if res.Data.CustomerMessage != "" {
 			err = NewErrorWithMetadata(errors.New(res.Data.CustomerMessage), res)

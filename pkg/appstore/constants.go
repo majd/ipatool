@@ -7,6 +7,7 @@ const (
 	FailureTypeTemporarilyUnavailable = "2059"
 
 	CustomerMessageBadLogin             = "MZFinance.BadLogin.Configurator_message"
+	CustomerMessageAccountDisabled      = "Your account is disabled."
 	CustomerMessageSubscriptionRequired = "Subscription Required"
 
 	iTunesAPIDomain     = "itunes.apple.com"
