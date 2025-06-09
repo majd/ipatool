@@ -123,6 +123,26 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 		})
 
+		When("store API indicates account is disabled", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						Data: loginResult{
+							CustomerMessage: CustomerMessageAccountDisabled,
+						},
+					}, nil)
+			})
+
+			It("returns account disabled error", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("account is disabled"))
+			})
+		})
+
 		When("store API requires 2FA code", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
