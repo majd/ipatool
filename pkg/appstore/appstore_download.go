@@ -71,7 +71,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	version := "unknown"
 
 	// Read the version from the item metadata
-	if itemVersion, ok := item.Metadata["softwareVersionExternalIdentifier"].(interface{}); ok {
+	if itemVersion, ok := item.Metadata["softwareVersionExternalIdentifier"]; ok {
 		version = fmt.Sprintf("%v", itemVersion)
 	}
 

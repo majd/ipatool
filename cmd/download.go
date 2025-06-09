@@ -31,7 +31,7 @@ func downloadCmd() *cobra.Command {
 
 			var lastErr error
 			var acc appstore.Account
-			var purchased bool = false
+			purchased := false
 
 			return retry.Do(func() error {
 				infoResult, err := dependencies.AppStore.AccountInfo()
