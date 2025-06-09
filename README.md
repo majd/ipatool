@@ -120,19 +120,39 @@ Global Flags:
 
 To download a copy of the ipa file, use the `download` command.
 
-```
+````
 Download (encrypted) iOS app packages from the App Store
 
 Usage:
   ipatool download [flags]
 
 Flags:
-  -i, --app-id int                 ID of the target iOS app (required)
-  -b, --bundle-identifier string   The bundle identifier of the target iOS app (overrides the app ID)
-  -h, --help                       help for download
-  -o, --output string              The destination path of the downloaded app package
-      --purchase                   Obtain a license for the app if needed
-      --version string             Version of the app to download (defaults to latest version when not specified)
+  -i, --app-id int                   ID of the target iOS app (required)
+  -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
+      --external-version-id string   External version identifier of the target iOS app (defaults to latest version when not specified)
+  -h, --help                         help for download
+  -o, --output string                The destination path of the downloaded app package
+      --purchase                     Obtain a license for the app if needed
+
+Global Flags:
+      --format format                sets output format for command; can be 'text', 'json' (default text)
+      --keychain-passphrase string   passphrase for unlocking keychain
+      --non-interactive              run in non-interactive session
+      --verbose                      enables verbose logs
+```
+
+To resolve an external version identifier, returned by the `list-versions` command, use the `get-version-metadata` command.
+```
+Retrieves the metadata for a specific version of an app
+
+Usage:
+  ipatool get-version-metadata [flags]
+
+Flags:
+  -i, --app-id int                   ID of the target iOS app (required)
+  -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
+      --external-version-id string   External version identifier of the target iOS app (required)
+  -h, --help                         help for get-version-metadata
 
 Global Flags:
       --format format                sets output format for command; can be 'text', 'json' (default text)
@@ -150,7 +170,7 @@ The tool can be compiled using the Go toolchain.
 
 ```shell
 $ go build -o ipatool
-```
+````
 
 Unit tests can be executed with the following commands.
 
