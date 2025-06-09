@@ -90,7 +90,7 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 		return Account{}, NewErrorWithMetadata(errors.New("too many attempts"), res)
 	}
 
-	sf, err := res.GetHeader(HTTPHeaderStoreFront)
+	storeFront, err := res.GetHeader(HTTPHeaderStoreFront)
 	if err != nil {
 		return Account{}, NewErrorWithMetadata(fmt.Errorf("failed to get storefront header: %w", err), res)
 	}
@@ -101,7 +101,7 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 		Email:               res.Data.Account.Email,
 		PasswordToken:       res.Data.PasswordToken,
 		DirectoryServicesID: res.Data.DirectoryServicesID,
-		StoreFront:          sf,
+		StoreFront:          storeFront,
 		Password:            password,
 	}
 
