@@ -60,8 +60,7 @@ func ListVersionsCmd() *cobra.Command {
 				}
 
 				dependencies.Logger.Log().
-					Interface("versions", out.Versions).
-					Str("latestVersion", out.LatestVersion).
+					Interface("externalVersionIdentifiers", out.ExternalVersionIdentifiers).
 					Str("bundleID", app.BundleID).
 					Bool("success", true).
 					Send()

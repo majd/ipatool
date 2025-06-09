@@ -57,8 +57,6 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 
 	item := res.Data.Items[0]
 
-	fmt.Printf("%+v\n", item)
-
 	releaseDate, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", item.Metadata["releaseDate"]))
 	if err != nil {
 		return GetVersionMetadataOutput{}, fmt.Errorf("failed to parse release date: %w", err)

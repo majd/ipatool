@@ -19,11 +19,11 @@ var (
 )
 
 type DownloadInput struct {
-	Account    Account
-	App        App
-	OutputPath string
-	Progress   *progressbar.ProgressBar
-	Version    string
+	Account           Account
+	App               App
+	OutputPath        string
+	Progress          *progressbar.ProgressBar
+	ExternalVersionID string
 }
 
 type DownloadOutput struct {
@@ -39,7 +39,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.downloadRequest(input.Account, input.App, guid, input.Version)
+	req := t.downloadRequest(input.Account, input.App, guid, input.ExternalVersionID)
 
 	res, err := t.downloadClient.Send(req)
 	if err != nil {
@@ -147,7 +147,7 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	return nil
 }
 
-func (*appstore) downloadRequest(acc Account, app App, guid string, version string) http.Request {
+func (*appstore) downloadRequest(acc Account, app App, guid string, externalVersionID string) http.Request {
 	host := fmt.Sprintf("%s-%s", PrivateAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
 
 	payload := map[string]interface{}{
@@ -156,8 +156,8 @@ func (*appstore) downloadRequest(acc Account, app App, guid string, version stri
 		"salableAdamId": app.ID,
 	}
 
-	if version != "" {
-		payload["externalVersionId"] = version
+	if externalVersionID != "" {
+		payload["externalVersionId"] = externalVersionID
 	}
 
 	return http.Request{

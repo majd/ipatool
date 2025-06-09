@@ -14,8 +14,8 @@ type ListVersionsInput struct {
 }
 
 type ListVersionsOutput struct {
-	Versions      []string
-	LatestVersion string
+	ExternalVersionIdentifiers []string
+	LatestExternalVersionID    string
 }
 
 func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, error) {
@@ -60,19 +60,19 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 		return ListVersionsOutput{}, NewErrorWithMetadata(fmt.Errorf("failed to get version identifiers from item metadata"), item.Metadata)
 	}
 
-	versions := make([]string, len(rawIdentifiers))
+	externalVersionIdentifiers := make([]string, len(rawIdentifiers))
 	for i, val := range rawIdentifiers {
-		versions[i] = fmt.Sprintf("%v", val)
+		externalVersionIdentifiers[i] = fmt.Sprintf("%v", val)
 	}
 
-	latestVersionRaw := item.Metadata["softwareVersionExternalIdentifier"]
-	if latestVersionRaw == nil {
+	latestExternalVersionID := item.Metadata["softwareVersionExternalIdentifier"]
+	if latestExternalVersionID == nil {
 		return ListVersionsOutput{}, NewErrorWithMetadata(fmt.Errorf("failed to get latest version from item metadata"), item.Metadata)
 	}
 
 	return ListVersionsOutput{
-		Versions:      versions,
-		LatestVersion: fmt.Sprintf("%v", latestVersionRaw),
+		ExternalVersionIdentifiers: externalVersionIdentifiers,
+		LatestExternalVersionID:    fmt.Sprintf("%v", latestExternalVersionID),
 	}, nil
 }
 

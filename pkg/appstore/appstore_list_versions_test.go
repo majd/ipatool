@@ -257,8 +257,8 @@ var _ = Describe("AppStore (ListVersions)", func() {
 		It("returns versions", func() {
 			out, err := as.ListVersions(ListVersionsInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(out.Versions).To(Equal([]string{testVersion1, testVersion2}))
-			Expect(out.LatestVersion).To(Equal(testLatest))
+			Expect(out.ExternalVersionIdentifiers).To(Equal([]string{testVersion1, testVersion2}))
+			Expect(out.LatestExternalVersionID).To(Equal(testLatest))
 		})
 	})
 })
