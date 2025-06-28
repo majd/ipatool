@@ -67,27 +67,8 @@ var _ = Describe("AppStore (Download)", func() {
 		ctrl.Finish()
 	})
 
-	When("fails to resolve output path", func() {
-		BeforeEach(func() {
-			mockOS.EXPECT().
-				Stat(gomock.Any()).
-				Return(nil, errors.New(""))
-		})
-
-		It("returns error", func() {
-			_, err := as.Download(DownloadInput{
-				OutputPath: "test-out",
-			})
-			Expect(err).To(HaveOccurred())
-		})
-	})
-
 	When("fails to read MAC address", func() {
 		BeforeEach(func() {
-			mockOS.EXPECT().
-				Getwd().
-				Return("", nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("", errors.New(""))
@@ -101,10 +82,6 @@ var _ = Describe("AppStore (Download)", func() {
 
 	When("request fails", func() {
 		BeforeEach(func() {
-			mockOS.EXPECT().
-				Getwd().
-				Return("", nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("", nil)
@@ -122,10 +99,6 @@ var _ = Describe("AppStore (Download)", func() {
 
 	When("password token is expired", func() {
 		BeforeEach(func() {
-			mockOS.EXPECT().
-				Getwd().
-				Return("", nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("", nil)
@@ -147,10 +120,6 @@ var _ = Describe("AppStore (Download)", func() {
 
 	When("license is missing", func() {
 		BeforeEach(func() {
-			mockOS.EXPECT().
-				Getwd().
-				Return("", nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("", nil)
@@ -172,10 +141,6 @@ var _ = Describe("AppStore (Download)", func() {
 
 	When("store API returns error", func() {
 		BeforeEach(func() {
-			mockOS.EXPECT().
-				Getwd().
-				Return("", nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("", nil)
@@ -219,10 +184,6 @@ var _ = Describe("AppStore (Download)", func() {
 
 	When("store API returns no items", func() {
 		BeforeEach(func() {
-			mockOS.EXPECT().
-				Getwd().
-				Return("", nil)
-
 			mockMachine.EXPECT().
 				MacAddress().
 				Return("", nil)
@@ -238,6 +199,33 @@ var _ = Describe("AppStore (Download)", func() {
 
 		It("returns error", func() {
 			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	When("fails to resolve output path", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("", nil)
+
+			mockDownloadClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[downloadResult]{
+					Data: downloadResult{
+						Items: []downloadItemResult{{}},
+					},
+				}, nil)
+
+			mockOS.EXPECT().
+				Stat(gomock.Any()).
+				Return(nil, errors.New(""))
+		})
+
+		It("returns error", func() {
+			_, err := as.Download(DownloadInput{
+				OutputPath: "test-out",
+			})
 			Expect(err).To(HaveOccurred())
 		})
 	})
@@ -387,7 +375,9 @@ var _ = Describe("AppStore (Download)", func() {
 					Data: downloadResult{
 						Items: []downloadItemResult{
 							{
-								Metadata: map[string]interface{}{},
+								Metadata: map[string]interface{}{
+									"bundleShortVersionString": "xyz",
+								},
 								Sinfs: []Sinf{
 									{
 										ID:   0,

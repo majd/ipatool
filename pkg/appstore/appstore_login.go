@@ -135,6 +135,8 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		retry = true
 	} else if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
 		err = ErrAuthCodeRequired
+	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageAccountDisabled {
+		err = NewErrorWithMetadata(errors.New("account is disabled"), res)
 	} else if res.Data.FailureType != "" {
 		if res.Data.CustomerMessage != "" {
 			err = NewErrorWithMetadata(errors.New(res.Data.CustomerMessage), res)
@@ -161,7 +163,7 @@ func (t *appstore) loginRequest(email, password, authCode, guid string, attempt 
 				"appleId":  email,
 				"attempt":  strconv.Itoa(attempt),
 				"guid":     guid,
-				"password": fmt.Sprintf("%s%s", password, authCode),
+				"password": fmt.Sprintf("%s%s", password, strings.ReplaceAll(authCode, " ", "")),
 				"rmp":      "0",
 				"why":      "signIn",
 			},

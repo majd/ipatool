@@ -5,7 +5,7 @@
 
 `ipatool` is a command line tool that allows you to search for iOS apps on the [App Store](https://apps.apple.com) and download a copy of the app package, known as an _ipa_ file.
 
-![Demo](./demo.gif)
+![Demo](./resources/demo.gif)
 
 - [Requirements](#requirements)
 - [Installation](#installation)
@@ -14,10 +14,11 @@
 - [Usage](#usage)
 - [Compiling](#compiling)
 - [License](#license)
-- [Changelog](https://github.com/majd/ipatool/blob/main/CHANGELOG.md)
+- [Releases](https://github.com/majd/ipatool/releases)
 - [FAQ](https://github.com/majd/ipatool/wiki/FAQ)
 
 ## Requirements
+
 - Supported operating system (Windows, Linux or macOS).
 - Apple ID set up to use the App Store.
 
@@ -32,7 +33,6 @@ You can grab the latest version of `ipatool` from [GitHub releases](https://gith
 You can install `ipatool` using [Homebrew](https://brew.sh).
 
 ```shell
-$ brew tap majd/repo
 $ brew install ipatool
 ```
 
@@ -98,6 +98,26 @@ Global Flags:
       --verbose           enables verbose logs
 ```
 
+To obtain a list of availble app versions to download, use the `list-versions` command.
+
+```
+List the available versions of an iOS app
+
+Usage:
+  ipatool list-versions [flags]
+
+Flags:
+  -i, --app-id int                 ID of the target iOS app (required)
+  -b, --bundle-identifier string   The bundle identifier of the target iOS app (overrides the app ID)
+  -h, --help                       help for list-versions
+
+Global Flags:
+      --format format                sets output format for command; can be 'text', 'json' (default text)
+      --keychain-passphrase string   passphrase for unlocking keychain
+      --non-interactive              run in non-interactive session
+      --verbose                      enables verbose logs
+```
+
 To download a copy of the ipa file, use the `download` command.
 
 ```
@@ -107,11 +127,33 @@ Usage:
   ipatool download [flags]
 
 Flags:
-  -i, --app-id int                 ID of the target iOS app (required)
-  -b, --bundle-identifier string   The bundle identifier of the target iOS app (overrides the app ID)
-  -h, --help                       help for download
-  -o, --output string              The destination path of the downloaded app package
-      --purchase                   Obtain a license for the app if needed
+  -i, --app-id int                   ID of the target iOS app (required)
+  -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
+      --external-version-id string   External version identifier of the target iOS app (defaults to latest version when not specified)
+  -h, --help                         help for download
+  -o, --output string                The destination path of the downloaded app package
+      --purchase                     Obtain a license for the app if needed
+
+Global Flags:
+      --format format                sets output format for command; can be 'text', 'json' (default text)
+      --keychain-passphrase string   passphrase for unlocking keychain
+      --non-interactive              run in non-interactive session
+      --verbose                      enables verbose logs
+```
+
+To resolve an external version identifier, returned by the `list-versions` command, use the `get-version-metadata` command.
+
+```
+Retrieves the metadata for a specific version of an app
+
+Usage:
+  ipatool get-version-metadata [flags]
+
+Flags:
+  -i, --app-id int                   ID of the target iOS app (required)
+  -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
+      --external-version-id string   External version identifier of the target iOS app (required)
+  -h, --help                         help for get-version-metadata
 
 Global Flags:
       --format format                sets output format for command; can be 'text', 'json' (default text)

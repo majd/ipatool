@@ -19,10 +19,11 @@ var (
 )
 
 type DownloadInput struct {
-	Account    Account
-	App        App
-	OutputPath string
-	Progress   *progressbar.ProgressBar
+	Account           Account
+	App               App
+	OutputPath        string
+	Progress          *progressbar.ProgressBar
+	ExternalVersionID string
 }
 
 type DownloadOutput struct {
@@ -31,11 +32,6 @@ type DownloadOutput struct {
 }
 
 func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
-	destination, err := t.resolveDestinationPath(input.App, input.OutputPath)
-	if err != nil {
-		return DownloadOutput{}, fmt.Errorf("failed to resolve destination path: %w", err)
-	}
-
 	macAddr, err := t.machine.MacAddress()
 	if err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to get mac address: %w", err)
@@ -43,7 +39,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.downloadRequest(input.Account, input.App, guid)
+	req := t.downloadRequest(input.Account, input.App, guid, input.ExternalVersionID)
 
 	res, err := t.downloadClient.Send(req)
 	if err != nil {
@@ -71,6 +67,18 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	}
 
 	item := res.Data.Items[0]
+
+	version := "unknown"
+
+	// Read the version from the item metadata
+	if itemVersion, ok := item.Metadata["bundleShortVersionString"]; ok {
+		version = fmt.Sprintf("%v", itemVersion)
+	}
+
+	destination, err := t.resolveDestinationPath(input.App, version, input.OutputPath)
+	if err != nil {
+		return DownloadOutput{}, fmt.Errorf("failed to resolve destination path: %w", err)
+	}
 
 	err = t.downloadFile(item.URL, fmt.Sprintf("%s.tmp", destination), input.Progress)
 	if err != nil {
@@ -150,8 +158,18 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	return nil
 }
 
-func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request {
+func (*appstore) downloadRequest(acc Account, app App, guid string, externalVersionID string) http.Request {
 	host := fmt.Sprintf("%s-%s", PrivateAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
+
+	payload := map[string]interface{}{
+		"creditDisplay": "",
+		"guid":          guid,
+		"salableAdamId": app.ID,
+	}
+
+	if externalVersionID != "" {
+		payload["externalVersionId"] = externalVersionID
+	}
 
 	return http.Request{
 		URL:            fmt.Sprintf("https://%s%s?guid=%s", host, PrivateAppStoreAPIPathDownload, guid),
@@ -163,16 +181,12 @@ func (*appstore) downloadRequest(acc Account, app App, guid string) http.Request
 			"X-Dsid":       acc.DirectoryServicesID,
 		},
 		Payload: &http.XMLPayload{
-			Content: map[string]interface{}{
-				"creditDisplay": "",
-				"guid":          guid,
-				"salableAdamId": app.ID,
-			},
+			Content: payload,
 		},
 	}
 }
 
-func fileName(app App) string {
+func fileName(app App, version string) string {
 	var parts []string
 
 	if app.BundleID != "" {
@@ -183,15 +197,15 @@ func fileName(app App) string {
 		parts = append(parts, strconv.FormatInt(app.ID, 10))
 	}
 
-	if app.Version != "" {
-		parts = append(parts, app.Version)
+	if version != "" {
+		parts = append(parts, version)
 	}
 
 	return fmt.Sprintf("%s.ipa", strings.Join(parts, "_"))
 }
 
-func (t *appstore) resolveDestinationPath(app App, path string) (string, error) {
-	file := fileName(app)
+func (t *appstore) resolveDestinationPath(app App, version string, path string) (string, error) {
+	file := fileName(app, version)
 
 	if path == "" {
 		workdir, err := t.os.Getwd()

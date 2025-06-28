@@ -7,6 +7,7 @@ const (
 	FailureTypeTemporarilyUnavailable = "2059"
 
 	CustomerMessageBadLogin             = "MZFinance.BadLogin.Configurator_message"
+	CustomerMessageAccountDisabled      = "Your account is disabled."
 	CustomerMessageSubscriptionRequired = "Subscription Required"
 
 	iTunesAPIDomain     = "itunes.apple.com"
@@ -17,7 +18,7 @@ const (
 	PrivateAppStoreAPIDomainPrefixWithAuthCode    = "p71"
 	PrivateAppStoreAPIDomain                      = "buy." + iTunesAPIDomain
 	PrivateAppStoreAPIPathAuthenticate            = "/WebObjects/MZFinance.woa/wa/authenticate"
-	PrivateAppStoreAPIPathPurchase                = "/WebObjects/MZBuy.woa/wa/buyProduct"
+	PrivateAppStoreAPIPathPurchase                = "/WebObjects/MZFinance.woa/wa/buyProduct"
 	PrivateAppStoreAPIPathDownload                = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 
 	HTTPHeaderStoreFront = "X-Set-Apple-Store-Front"
