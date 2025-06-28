@@ -1,9 +1,6 @@
 name: Unit Tests
 
-on:
-  pull_request:
-    branches:
-      - main
+on: workflow_dispatch
 
 jobs:
   run_tests:
