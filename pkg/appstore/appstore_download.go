@@ -118,7 +118,13 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	}
 
 	defer file.Close()
-	stat, _ := file.Stat()
+
+	stat, err := t.os.Stat(dst)
+
+	if err != nil {
+		return fmt.Errorf("failed to get file info: %w", err)
+	}
+
 	req.Header.Add("range", fmt.Sprintf("bytes=%d-", stat.Size()))
 
 	res, err := t.httpClient.Do(req)
