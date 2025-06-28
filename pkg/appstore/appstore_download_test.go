@@ -434,24 +434,6 @@ var _ = Describe("AppStore (Download)", func() {
 
 			BeforeEach(func() {
 
-				mockHTTPClient.EXPECT().
-					NewRequest("GET", gomock.Any(), nil).
-					Return(&gohttp.Request{Header: map[string][]string{}}, nil)
-
-				mockOS.EXPECT().
-					OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
-					Return(testFile, nil)
-
-				mockOS.EXPECT().
-					Stat(gomock.Any()).
-					Return(&dummyFileInfo{}, nil)
-
-				mockHTTPClient.EXPECT().
-					Do(gomock.Any()).
-					Return(&gohttp.Response{
-						Body: io.NopCloser(strings.NewReader("ping")),
-					}, nil)
-
 				var err error
 				tmpFile, err = os.OpenFile(fmt.Sprintf("%s.tmp", testFile.Name()), os.O_CREATE|os.O_WRONLY, 0644)
 				Expect(err).ToNot(HaveOccurred())
