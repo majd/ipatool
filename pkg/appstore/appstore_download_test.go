@@ -23,12 +23,12 @@ import (
 
 type dummyFileInfo struct{}
 
-func (d *dummyFileInfo) Name() string            { return "dummy" }
-func (d *dummyFileInfo) Size() int64             { return 0 }
-func (d *dummyFileInfo) Mode() fs.FileMode       { return 0 }
-func (d *dummyFileInfo) ModTime() (t time.Time)  { return }
-func (d *dummyFileInfo) IsDir() bool             { return false }
-func (d *dummyFileInfo) Sys() interface{}        { return nil }
+func (d *dummyFileInfo) Name() string       { return "dummy" }
+func (d *dummyFileInfo) Size() int64        { return 0 }
+func (d *dummyFileInfo) Mode() fs.FileMode  { return 0 }
+func (d *dummyFileInfo) ModTime() time.Time { return time.Time{} }
+func (d *dummyFileInfo) IsDir() bool        { return false }
+func (d *dummyFileInfo) Sys() interface{}   { return nil }
 
 var _ = Describe("AppStore (Download)", func() {
 	var (
@@ -291,9 +291,9 @@ var _ = Describe("AppStore (Download)", func() {
 					Return(nil, nil)
 
 				mockOS.EXPECT().
-				    Stat(gomock.Any()).
+					Stat(gomock.Any()).
 					Return(&dummyFileInfo{}, errors.New(""))
-				
+
 			})
 
 			It("returns error", func() {
@@ -313,7 +313,7 @@ var _ = Describe("AppStore (Download)", func() {
 					Return(nil, nil)
 
 				mockOS.EXPECT().
-				    Stat(gomock.Any()).
+					Stat(gomock.Any()).
 					Return(&dummyFileInfo{}, nil)
 
 				mockHTTPClient.EXPECT().
@@ -338,7 +338,7 @@ var _ = Describe("AppStore (Download)", func() {
 					Return(nil, nil)
 
 				mockOS.EXPECT().
-				    Stat(gomock.Any()).
+					Stat(gomock.Any()).
 					Return(&dummyFileInfo{}, nil)
 
 				mockHTTPClient.EXPECT().
@@ -390,8 +390,8 @@ var _ = Describe("AppStore (Download)", func() {
 				}, nil)
 
 			mockHTTPClient.EXPECT().
-					NewRequest("GET", gomock.Any(), nil).
-					Return(&gohttp.Request{Header: map[string][]string{}}, nil)
+				NewRequest("GET", gomock.Any(), nil).
+				Return(&gohttp.Request{Header: map[string][]string{}}, nil)
 
 			mockOS.EXPECT().
 				OpenFile(gomock.Any(), gomock.Any(), gomock.Any()).
