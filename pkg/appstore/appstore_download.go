@@ -133,7 +133,9 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 		return fmt.Errorf("failed to get file info: %w", err)
 	}
 
-	req.Header.Add("range", fmt.Sprintf("bytes=%d-", stat.Size()))
+	if req != nil && stat != nil {
+		req.Header.Add("range", fmt.Sprintf("bytes=%d-", stat.Size()))
+	}
 
 	res, err := t.httpClient.Do(req)
 	if err != nil {
@@ -144,8 +146,16 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 
 	if progress != nil {
 		progress.ChangeMax64(res.ContentLength + stat.Size())
-		progress.Set64(stat.Size())
-		file.Seek(0, io.SeekEnd)
+		err = progress.Set64(stat.Size())
+
+		if err != nil {
+			return fmt.Errorf("can not set bar progress: %w", err)
+		}
+		_, err = file.Seek(0, io.SeekEnd)
+
+		if err != nil {
+			return fmt.Errorf("can not seek file: %w", err)
+		}
 		_, err = io.Copy(io.MultiWriter(file, progress), res.Body)
 	} else {
 		_, err = io.Copy(file, res.Body)
