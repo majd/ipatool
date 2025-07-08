@@ -388,7 +388,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 			BeforeEach(func() {
 				var err error
-				tmpFile, err = os.OpenFile(fmt.Sprintf("%s.tmp", testFile.Name()), os.O_CREATE|os.O_WRONLY, 0644)
+				tmpFile, err = os.OpenFile(fmt.Sprintf("%s.tmp", testFile.Name()), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 				Expect(err).ToNot(HaveOccurred())
 
 				outputPath = strings.TrimSuffix(tmpFile.Name(), ".tmp")

@@ -27,11 +27,11 @@ type ReplicateSinfInput struct {
 func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	zipReader, err := zip.OpenReader(input.PackagePath)
 	if err != nil {
-		return errors.New("failed to open zip reader")
+		return fmt.Errorf("failed to open zip reader: %w", err)
 	}
 
 	tmpPath := fmt.Sprintf("%s.tmp", input.PackagePath)
-	tmpFile, err := t.os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY, 0644)
+	tmpFile, err := t.os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
