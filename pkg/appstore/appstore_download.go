@@ -120,21 +120,41 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	res, err := t.httpClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer res.Body.Close()
-
-	file, err := t.os.OpenFile(dst, os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := t.os.OpenFile(dst, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 
 	defer file.Close()
 
+	stat, err := t.os.Stat(dst)
+	if err != nil {
+		return fmt.Errorf("failed to get file info: %w", err)
+	}
+
+	if req != nil && stat != nil {
+		req.Header.Add("range", fmt.Sprintf("bytes=%d-", stat.Size()))
+	}
+
+	res, err := t.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer res.Body.Close()
+
 	if progress != nil {
-		progress.ChangeMax64(res.ContentLength)
+		progress.ChangeMax64(res.ContentLength + stat.Size())
+		err = progress.Set64(stat.Size())
+
+		if err != nil {
+			return fmt.Errorf("can not set bar progress: %w", err)
+		}
+
+		_, err = file.Seek(0, io.SeekEnd)
+		if err != nil {
+			return fmt.Errorf("can not seek file: %w", err)
+		}
+
 		_, err = io.Copy(io.MultiWriter(file, progress), res.Body)
 	} else {
 		_, err = io.Copy(file, res.Body)
