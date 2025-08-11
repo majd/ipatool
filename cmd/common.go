@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -71,7 +70,8 @@ func newKeychain(machine machine.Machine, logger log.Logger, interactive bool) k
 		FileDir:     filepath.Join(machine.HomeDirectory(), ConfigDirectoryName),
 		FilePasswordFunc: func(s string) (string, error) {
 			if keychainPassphrase == "" && !interactive {
-				return "", errors.New("keychain passphrase is required when not running in interactive mode; use the \"--keychain-passphrase\" flag")
+				// in noninteractive mode empty string as keychainPassphrase accepted
+				return keychainPassphrase, nil
 			}
 
 			if keychainPassphrase != "" {
