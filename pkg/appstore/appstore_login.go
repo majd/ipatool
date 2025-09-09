@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrAuthCodeRequired = errors.New("auth code is required")
+	ErrInvalidAuthCode  = errors.New("invalid or expired 2FA code")
 )
 
 type LoginInput struct {
@@ -133,6 +134,12 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		}
 	} else if attempt == 1 && res.Data.FailureType == FailureTypeInvalidCredentials {
 		retry = true
+	} else if res.Data.FailureType == FailureTypeInvalidAuthCode {
+		err = ErrInvalidAuthCode
+	} else if res.Data.FailureType == FailureTypeInvalidCredentials && authCode != "" {
+		err = ErrInvalidAuthCode
+	} else if res.Data.FailureType == "" && authCode != "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
+		err = ErrInvalidAuthCode
 	} else if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
 		err = ErrAuthCodeRequired
 	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageAccountDisabled {
@@ -141,7 +148,7 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		if res.Data.CustomerMessage != "" {
 			err = NewErrorWithMetadata(errors.New(res.Data.CustomerMessage), res)
 		} else {
-			err = NewErrorWithMetadata(errors.New("something went wrong"), res)
+			err = NewErrorWithMetadata(fmt.Errorf("something went wrong (failureType: %s)", res.Data.FailureType), res)
 		}
 	} else if res.StatusCode != gohttp.StatusOK || res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
 		err = NewErrorWithMetadata(errors.New("something went wrong"), res)

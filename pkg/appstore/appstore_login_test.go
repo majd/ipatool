@@ -104,6 +104,26 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 		})
 
+		When("store API returns 5005 failure type (invalid auth code)", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						Data: loginResult{
+							FailureType: FailureTypeInvalidAuthCode,
+						},
+					}, nil)
+			})
+
+			It("returns ErrInvalidAuthCode error", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+					AuthCode: "123456",
+				})
+				Expect(err).To(Equal(ErrInvalidAuthCode))
+			})
+		})
+
 		When("store API returns error", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
@@ -115,11 +135,12 @@ var _ = Describe("AppStore (Login)", func() {
 					}, nil)
 			})
 
-			It("returns error", func() {
+			It("returns error with failure type", func() {
 				_, err := as.Login(LoginInput{
 					Password: testPassword,
 				})
 				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("something went wrong (failureType: random-error)"))
 			})
 		})
 
@@ -160,6 +181,27 @@ var _ = Describe("AppStore (Login)", func() {
 					Password: testPassword,
 				})
 				Expect(err).To(Equal(ErrAuthCodeRequired))
+			})
+		})
+
+		When("store API returns invalid auth code with auth code provided", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						Data: loginResult{
+							FailureType:     "",
+							CustomerMessage: CustomerMessageBadLogin,
+						},
+					}, nil)
+			})
+
+			It("returns ErrInvalidAuthCode error", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+					AuthCode: "wrongcode",
+				})
+				Expect(err).To(Equal(ErrInvalidAuthCode))
 			})
 		})
 
