@@ -5,6 +5,7 @@ const (
 	FailureTypePasswordTokenExpired   = "2034"
 	FailureTypeLicenseNotFound        = "9610"
 	FailureTypeTemporarilyUnavailable = "2059"
+	FailureTypeInvalidAuthCode        = "5005"
 
 	CustomerMessageBadLogin             = "MZFinance.BadLogin.Configurator_message"
 	CustomerMessageAccountDisabled      = "Your account is disabled."
