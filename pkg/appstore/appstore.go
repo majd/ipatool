@@ -1,6 +1,8 @@
 package appstore
 
 import (
+	"net/url"
+
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	"github.com/majd/ipatool/v2/pkg/util/machine"
@@ -47,13 +49,14 @@ type Args struct {
 	CookieJar       http.CookieJar
 	OperatingSystem operatingsystem.OperatingSystem
 	Machine         machine.Machine
+	ProxyUrl        *url.URL
 }
 
 func NewAppStore(args Args) AppStore {
 	clientArgs := http.Args{
 		CookieJar: args.CookieJar,
+		ProxyUrl:  args.ProxyUrl,
 	}
-
 	return &appstore{
 		keychain:       args.Keychain,
 		loginClient:    http.NewClient[loginResult](clientArgs),

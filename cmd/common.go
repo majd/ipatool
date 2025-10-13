@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,7 @@ import (
 
 var dependencies = Dependencies{}
 var keychainPassphrase string
+var proxyUrl string
 
 type Dependencies struct {
 	Logger    log.Logger
@@ -107,11 +109,21 @@ func initWithCommand(cmd *cobra.Command) {
 	dependencies.Machine = machine.New(machine.Args{OS: dependencies.OS})
 	dependencies.CookieJar = newCookieJar(dependencies.Machine)
 	dependencies.Keychain = newKeychain(dependencies.Machine, dependencies.Logger, interactive)
+	var proxyUrlParsed *url.URL
+	if proxyUrl != "" {
+		parsedUrl, err := url.Parse(proxyUrl)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: invalid proxy url: %v\n", proxyUrl)
+			os.Exit(1)
+		}
+		proxyUrlParsed = parsedUrl
+	}
 	dependencies.AppStore = appstore.NewAppStore(appstore.Args{
 		CookieJar:       dependencies.CookieJar,
 		OperatingSystem: dependencies.OS,
 		Keychain:        dependencies.Keychain,
 		Machine:         dependencies.Machine,
+		ProxyUrl:        proxyUrlParsed,
 	})
 
 	util.Must("", createConfigDirectory(dependencies.OS, dependencies.Machine))

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"howett.net/plist"
@@ -29,6 +30,7 @@ type client[R interface{}] struct {
 
 type Args struct {
 	CookieJar CookieJar
+	ProxyUrl  *url.URL
 }
 
 type AddHeaderTransport struct {
@@ -49,6 +51,12 @@ func (t *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error
 }
 
 func NewClient[R interface{}](args Args) Client[R] {
+	var proxy http.RoundTripper
+	if args.ProxyUrl != nil {
+		proxy = &http.Transport{Proxy: http.ProxyURL(args.ProxyUrl)}
+	} else {
+		proxy = http.DefaultTransport
+	}
 	return &client[R]{
 		internalClient: http.Client{
 			Timeout: 0,
@@ -60,7 +68,7 @@ func NewClient[R interface{}](args Args) Client[R] {
 
 				return nil
 			},
-			Transport: &AddHeaderTransport{http.DefaultTransport},
+			Transport: &AddHeaderTransport{proxy},
 		},
 		cookieJar: args.CookieJar,
 	}
