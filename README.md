@@ -129,6 +129,7 @@ Usage:
 Flags:
   -i, --app-id int                   ID of the target iOS app (required)
   -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
+      --all-versions                 Download all available versions of the target iOS app
       --external-version-id string   External version identifier of the target iOS app (defaults to latest version when not specified)
   -h, --help                         help for download
   -o, --output string                The destination path of the downloaded app package
@@ -140,6 +141,8 @@ Global Flags:
       --non-interactive              run in non-interactive session
       --verbose                      enables verbose logs
 ```
+
+When using `download --all-versions`, the command retrieves every available version identifier and issues a download request for each one. To avoid risking your main Apple Account with that volume of private API traffic, prefer a secondary account and point `--output` at a directory.
 
 To resolve an external version identifier, returned by the `list-versions` command, use the `get-version-metadata` command.
 
