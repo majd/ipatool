@@ -163,6 +163,8 @@ Global Flags:
       --verbose                      enables verbose logs
 ```
 
+When using `--all-versions`, the command fires one request per version identifier against Apple’s private APIs. To avoid risking your main Apple Account, run this mode with a secondary account.
+
 **Note:** the tool runs in interactive mode by default. Use the `--non-interactive` flag
 if running in an automated environment.
 
