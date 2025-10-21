@@ -147,6 +147,7 @@ func downloadCmd() *cobra.Command {
 					}
 
 					displayCache[versionID] = meta.DisplayVersion
+
 					return meta.DisplayVersion, nil
 				}
 
@@ -165,6 +166,7 @@ func downloadCmd() *cobra.Command {
 								errors.Is(err, context.Canceled) {
 								entry["success"] = false
 								entry["error"] = err.Error()
+
 								return entry, err
 							}
 						} else {
@@ -185,6 +187,7 @@ func downloadCmd() *cobra.Command {
 					case <-ctx.Done():
 						entry["success"] = false
 						entry["error"] = ctx.Err().Error()
+						
 						return entry, ctx.Err()
 					default:
 					}
