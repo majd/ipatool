@@ -152,7 +152,8 @@ Usage:
 Flags:
   -i, --app-id int                   ID of the target iOS app (required)
   -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
-      --external-version-id string   External version identifier of the target iOS app (required)
+      --all-versions                 Retrieve metadata for all available versions
+      --external-version-id string   External version identifier of the target iOS app
   -h, --help                         help for get-version-metadata
 
 Global Flags:
