@@ -187,7 +187,7 @@ func downloadCmd() *cobra.Command {
 					case <-ctx.Done():
 						entry["success"] = false
 						entry["error"] = ctx.Err().Error()
-						
+
 						return entry, ctx.Err()
 					default:
 					}
