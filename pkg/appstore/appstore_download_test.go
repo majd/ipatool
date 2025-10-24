@@ -148,6 +148,27 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 	})
 
+	When("Sign In to the iTunes Store", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("", nil)
+
+			mockDownloadClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[downloadResult]{
+					Data: downloadResult{
+						FailureType: FailureTypeSignInRequired,
+					},
+				}, nil)
+		})
+
+		It("returns error", func() {
+			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	When("license is missing", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().

@@ -152,6 +152,31 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 	})
 
+	When("Sign In to the iTunes Store", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[purchaseResult]{
+					Data: purchaseResult{
+						FailureType: FailureTypeSignInRequired,
+					},
+				}, nil)
+		})
+
+		It("returns error", func() {
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	When("store API returns customer error message", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().

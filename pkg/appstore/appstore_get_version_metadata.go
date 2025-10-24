@@ -35,7 +35,8 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 		return GetVersionMetadataOutput{}, fmt.Errorf("failed to send http request: %w", err)
 	}
 
-	if res.Data.FailureType == FailureTypePasswordTokenExpired {
+	if (res.Data.FailureType == FailureTypePasswordTokenExpired ||
+	   res.Data.FailureType == FailureTypeSignInRequired) {
 		return GetVersionMetadataOutput{}, ErrPasswordTokenExpired
 	}
 

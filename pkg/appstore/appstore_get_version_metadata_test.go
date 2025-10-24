@@ -117,6 +117,27 @@ var _ = Describe("AppStore (GetVersionMetadata)", func() {
 		})
 	})
 
+	When("Sign In to the iTunes Store", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockDownloadClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[downloadResult]{
+					Data: downloadResult{
+						FailureType: FailureTypeSignInRequired,
+					},
+				}, nil)
+		})
+
+		It("returns error", func() {
+			_, err := as.GetVersionMetadata(GetVersionMetadataInput{})
+			Expect(err).To(Equal(ErrPasswordTokenExpired))
+		})
+	})
+
 	When("license is missing", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
