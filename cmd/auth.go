@@ -24,6 +24,7 @@ func authCmd() *cobra.Command {
 	cmd.AddCommand(loginCmd())
 	cmd.AddCommand(infoCmd())
 	cmd.AddCommand(revokeCmd())
+	cmd.AddCommand(reauthCmd())
 
 	return cmd
 }
@@ -144,6 +145,50 @@ func infoCmd() *cobra.Command {
 				Str("email", output.Account.Email).
 				Bool("success", true).
 				Send()
+
+			return nil
+		},
+	}
+}
+
+func reauthCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "reauth",
+		Short: "Attempt re-signin into iTunes Store (if the login had expired)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			interactive := cmd.Context().Value("interactive").(bool)
+
+			output0, err0 := dependencies.AppStore.AccountInfo()
+			if err0 != nil {
+				return err0
+			}
+
+			// dependencies.Logger.Log().
+			// 	Str("name", output0.Account.Name).
+			// 	Str("email", output0.Account.Email).
+			// 	Bool("success", true).
+			// 	Send()
+
+			output, err := dependencies.AppStore.Login(appstore.LoginInput{
+				Email:    output0.Account.Email,
+				Password: output0.Account.Password,
+				AuthCode: "",
+			})
+			if err != nil {
+				if errors.Is(err, appstore.ErrAuthCodeRequired) && !interactive {
+					dependencies.Logger.Log().Msg("2FA code is required; run the command again and supply a code using the `--auth-code` flag")
+
+					return nil
+				}
+
+				return err
+			}
+
+			dependencies.Logger.Log().
+					Str("name", output.Account.Name).
+					Str("email", output.Account.Email).
+					Bool("success", true).
+					Send()
 
 			return nil
 		},
