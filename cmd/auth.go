@@ -24,6 +24,8 @@ func authCmd() *cobra.Command {
 	cmd.AddCommand(loginCmd())
 	cmd.AddCommand(infoCmd())
 	cmd.AddCommand(revokeCmd())
+	cmd.AddCommand(listAccountsCmd())
+	cmd.AddCommand(switchAccountCmd())
 
 	return cmd
 }
@@ -172,4 +174,71 @@ func revokeCmd() *cobra.Command {
 			return nil
 		},
 	}
+}
+
+func listAccountsCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List saved App Store accounts",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := dependencies.AppStore.AccountsInfo()
+			if err != nil {
+				return err
+			}
+
+			for _, acc := range data.Accounts {
+				dependencies.Logger.Log().
+					Str("name", acc.Name).
+					Str("email", acc.Email)
+			}
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+// IF provider with -e --email, then switch to that account
+// if not provided, list accounts and prompt user to select one
+func switchAccountCmd() *cobra.Command {
+	var email string
+	cmd := &cobra.Command{
+		Use:   "switch",
+		Short: "Switch to a different App Store account",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if email == "" {
+				accounts, err := dependencies.AppStore.AccountsInfo()
+				if err != nil {
+					return errors.New("no saved accounts find, please login first")
+				}
+				if len(accounts.Accounts) == 0 {
+					return errors.New("no saved accounts find, please login first")
+				}
+
+				for i, acc := range accounts.Accounts {
+					fmt.Printf("[%d] %s <%s>\n", i+1, acc.Name, acc.Email)
+				}
+
+				fmt.Print("Select an account by number: ")
+				var selection int
+				_, err = fmt.Scanf("%d", &selection)
+				if err != nil {
+					return fmt.Errorf("failed to read selection: %w", err)
+				}
+				if selection < 1 || selection > len(accounts.Accounts) {
+					return fmt.Errorf("invalid selection")
+				}
+				email = accounts.Accounts[selection-1].Email
+				fmt.Printf("Switching to account: %s\n", email)
+				_, err = dependencies.AppStore.SwitchAccount(email)
+				return err
+			}
+			_, err := dependencies.AppStore.SwitchAccount(email)
+			return err
+		},
+	}
+
+	cmd.Flags().StringVarP(&email, "email", "e", "", "email address for the Apple ID")
+
+	return cmd
 }
