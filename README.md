@@ -40,6 +40,14 @@ $ brew install ipatool
 
 To authenticate with the App Store, use the `auth` command.
 
+> If you're logging in for the first time:
+>
+> ```
+> ipatool auth login -e APPLE_ID_EMAIL -p APPLE_ID_PASSWORD
+> ```
+>
+> 2FA is supported, but no specific error message is thrown if username/password are invalid.
+
 ```
 Authenticate with the App Store
 
