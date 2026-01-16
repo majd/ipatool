@@ -135,16 +135,16 @@ func (t *appstore) replicateSinfFromInfo(info packageInfo, zip *zip.Writer, sinf
 
 func (t *appstore) replicateZip(src *zip.ReadCloser, dst *zip.Writer) error {
 	for _, file := range src.File {
-		srcFile, err := file.OpenRaw()
+		srcFile, err := file.Open()
 		if err != nil {
-			return fmt.Errorf("failed to open raw file: %w", err)
+			return fmt.Errorf("failed to open file: %w", err)
 		}
 
 		header := file.FileHeader
-		dstFile, err := dst.CreateRaw(&header)
+		dstFile, err := dst.CreateHeader(&header)
 
 		if err != nil {
-			return fmt.Errorf("failed to create raw file: %w", err)
+			return fmt.Errorf("failed to create file: %w", err)
 		}
 
 		_, err = io.Copy(dstFile, srcFile)
