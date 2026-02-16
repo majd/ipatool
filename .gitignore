@@ -4,3 +4,4 @@
 .vscode/
 .idea/
 **/*_mock.go
+exp/
