@@ -83,10 +83,16 @@ func loginCmd() *cobra.Command {
 					Str("authCode", util.IfEmpty(authCode, "<nil>")).
 					Msg("logging in")
 
+				bag, err := dependencies.AppStore.Bag(appstore.BagInput{})
+				if err != nil {
+					return fmt.Errorf("failed to get bag: %w", err)
+				}
+
 				output, err := dependencies.AppStore.Login(appstore.LoginInput{
 					Email:    email,
 					Password: password,
 					AuthCode: authCode,
+					Endpoint: bag.AuthEndpoint,
 				})
 				if err != nil {
 					if errors.Is(err, appstore.ErrAuthCodeRequired) && !interactive {
