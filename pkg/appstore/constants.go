@@ -14,6 +14,9 @@ const (
 	iTunesAPIPathSearch = "/search"
 	iTunesAPIPathLookup = "/lookup"
 
+	PrivateInitDomain = "init." + iTunesAPIDomain
+	PrivateInitPath   = "/bag.xml"
+
 	PrivateAppStoreAPIDomainPrefixWithoutAuthCode = "p25"
 	PrivateAppStoreAPIDomainPrefixWithAuthCode    = "p71"
 	PrivateAppStoreAPIDomain                      = "buy." + iTunesAPIDomain

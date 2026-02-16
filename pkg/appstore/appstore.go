@@ -29,6 +29,8 @@ type AppStore interface {
 	ListVersions(input ListVersionsInput) (ListVersionsOutput, error)
 	// GetVersionMetadata returns the metadata for the specified version.
 	GetVersionMetadata(input GetVersionMetadataInput) (GetVersionMetadataOutput, error)
+	// Bag fetches the bag which contains endpoint definitions.
+	Bag(input BagInput) (BagOutput, error)
 }
 
 type appstore struct {
@@ -37,6 +39,7 @@ type appstore struct {
 	searchClient   http.Client[searchResult]
 	purchaseClient http.Client[purchaseResult]
 	downloadClient http.Client[downloadResult]
+	bagClient      http.Client[bagResult]
 	httpClient     http.Client[interface{}]
 	machine        machine.Machine
 	os             operatingsystem.OperatingSystem
@@ -60,6 +63,7 @@ func NewAppStore(args Args) AppStore {
 		searchClient:   http.NewClient[searchResult](clientArgs),
 		purchaseClient: http.NewClient[purchaseResult](clientArgs),
 		downloadClient: http.NewClient[downloadResult](clientArgs),
+		bagClient:      http.NewClient[bagResult](clientArgs),
 		httpClient:     http.NewClient[interface{}](clientArgs),
 		machine:        args.Machine,
 		os:             args.OperatingSystem,
