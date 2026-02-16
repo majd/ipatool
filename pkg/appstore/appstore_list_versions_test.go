@@ -62,6 +62,36 @@ var _ = Describe("AppStore (ListVersions)", func() {
 		})
 	})
 
+	When("request uses a custom pod", func() {
+		const (
+			testPod  = "42"
+			testGUID = "001122334455"
+		)
+
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockDownloadClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					expectedURL := "https://p" + testPod + "-" + PrivateAppStoreAPIDomain + PrivateAppStoreAPIPathDownload + "?guid=" + testGUID
+					Expect(req.URL).To(Equal(expectedURL))
+				}).
+				Return(http.Result[downloadResult]{}, errors.New(""))
+		})
+
+		It("sends the request to the pod-specific host", func() {
+			_, err := as.ListVersions(ListVersionsInput{
+				Account: Account{
+					Pod: testPod,
+				},
+			})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	When("password token is expired", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().

@@ -93,6 +93,40 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 	})
 
+	When("request uses a custom pod", func() {
+		const (
+			testPod  = "42"
+			testGUID = "001122334455"
+		)
+
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					expectedURL := "https://p" + testPod + "-" + PrivateAppStoreAPIDomain + PrivateAppStoreAPIPathPurchase
+					Expect(req.URL).To(Equal(expectedURL))
+					Expect(req.Payload).To(BeAssignableToTypeOf(&http.XMLPayload{}))
+					payload := req.Payload.(*http.XMLPayload)
+					Expect(payload.Content["guid"]).To(Equal(testGUID))
+				}).
+				Return(http.Result[purchaseResult]{}, errors.New(""))
+		})
+
+		It("sends the request to the pod-specific host", func() {
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+					Pod:        testPod,
+				},
+			})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	When("password token is expired", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
