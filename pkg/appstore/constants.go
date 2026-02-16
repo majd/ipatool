@@ -17,11 +17,9 @@ const (
 	PrivateInitDomain = "init." + iTunesAPIDomain
 	PrivateInitPath   = "/bag.xml"
 
-	PrivateAppStoreAPIDomainPrefixWithoutAuthCode = "p25"
-	PrivateAppStoreAPIDomainPrefixWithAuthCode    = "p71"
-	PrivateAppStoreAPIDomain                      = "buy." + iTunesAPIDomain
-	PrivateAppStoreAPIPathPurchase                = "/WebObjects/MZFinance.woa/wa/buyProduct"
-	PrivateAppStoreAPIPathDownload                = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
+	PrivateAppStoreAPIDomain       = "buy." + iTunesAPIDomain
+	PrivateAppStoreAPIPathPurchase = "/WebObjects/MZFinance.woa/wa/buyProduct"
+	PrivateAppStoreAPIPathDownload = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 
 	HTTPHeaderStoreFront = "X-Set-Apple-Store-Front"
 	HTTPHeaderPod        = "pod"
