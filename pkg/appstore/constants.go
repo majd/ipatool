@@ -20,11 +20,11 @@ const (
 	PrivateAppStoreAPIDomainPrefixWithoutAuthCode = "p25"
 	PrivateAppStoreAPIDomainPrefixWithAuthCode    = "p71"
 	PrivateAppStoreAPIDomain                      = "buy." + iTunesAPIDomain
-	PrivateAppStoreAPIPathAuthenticate            = "/WebObjects/MZFinance.woa/wa/authenticate"
 	PrivateAppStoreAPIPathPurchase                = "/WebObjects/MZFinance.woa/wa/buyProduct"
 	PrivateAppStoreAPIPathDownload                = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 
 	HTTPHeaderStoreFront = "X-Set-Apple-Store-Front"
+	HTTPHeaderPod        = "pod"
 
 	PricingParameterAppStore    = "STDQ"
 	PricingParameterAppleArcade = "GAME"

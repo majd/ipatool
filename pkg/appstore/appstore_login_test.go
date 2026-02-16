@@ -20,6 +20,7 @@ var _ = Describe("AppStore (Login)", func() {
 		testEmail     = "test-email"
 		testFirstName = "test-first-name"
 		testLastName  = "test-last-name"
+		testPod       = "42"
 	)
 
 	var (
@@ -165,7 +166,7 @@ var _ = Describe("AppStore (Login)", func() {
 
 		When("store API redirects", func() {
 			const (
-				testRedirectLocation = "https://" + PrivateAppStoreAPIDomain + PrivateAppStoreAPIPathAuthenticate + "?PRH=31&Pod=31"
+				testRedirectLocation = "https://test-redirect-url.com"
 			)
 
 			BeforeEach(func() {
@@ -230,7 +231,10 @@ var _ = Describe("AppStore (Login)", func() {
 					Send(gomock.Any()).
 					Return(http.Result[loginResult]{
 						StatusCode: 200,
-						Headers:    map[string]string{HTTPHeaderStoreFront: testStoreFront},
+						Headers: map[string]string{
+							HTTPHeaderStoreFront: testStoreFront,
+							HTTPHeaderPod:        testPod,
+						},
 						Data: loginResult{
 							PasswordToken:       testPasswordToken,
 							DirectoryServicesID: testDirectoryServicesID,
@@ -257,6 +261,7 @@ var _ = Describe("AppStore (Login)", func() {
 								Password:            testPassword,
 								DirectoryServicesID: testDirectoryServicesID,
 								StoreFront:          testStoreFront,
+								Pod:                 testPod,
 							}
 
 							var got Account
@@ -287,6 +292,7 @@ var _ = Describe("AppStore (Login)", func() {
 								Password:            testPassword,
 								DirectoryServicesID: testDirectoryServicesID,
 								StoreFront:          testStoreFront,
+								Pod:                 testPod,
 							}
 
 							var got Account

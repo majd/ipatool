@@ -20,6 +20,7 @@ type LoginInput struct {
 	Email    string
 	Password string
 	AuthCode string
+	Endpoint string
 }
 
 type LoginOutput struct {
@@ -34,7 +35,7 @@ func (t *appstore) Login(input LoginInput) (LoginOutput, error) {
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	acc, err := t.login(input.Email, input.Password, input.AuthCode, guid)
+	acc, err := t.login(input.Email, input.Password, input.AuthCode, guid, input.Endpoint)
 	if err != nil {
 		return LoginOutput{}, err
 	}
@@ -62,7 +63,7 @@ type loginResult struct {
 	PasswordToken       string             `plist:"passwordToken,omitempty"`
 }
 
-func (t *appstore) login(email, password, authCode, guid string) (Account, error) {
+func (t *appstore) login(email, password, authCode, guid, endpoint string) (Account, error) {
 	redirect := ""
 
 	var (
@@ -73,7 +74,7 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 	retry := true
 
 	for attempt := 1; retry && attempt <= 4; attempt++ {
-		request := t.loginRequest(email, password, authCode, guid, attempt)
+		request := t.loginRequest(email, password, authCode, guid, endpoint, attempt)
 		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
 
@@ -95,6 +96,11 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 		return Account{}, NewErrorWithMetadata(fmt.Errorf("failed to get storefront header: %w", err), res)
 	}
 
+	pod, err := res.GetHeader(HTTPHeaderPod)
+	if err != nil && !errors.Is(err, http.ErrHeaderNotFound) {
+		return Account{}, NewErrorWithMetadata(fmt.Errorf("failed to get pod header: %w", err), res)
+	}
+
 	addr := res.Data.Account.Address
 	acc := Account{
 		Name:                strings.Join([]string{addr.FirstName, addr.LastName}, " "),
@@ -103,6 +109,7 @@ func (t *appstore) login(email, password, authCode, guid string) (Account, error
 		DirectoryServicesID: res.Data.DirectoryServicesID,
 		StoreFront:          sf,
 		Password:            password,
+		Pod:                 pod,
 	}
 
 	data, err := json.Marshal(acc)
@@ -150,10 +157,10 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 	return retry, redirect, err
 }
 
-func (t *appstore) loginRequest(email, password, authCode, guid string, attempt int) http.Request {
+func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string, attempt int) http.Request {
 	return http.Request{
 		Method:         http.MethodPOST,
-		URL:            fmt.Sprintf("https://%s%s", PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathAuthenticate),
+		URL:            endpoint,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",
