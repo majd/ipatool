@@ -29,15 +29,19 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	if err != nil {
 		return errors.New("failed to open zip reader")
 	}
+	defer zipReader.Close()
 
 	tmpPath := fmt.Sprintf("%s.tmp", input.PackagePath)
-	tmpFile, err := t.os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY, 0644)
 
+	tmpFile, err := t.os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 
+	defer tmpFile.Close()
+
 	zipWriter := zip.NewWriter(tmpFile)
+	defer zipWriter.Close()
 
 	err = t.replicateZip(zipReader, zipWriter)
 	if err != nil {
@@ -68,10 +72,6 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	if err != nil {
 		return fmt.Errorf("failed to replicate sinf: %w", err)
 	}
-
-	zipReader.Close()
-	zipWriter.Close()
-	tmpFile.Close()
 
 	err = t.os.Remove(input.PackagePath)
 	if err != nil {
@@ -163,6 +163,7 @@ func (*appstore) readInfoPlist(reader *zip.ReadCloser) (*packageInfo, error) {
 			if err != nil {
 				return nil, fmt.Errorf("failed to open file: %w", err)
 			}
+			defer src.Close()
 
 			data := new(bytes.Buffer)
 			_, err = io.Copy(data, src)
@@ -192,6 +193,7 @@ func (*appstore) readManifestPlist(reader *zip.ReadCloser) (*packageManifest, er
 			if err != nil {
 				return nil, fmt.Errorf("failed to open file: %w", err)
 			}
+			defer src.Close()
 
 			data := new(bytes.Buffer)
 			_, err = io.Copy(data, src)
