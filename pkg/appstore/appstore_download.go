@@ -264,6 +264,7 @@ func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst s
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
+	defer dstFile.Close()
 
 	dstZip := zip.NewWriter(dstFile)
 	defer dstZip.Close()
