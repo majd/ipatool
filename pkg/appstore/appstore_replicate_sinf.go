@@ -29,7 +29,11 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	if err != nil {
 		return errors.New("failed to open zip reader")
 	}
-	defer zipReader.Close()
+	defer func() {
+		if zipReader != nil {
+			_ = zipReader.Close()
+		}
+	}()
 
 	tmpPath := fmt.Sprintf("%s.tmp", input.PackagePath)
 
@@ -38,10 +42,18 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 
-	defer tmpFile.Close()
+	defer func() {
+		if tmpFile != nil {
+			_ = tmpFile.Close()
+		}
+	}()
 
 	zipWriter := zip.NewWriter(tmpFile)
-	defer zipWriter.Close()
+	defer func() {
+		if zipWriter != nil {
+			_ = zipWriter.Close()
+		}
+	}()
 
 	err = t.replicateZip(zipReader, zipWriter)
 	if err != nil {
@@ -72,6 +84,27 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	if err != nil {
 		return fmt.Errorf("failed to replicate sinf: %w", err)
 	}
+
+	err = zipWriter.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close zip writer: %w", err)
+	}
+
+	zipWriter = nil
+
+	err = tmpFile.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	tmpFile = nil
+
+	err = zipReader.Close()
+	if err != nil {
+		return fmt.Errorf("failed to close zip reader: %w", err)
+	}
+
+	zipReader = nil
 
 	err = t.os.Remove(input.PackagePath)
 	if err != nil {
