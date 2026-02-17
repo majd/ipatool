@@ -203,7 +203,7 @@ func (*appstore) copyRawZipFile(file *zip.File, dst *zip.Writer) error {
 
 func (*appstore) readInfoPlist(reader *zip.ReadCloser) (*packageInfo, error) {
 	for _, file := range reader.File {
-		if strings.Contains(file.Name, ".app/Info.plist") {
+		if strings.Contains(file.Name, ".app/Info.plist") && !strings.Contains(file.Name, "/Watch/") {
 			src, err := file.Open()
 			if err != nil {
 				return nil, fmt.Errorf("failed to open file: %w", err)
