@@ -135,33 +135,34 @@ func (t *appstore) replicateSinfFromInfo(info packageInfo, zip *zip.Writer, sinf
 
 func (t *appstore) replicateZip(src *zip.ReadCloser, dst *zip.Writer) error {
 	for _, file := range src.File {
-		err := func() error {
-			srcFile, err := file.OpenRaw()
-			if err != nil {
-				return fmt.Errorf("failed to open raw file: %w", err)
-			}
-			if srcCloser, ok := srcFile.(io.Closer); ok {
-				defer srcCloser.Close()
-			}
-
-			header := file.FileHeader
-			dstFile, err := dst.CreateRaw(&header)
-
-			if err != nil {
-				return fmt.Errorf("failed to create raw file: %w", err)
-			}
-
-			_, err = io.Copy(dstFile, srcFile)
-			if err != nil {
-				return fmt.Errorf("failed to copy file: %w", err)
-			}
-
-			return nil
-		}()
-
+		err := t.copyRawZipFile(file, dst)
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (*appstore) copyRawZipFile(file *zip.File, dst *zip.Writer) error {
+	srcFile, err := file.OpenRaw()
+	if err != nil {
+		return fmt.Errorf("failed to open raw file: %w", err)
+	}
+
+	if srcCloser, ok := srcFile.(io.Closer); ok {
+		defer srcCloser.Close()
+	}
+
+	header := file.FileHeader
+	dstFile, err := dst.CreateRaw(&header)
+	if err != nil {
+		return fmt.Errorf("failed to create raw file: %w", err)
+	}
+
+	_, err = io.Copy(dstFile, srcFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
 	}
 
 	return nil
