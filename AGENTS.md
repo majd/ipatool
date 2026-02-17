@@ -11,16 +11,19 @@ This file provides guidance for coding agents working in this repository.
 ## Development workflow
 1. Keep changes focused and minimal.
 2. Prefer idiomatic Go and keep command behavior consistent with existing commands in `cmd/`.
-3. Run formatting and tests before finalizing changes.
+3. Run formatting, linting, and tests before finalizing changes.
 
 ## Local checks
 Use these commands from the repository root:
 
 ```bash
 go generate ./...
+golangci-lint run ./...
 go test ./...
 go build ./...
 ```
+
+`golangci-lint run ./...` must pass before considering the test/build checks as passed.
 
 ## Coding conventions
 - Follow standard Go formatting (`gofmt`).

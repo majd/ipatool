@@ -29,6 +29,7 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 	if err != nil {
 		return errors.New("failed to open zip reader")
 	}
+
 	defer func() {
 		if zipReader != nil {
 			_ = zipReader.Close()
@@ -189,6 +190,7 @@ func (*appstore) copyRawZipFile(file *zip.File, dst *zip.Writer) error {
 
 	header := file.FileHeader
 	dstFile, err := dst.CreateRaw(&header)
+
 	if err != nil {
 		return fmt.Errorf("failed to create raw file: %w", err)
 	}
