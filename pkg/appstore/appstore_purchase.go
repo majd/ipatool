@@ -72,7 +72,9 @@ func (t *appstore) purchaseWithParams(acc Account, app App, guid string, pricing
 		return ErrSubscriptionRequired
 	}
 
-	if res.Data.FailureType == FailureTypePasswordTokenExpired || res.Data.FailureType == FailureTypeSignInRequired {
+	if res.Data.FailureType == FailureTypePasswordTokenExpired ||
+		res.Data.FailureType == FailureTypeSignInRequired ||
+		res.Data.CustomerMessage == CustomerMessagePasswordChanged {
 		return ErrPasswordTokenExpired
 	}
 

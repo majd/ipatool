@@ -10,6 +10,7 @@ const (
 	CustomerMessageBadLogin             = "MZFinance.BadLogin.Configurator_message"
 	CustomerMessageAccountDisabled      = "Your account is disabled."
 	CustomerMessageSubscriptionRequired = "Subscription Required"
+	CustomerMessagePasswordChanged      = "Your password has changed."
 
 	iTunesAPIDomain     = "itunes.apple.com"
 	iTunesAPIPathSearch = "/search"
@@ -18,9 +19,10 @@ const (
 	PrivateInitDomain = "init." + iTunesAPIDomain
 	PrivateInitPath   = "/bag.xml"
 
-	PrivateAppStoreAPIDomain       = "buy." + iTunesAPIDomain
-	PrivateAppStoreAPIPathPurchase = "/WebObjects/MZFinance.woa/wa/buyProduct"
-	PrivateAppStoreAPIPathDownload = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
+	PrivateAppStoreAPIDomain           = "buy." + iTunesAPIDomain
+	PrivateAppStoreAPIPathAuthenticate = "https://" + PrivateAppStoreAPIDomain + "/WebObjects/MZFinance.woa/wa/authenticate"
+	PrivateAppStoreAPIPathPurchase     = "/WebObjects/MZFinance.woa/wa/buyProduct"
+	PrivateAppStoreAPIPathDownload     = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 
 	HTTPHeaderStoreFront = "X-Set-Apple-Store-Front"
 	HTTPHeaderPod        = "pod"

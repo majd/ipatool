@@ -85,7 +85,7 @@ var _ = Describe("AppStore (Bag)", func() {
 		})
 	})
 
-	When("request is successful", func() {
+	When("request is successful with authenticateAccount in urlBag", func() {
 		const testAuthEndpoint = "https://example.com"
 
 		BeforeEach(func() {
@@ -115,6 +115,27 @@ var _ = Describe("AppStore (Bag)", func() {
 			out, err := as.Bag(BagInput{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out.AuthEndpoint).To(Equal(testAuthEndpoint))
+		})
+	})
+
+	When("request is successful but authenticateAccount is empty", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("aa:bb:cc:dd:ee:ff", nil)
+
+			mockBagClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[bagResult]{
+					StatusCode: gohttp.StatusOK,
+					Data:       bagResult{},
+				}, nil)
+		})
+
+		It("falls back to hardcoded auth endpoint", func() {
+			out, err := as.Bag(BagInput{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out.AuthEndpoint).To(Equal(PrivateAppStoreAPIPathAuthenticate))
 		})
 	})
 })

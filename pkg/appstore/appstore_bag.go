@@ -32,8 +32,13 @@ func (t *appstore) Bag(input BagInput) (BagOutput, error) {
 		return BagOutput{}, fmt.Errorf("received unexpected status code: %d", res.StatusCode)
 	}
 
+	authEndpoint := res.Data.URLBag.AuthEndpoint
+	if authEndpoint == "" {
+		authEndpoint = PrivateAppStoreAPIPathAuthenticate
+	}
+
 	return BagOutput{
-		AuthEndpoint: res.Data.URLBag.AuthEndpoint,
+		AuthEndpoint: authEndpoint,
 	}, nil
 }
 
