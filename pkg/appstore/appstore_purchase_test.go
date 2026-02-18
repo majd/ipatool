@@ -177,6 +177,32 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 	})
 
+	When("customer message indicates password has changed", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[purchaseResult]{
+					Data: purchaseResult{
+						FailureType:     "some_other_failure",
+						CustomerMessage: CustomerMessagePasswordChanged,
+					},
+				}, nil)
+		})
+
+		It("returns password token expired error", func() {
+			err := as.Purchase(PurchaseInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+			})
+			Expect(err).To(MatchError(ErrPasswordTokenExpired))
+		})
+	})
+
 	When("store API returns customer error message", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().

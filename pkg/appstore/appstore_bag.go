@@ -34,7 +34,7 @@ func (t *appstore) Bag(input BagInput) (BagOutput, error) {
 
 	authEndpoint := res.Data.URLBag.AuthEndpoint
 	if authEndpoint == "" {
-		authEndpoint = PrivateAppStoreAPIPathAuthenticate
+		authEndpoint = fmt.Sprintf("https://%s%s", PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathAuthenticate)
 	}
 
 	return BagOutput{
