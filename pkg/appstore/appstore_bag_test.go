@@ -132,10 +132,10 @@ var _ = Describe("AppStore (Bag)", func() {
 				}, nil)
 		})
 
-		It("falls back to hardcoded auth endpoint", func() {
+		It("returns empty auth endpoint", func() {
 			out, err := as.Bag(BagInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(out.AuthEndpoint).To(Equal("https://" + PrivateAppStoreAPIDomain + PrivateAppStoreAPIPathAuthenticate))
+			Expect(out.AuthEndpoint).To(BeEmpty())
 		})
 	})
 })
