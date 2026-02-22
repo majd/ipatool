@@ -72,7 +72,7 @@ func downloadCmd() *cobra.Command {
 
 				if errors.Is(lastErr, appstore.ErrLicenseRequired) {
 					err := dependencies.AppStore.Purchase(appstore.PurchaseInput{Account: acc, App: app})
-					if err != nil {
+					if err != nil && !errors.Is(err, appstore.ErrLicenseAlreadyExists) {
 						return err
 					}
 					purchased = true

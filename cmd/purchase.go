@@ -53,11 +53,14 @@ func purchaseCmd() *cobra.Command {
 				}
 
 				err = dependencies.AppStore.Purchase(appstore.PurchaseInput{Account: acc, App: lookupResult.App})
-				if err != nil {
+				if err != nil && !errors.Is(err, appstore.ErrLicenseAlreadyExists) {
 					return err
 				}
 
-				dependencies.Logger.Log().Bool("success", true).Send()
+				dependencies.Logger.Log().
+					Bool("alreadyOwned", errors.Is(err, appstore.ErrLicenseAlreadyExists)).
+					Bool("success", true).
+					Send()
 
 				return nil
 			},
