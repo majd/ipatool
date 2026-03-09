@@ -69,8 +69,6 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 }
 
 func (t *appstore) getVersionMetadataRequest(acc Account, app App, guid string, version string) http.Request {
-	host := fmt.Sprintf("%s-%s", PrivateAppStoreAPIDomainPrefixWithoutAuthCode, PrivateAppStoreAPIDomain)
-
 	payload := map[string]interface{}{
 		"creditDisplay":     "",
 		"guid":              guid,
@@ -78,8 +76,13 @@ func (t *appstore) getVersionMetadataRequest(acc Account, app App, guid string, 
 		"externalVersionId": version,
 	}
 
+	podPrefix := ""
+	if acc.Pod != "" {
+		podPrefix = "p" + acc.Pod + "-"
+	}
+
 	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s?guid=%s", host, PrivateAppStoreAPIPathDownload, guid),
+		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{

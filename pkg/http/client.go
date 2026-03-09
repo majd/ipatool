@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 
 	"howett.net/plist"
@@ -13,6 +14,12 @@ import (
 
 const (
 	appStoreAuthURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
+)
+
+var (
+	documentXMLPattern = regexp.MustCompile(`(?is)<Document\b[^>]*>(.*)</Document>`)
+	plistXMLPattern    = regexp.MustCompile(`(?is)<plist\b[^>]*>.*?</plist>`)
+	dictXMLPattern     = regexp.MustCompile(`(?is)<dict\b[^>]*>.*</dict>`)
 )
 
 //go:generate go run go.uber.org/mock/mockgen -source=client.go -destination=client_mock.go -package=http
@@ -155,7 +162,9 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 
 	var data R
 
-	_, err = plist.Unmarshal(body, &data)
+	normalizedBody := normalizeXMLPlistBody(body)
+
+	_, err = plist.Unmarshal(normalizedBody, &data)
 	if err != nil {
 		return Result[R]{}, fmt.Errorf("failed to unmarshal xml: %w", err)
 	}
@@ -170,4 +179,61 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 		Headers:    headers,
 		Data:       data,
 	}, nil
+}
+
+func normalizeXMLPlistBody(body []byte) []byte {
+	normalized := bytes.TrimSpace(body)
+	if len(normalized) == 0 {
+		return normalized
+	}
+
+	if documentBody := extractDocumentInnerBody(normalized); len(documentBody) > 0 {
+		normalized = documentBody
+	}
+
+	if embeddedPlist := extractEmbeddedPlist(normalized); len(embeddedPlist) > 0 {
+		normalized = embeddedPlist
+	}
+
+	if dictBody := extractEmbeddedDict(normalized); len(dictBody) > 0 {
+		return dictBody
+	}
+
+	if bytes.Contains(normalized, []byte("<key>")) {
+		return []byte("<dict>" + string(normalized) + "</dict>")
+	}
+
+	return normalized
+}
+
+func extractEmbeddedPlist(body []byte) []byte {
+	plistMatch := plistXMLPattern.Find(body)
+	if len(plistMatch) == 0 {
+		return nil
+	}
+
+	return bytes.TrimSpace(plistMatch)
+}
+
+func extractEmbeddedDict(body []byte) []byte {
+	dictMatch := dictXMLPattern.Find(body)
+	if len(dictMatch) == 0 {
+		return nil
+	}
+
+	return bytes.TrimSpace(dictMatch)
+}
+
+func extractDocumentInnerBody(body []byte) []byte {
+	documentMatch := documentXMLPattern.FindSubmatch(body)
+	if len(documentMatch) < 2 {
+		return nil
+	}
+
+	documentBody := bytes.TrimSpace(documentMatch[1])
+	if len(documentBody) == 0 {
+		return nil
+	}
+
+	return documentBody
 }
