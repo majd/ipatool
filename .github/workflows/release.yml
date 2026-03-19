@@ -142,7 +142,7 @@ jobs:
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-linux-${{ matrix.arch }}
           path: bin
-      - run: tar -czvf $FILE.tar.gz bin/$FILE
+      - run: chmod +x bin/$FILE && tar -czvf $FILE.tar.gz bin/$FILE
         env:
           FILE: ipatool-${{ needs.get_version.outputs.version }}-linux-${{ matrix.arch }}
       - run: ./tools/sha256sum.sh $TARBALL > $TARBALL.sha256sum
@@ -167,14 +167,14 @@ jobs:
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-macos-arm64
           path: bin
-      - run: tar -czvf $BIN.tar.gz bin/$BIN && rm -rf bin/
+      - run: chmod +x bin/$BIN && tar -czvf $BIN.tar.gz bin/$BIN && rm -rf bin/
         env:
           BIN: ipatool-${{ needs.get_version.outputs.version }}-macos-arm64
       - uses: actions/download-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-macos-amd64
           path: bin
-      - run: tar -czvf $FILE.tar.gz bin/$FILE && rm -rf bin/
+      - run: chmod +x bin/$FILE && tar -czvf $FILE.tar.gz bin/$FILE && rm -rf bin/
         env:
           FILE: ipatool-${{ needs.get_version.outputs.version }}-macos-amd64
       - id: sha256

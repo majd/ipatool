@@ -96,8 +96,13 @@ func (t *appstore) purchaseWithParams(acc Account, app App, guid string, pricing
 }
 
 func (t *appstore) purchaseRequest(acc Account, app App, storeFront, guid string, pricingParameters string) http.Request {
+	podPrefix := ""
+	if acc.Pod != "" {
+		podPrefix = "p" + acc.Pod + "-"
+	}
+
 	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s", PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathPurchase),
+		URL:            fmt.Sprintf("https://%s%s%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathPurchase),
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
