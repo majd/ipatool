@@ -1,6 +1,6 @@
 package keychain
 
-import "github.com/99designs/keyring"
+import "github.com/byteness/keyring"
 
 //go:generate go run go.uber.org/mock/mockgen -source=keyring.go -destination=keyring_mock.go -package keychain
 type Keyring interface {

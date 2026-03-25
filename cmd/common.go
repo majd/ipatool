@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/99designs/keyring"
+	"github.com/byteness/keyring"
 	cookiejar "github.com/juju/persistent-cookiejar"
 	"github.com/majd/ipatool/v2/pkg/appstore"
 	"github.com/majd/ipatool/v2/pkg/http"

@@ -3,7 +3,7 @@ package keychain
 import (
 	"fmt"
 
-	"github.com/99designs/keyring"
+	"github.com/byteness/keyring"
 )
 
 func (k *keychain) Set(key string, data []byte) error {
