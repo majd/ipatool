@@ -46,8 +46,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		return DownloadOutput{}, fmt.Errorf("failed to send http request: %w", err)
 	}
 
-	if (res.Data.FailureType == FailureTypePasswordTokenExpired ||
-	   res.Data.FailureType == FailureTypeSignInRequired) {
+	if res.Data.FailureType == FailureTypePasswordTokenExpired || res.Data.FailureType == FailureTypeSignInRequired {
 		return DownloadOutput{}, ErrPasswordTokenExpired
 	}
 

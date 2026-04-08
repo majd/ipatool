@@ -33,8 +33,7 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 		return ListVersionsOutput{}, fmt.Errorf("failed to send http request: %w", err)
 	}
 
-	if (res.Data.FailureType == FailureTypePasswordTokenExpired ||
-	   res.Data.FailureType == FailureTypeSignInRequired) {
+	if res.Data.FailureType == FailureTypePasswordTokenExpired || res.Data.FailureType == FailureTypeSignInRequired {
 		return ListVersionsOutput{}, ErrPasswordTokenExpired
 	}
 
