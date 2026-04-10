@@ -4,7 +4,6 @@ const (
 	FailureTypeInvalidCredentials     = "-5000"
 	FailureTypePasswordTokenExpired   = "2034"
 	FailureTypeSignInRequired         = "2042"
-
 	FailureTypeLicenseNotFound        = "9610"
 	FailureTypeTemporarilyUnavailable = "2059"
 
