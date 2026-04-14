@@ -1,16 +1,20 @@
 package cmd
 
 import (
+	"context"
 	"errors"
 	"reflect"
 
 	"github.com/majd/ipatool/v2/pkg/appstore"
 	"github.com/spf13/cobra"
 	"github.com/thediveo/enumflag/v2"
-	"golang.org/x/net/context"
 )
 
 var version = "dev"
+
+type contextKey string
+
+const interactiveKey contextKey = "interactive"
 
 func rootCmd() *cobra.Command {
 	var (
@@ -26,7 +30,7 @@ func rootCmd() *cobra.Command {
 		SilenceUsage:  true,
 		Version:       version,
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
-			ctx := context.WithValue(context.Background(), "interactive", !nonInteractive)
+			ctx := context.WithValue(context.Background(), interactiveKey, !nonInteractive)
 			cmd.SetContext(ctx)
 			initWithCommand(cmd)
 		},

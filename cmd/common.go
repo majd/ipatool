@@ -99,7 +99,7 @@ func newKeychain(machine machine.Machine, logger log.Logger, interactive bool) k
 // initWithCommand initializes the dependencies of the command.
 func initWithCommand(cmd *cobra.Command) {
 	verbose := cmd.Flag("verbose").Value.String() == "true"
-	interactive, _ := cmd.Context().Value("interactive").(bool)
+	interactive, _ := cmd.Context().Value(interactiveKey).(bool)
 	format := util.Must(OutputFormatFromString(cmd.Flag("format").Value.String()))
 
 	dependencies.Logger = newLogger(format, verbose)
