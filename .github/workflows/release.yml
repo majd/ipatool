@@ -18,8 +18,8 @@ jobs:
     name: Run tests
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.25.0"
           cache: true
@@ -30,8 +30,8 @@ jobs:
     runs-on: macos-latest
     needs: [get_version, test]
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-go@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: "1.25.0"
           cache: true
@@ -110,7 +110,7 @@ jobs:
       matrix:
         arch: [arm64, amd64]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-windows-${{ matrix.arch }}.exe
@@ -137,7 +137,7 @@ jobs:
       matrix:
         arch: [arm64, amd64]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           name: ipatool-${{ needs.get_version.outputs.version }}-linux-${{ matrix.arch }}
@@ -160,7 +160,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [get_version, build, release_windows, release_linux]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           path: ./ipatool
       - uses: actions/download-artifact@v4
@@ -192,7 +192,7 @@ jobs:
           tag: ${{ github.ref }}
           overwrite: false
           file_glob: true
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           repository: ${{ secrets.HOMEBREW_REPO }}
           ref: main
