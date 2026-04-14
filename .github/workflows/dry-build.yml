@@ -25,20 +25,23 @@ jobs:
           GOARCH: ${{ matrix.arch }}
   build_linux:
     name: Build for Linux
-    runs-on: macos-latest
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, amd64]
+        include:
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+          - arch: amd64
+            runner: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.0"
           cache: true
-      - run: go build -o ipatool-$GOOS-$GOARCH
+      - run: go build -o ipatool-linux-$GOARCH
         env:
-          GOOS: linux
           GOARCH: ${{ matrix.arch }}
   build_macos:
     name: Build for macOS
@@ -57,5 +60,6 @@ jobs:
         env:
           GOOS: darwin
           GOARCH: ${{ matrix.arch }}
+          CGO_ENABLED: 1
           CGO_CFLAGS: -mmacosx-version-min=10.15
           CGO_LDFLAGS: -mmacosx-version-min=10.15
