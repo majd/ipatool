@@ -84,6 +84,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	}
 
 	tmpPath := fmt.Sprintf("%s.tmp", destination)
+
 	err = t.downloadFile(item.URL, tmpPath, input.Progress)
 	if err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to download file: %w", err)

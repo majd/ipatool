@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -42,10 +43,15 @@ func downloadCmd() *cobra.Command {
 				acc = infoResult.Account
 
 				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
+					bagOutput, err := dependencies.AppStore.Bag(appstore.BagInput{})
+					if err != nil {
+						return fmt.Errorf("failed to get bag: %w", err)
+					}
+
 					loginResult, err := dependencies.AppStore.Login(appstore.LoginInput{
 						Email:    acc.Email,
 						Password: acc.Password,
-						Endpoint: appstore.DefaultAuthEndpoint,
+						Endpoint: bagOutput.AuthEndpoint,
 					})
 					if err != nil {
 						return err
