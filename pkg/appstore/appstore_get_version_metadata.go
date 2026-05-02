@@ -57,15 +57,15 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 
 	item := res.Data.Items[0]
 
-	releaseDate, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", item.Metadata["releaseDate"]))
+	// Do not fall back to item.Metadata here. The App Store download API can
+	// return stale version and release date values, so the IPA Info.plist is the
+	// source of truth and failures should be visible to callers.
+	metadata, err := t.readVersionMetadataFromIPA(item.URL)
 	if err != nil {
-		return GetVersionMetadataOutput{}, fmt.Errorf("failed to parse release date: %w", err)
+		return GetVersionMetadataOutput{}, fmt.Errorf("failed to read version metadata: %w", err)
 	}
 
-	return GetVersionMetadataOutput{
-		DisplayVersion: fmt.Sprintf("%v", item.Metadata["bundleShortVersionString"]),
-		ReleaseDate:    releaseDate,
-	}, nil
+	return GetVersionMetadataOutput(metadata), nil
 }
 
 func (t *appstore) getVersionMetadataRequest(acc Account, app App, guid string, version string) http.Request {
