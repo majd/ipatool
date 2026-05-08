@@ -20,6 +20,7 @@ func downloadCmd() *cobra.Command {
 		appID             int64
 		bundleID          string
 		externalVersionID string
+		country           string
 	)
 
 	cmd := &cobra.Command{
@@ -36,13 +37,19 @@ func downloadCmd() *cobra.Command {
 
 			return retry.Do(func() error {
 				infoResult, err := dependencies.AppStore.AccountInfo()
-				if err != nil {
-					return err
+				if err == nil {
+					acc = infoResult.Account
 				}
 
-				acc = infoResult.Account
+				if country == "" && acc.StoreFront == "" {
+					country = "US"
+				}
 
 				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
+					if acc.Email == "" {
+						return errors.New("login is required to download apps; please use the \"auth login\" command")
+					}
+
 					bagOutput, err := dependencies.AppStore.Bag(appstore.BagInput{})
 					if err != nil {
 						return fmt.Errorf("failed to get bag: %w", err)
@@ -62,12 +69,20 @@ func downloadCmd() *cobra.Command {
 
 				app := appstore.App{ID: appID}
 				if bundleID != "" {
-					lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{Account: acc, BundleID: bundleID})
+					lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{
+						Account:     acc,
+						BundleID:    bundleID,
+						CountryCode: country,
+					})
 					if err != nil {
 						return err
 					}
 
 					app = lookupResult.App
+				}
+
+				if acc.Email == "" {
+					return errors.New("login is required to download apps; please use the \"auth login\" command")
 				}
 
 				if errors.Is(lastErr, appstore.ErrLicenseRequired) {
@@ -81,7 +96,7 @@ func downloadCmd() *cobra.Command {
 						Msg("purchase")
 				}
 
-				interactive, _ := cmd.Context().Value("interactive").(bool)
+				interactive, _ := cmd.Context().Value(interactiveKey).(bool)
 				var progress *progressbar.ProgressBar
 				if interactive {
 					progress = progressbar.NewOptions64(1,
@@ -103,6 +118,9 @@ func downloadCmd() *cobra.Command {
 				out, err := dependencies.AppStore.Download(appstore.DownloadInput{
 					Account: acc, App: app, OutputPath: outputPath, Progress: progress, ExternalVersionID: externalVersionID})
 				if err != nil {
+					if errors.Is(err, appstore.ErrLicenseRequired) && !acquireLicense {
+						return fmt.Errorf("%w; please use the \"--purchase\" flag to obtain a license for this app", err)
+					}
 					return err
 				}
 
@@ -145,6 +163,7 @@ func downloadCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "The destination path of the downloaded app package")
 	cmd.Flags().StringVar(&externalVersionID, "external-version-id", "", "External version identifier of the target iOS app (defaults to latest version when not specified)")
 	cmd.Flags().BoolVar(&acquireLicense, "purchase", false, "Obtain a license for the app if needed")
+	cmd.Flags().StringVarP(&country, "country", "c", "", "Country code to use for lookup (e.g. US, GB); defaults to the account's country")
 
 	return cmd
 }

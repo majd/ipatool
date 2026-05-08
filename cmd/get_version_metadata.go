@@ -16,6 +16,7 @@ func getVersionMetadataCmd() *cobra.Command {
 		appID             int64
 		bundleID          string
 		externalVersionID string
+		country           string
 	)
 
 	cmd := &cobra.Command{
@@ -31,13 +32,19 @@ func getVersionMetadataCmd() *cobra.Command {
 
 			return retry.Do(func() error {
 				infoResult, err := dependencies.AppStore.AccountInfo()
-				if err != nil {
-					return err
+				if err == nil {
+					acc = infoResult.Account
 				}
 
-				acc = infoResult.Account
+				if country == "" && acc.StoreFront == "" {
+					country = "US"
+				}
 
 				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
+					if acc.Email == "" {
+						return errors.New("login is required to get version metadata; please use the \"auth login\" command")
+					}
+
 					bagOutput, err := dependencies.AppStore.Bag(appstore.BagInput{})
 					if err != nil {
 						return fmt.Errorf("failed to get bag: %w", err)
@@ -57,12 +64,20 @@ func getVersionMetadataCmd() *cobra.Command {
 
 				app := appstore.App{ID: appID}
 				if bundleID != "" {
-					lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{Account: acc, BundleID: bundleID})
+					lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{
+						Account:     acc,
+						BundleID:    bundleID,
+						CountryCode: country,
+					})
 					if err != nil {
 						return err
 					}
 
 					app = lookupResult.App
+				}
+
+				if acc.Email == "" {
+					return errors.New("login is required to get version metadata; please use the \"auth login\" command")
 				}
 
 				out, err := dependencies.AppStore.GetVersionMetadata(appstore.GetVersionMetadataInput{
@@ -99,6 +114,7 @@ func getVersionMetadataCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target iOS app (required)")
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (overrides the app ID)")
 	cmd.Flags().StringVar(&externalVersionID, "external-version-id", "", "External version identifier of the target iOS app (required)")
+	cmd.Flags().StringVarP(&country, "country", "c", "", "Country code to use for lookup (e.g. US, GB); defaults to the account's country")
 
 	_ = cmd.MarkFlagRequired("external-version-id")
 

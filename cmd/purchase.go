@@ -12,7 +12,10 @@ import (
 
 // nolint:wrapcheck
 func purchaseCmd() *cobra.Command {
-	var bundleID string
+	var (
+		bundleID string
+		country  string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "purchase",
@@ -23,13 +26,19 @@ func purchaseCmd() *cobra.Command {
 
 			return retry.Do(func() error {
 				infoResult, err := dependencies.AppStore.AccountInfo()
-				if err != nil {
-					return err
+				if err == nil {
+					acc = infoResult.Account
 				}
 
-				acc = infoResult.Account
+				if country == "" && acc.StoreFront == "" {
+					country = "US"
+				}
 
 				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
+					if acc.Email == "" {
+						return errors.New("login is required to purchase apps; please use the \"auth login\" command")
+					}
+
 					bagOutput, err := dependencies.AppStore.Bag(appstore.BagInput{})
 					if err != nil {
 						return fmt.Errorf("failed to get bag: %w", err)
@@ -47,9 +56,17 @@ func purchaseCmd() *cobra.Command {
 					acc = loginResult.Account
 				}
 
-				lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{Account: acc, BundleID: bundleID})
+				lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{
+					Account:     acc,
+					BundleID:    bundleID,
+					CountryCode: country,
+				})
 				if err != nil {
 					return err
+				}
+
+				if acc.Email == "" {
+					return errors.New("login is required to purchase apps; please use the \"auth login\" command")
 				}
 
 				err = dependencies.AppStore.Purchase(appstore.PurchaseInput{Account: acc, App: lookupResult.App})
@@ -78,6 +95,7 @@ func purchaseCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "Bundle identifier of the target iOS app (required)")
+	cmd.Flags().StringVarP(&country, "country", "c", "", "Country code to use for lookup (e.g. US, GB); defaults to the account's country")
 	_ = cmd.MarkFlagRequired("bundle-identifier")
 
 	return cmd

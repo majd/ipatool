@@ -10,8 +10,9 @@ import (
 )
 
 type LookupInput struct {
-	Account  Account
-	BundleID string
+	Account     Account
+	BundleID    string
+	CountryCode string
 }
 
 type LookupOutput struct {
@@ -19,9 +20,13 @@ type LookupOutput struct {
 }
 
 func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
-	countryCode, err := countryCodeFromStoreFront(input.Account.StoreFront)
-	if err != nil {
-		return LookupOutput{}, fmt.Errorf("failed to resolve the country code: %w", err)
+	countryCode := input.CountryCode
+	if countryCode == "" {
+		var err error
+		countryCode, err = countryCodeFromStoreFront(input.Account.StoreFront)
+		if err != nil {
+			return LookupOutput{}, fmt.Errorf("failed to resolve the country code: %w", err)
+		}
 	}
 
 	request := t.lookupRequest(input.BundleID, countryCode)

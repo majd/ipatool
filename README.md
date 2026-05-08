@@ -62,7 +62,7 @@ Global Flags:
 Use "ipatool auth [command] --help" for more information about a command.
 ```
 
-To search for apps on the App Store, use the `search` command.
+To search for apps on the App Store, use the `search` command. (Note: login is optional for this command)
 
 ```
 Search for iOS apps available on the App Store
@@ -71,9 +71,10 @@ Usage:
   ipatool search <term> [flags]
 
 Flags:
-  -h, --help        help for search
-  -l, --limit int   maximum amount of search results to retrieve (default 5)
-
+  -c, --country string   country code to search in (e.g. US, GB); defaults to the account's country
+  -h, --help             help for search
+  -l, --limit int        maximum amount of search results to retrieve (default 5)
+```
 Global Flags:
       --format format     sets output format for command; can be 'text', 'json' (default text)
       --non-interactive   run in non-interactive session
@@ -90,8 +91,9 @@ Usage:
 
 Flags:
   -b, --bundle-identifier string   Bundle identifier of the target iOS app (required)
+  -c, --country string             Country code to use for lookup (e.g. US, GB); defaults to the account's country
   -h, --help                       help for purchase
-
+```
 Global Flags:
       --format format     sets output format for command; can be 'text', 'json' (default text)
       --non-interactive   run in non-interactive session
@@ -109,8 +111,9 @@ Usage:
 Flags:
   -i, --app-id int                 ID of the target iOS app (required)
   -b, --bundle-identifier string   The bundle identifier of the target iOS app (overrides the app ID)
+  -c, --country string             Country code to use for lookup (e.g. US, GB); defaults to the account's country
   -h, --help                       help for list-versions
-
+```
 Global Flags:
       --format format                sets output format for command; can be 'text', 'json' (default text)
       --keychain-passphrase string   passphrase for unlocking keychain
@@ -129,11 +132,12 @@ Usage:
 Flags:
   -i, --app-id int                   ID of the target iOS app (required)
   -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
+  -c, --country string               Country code to use for lookup (e.g. US, GB); defaults to the account's country
       --external-version-id string   External version identifier of the target iOS app (defaults to latest version when not specified)
   -h, --help                         help for download
   -o, --output string                The destination path of the downloaded app package
       --purchase                     Obtain a license for the app if needed
-
+```
 Global Flags:
       --format format                sets output format for command; can be 'text', 'json' (default text)
       --keychain-passphrase string   passphrase for unlocking keychain
@@ -152,9 +156,10 @@ Usage:
 Flags:
   -i, --app-id int                   ID of the target iOS app (required)
   -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
+  -c, --country string               Country code to use for lookup (e.g. US, GB); defaults to the account's country
       --external-version-id string   External version identifier of the target iOS app (required)
   -h, --help                         help for get-version-metadata
-
+```
 Global Flags:
       --format format                sets output format for command; can be 'text', 'json' (default text)
       --keychain-passphrase string   passphrase for unlocking keychain

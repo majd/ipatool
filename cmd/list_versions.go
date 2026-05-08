@@ -15,6 +15,7 @@ func ListVersionsCmd() *cobra.Command {
 	var (
 		appID    int64
 		bundleID string
+		country  string
 	)
 
 	cmd := &cobra.Command{
@@ -30,13 +31,19 @@ func ListVersionsCmd() *cobra.Command {
 
 			return retry.Do(func() error {
 				infoResult, err := dependencies.AppStore.AccountInfo()
-				if err != nil {
-					return err
+				if err == nil {
+					acc = infoResult.Account
 				}
 
-				acc = infoResult.Account
+				if country == "" && acc.StoreFront == "" {
+					country = "US"
+				}
 
 				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
+					if acc.Email == "" {
+						return errors.New("login is required to list versions; please use the \"auth login\" command")
+					}
+
 					bagOutput, err := dependencies.AppStore.Bag(appstore.BagInput{})
 					if err != nil {
 						return fmt.Errorf("failed to get bag: %w", err)
@@ -56,12 +63,20 @@ func ListVersionsCmd() *cobra.Command {
 
 				app := appstore.App{ID: appID}
 				if bundleID != "" {
-					lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{Account: acc, BundleID: bundleID})
+					lookupResult, err := dependencies.AppStore.Lookup(appstore.LookupInput{
+						Account:     acc,
+						BundleID:    bundleID,
+						CountryCode: country,
+					})
 					if err != nil {
 						return err
 					}
 
 					app = lookupResult.App
+				}
+
+				if acc.Email == "" {
+					return errors.New("login is required to list versions; please use the \"auth login\" command")
 				}
 
 				out, err := dependencies.AppStore.ListVersions(appstore.ListVersionsInput{Account: acc, App: app})
@@ -92,6 +107,7 @@ func ListVersionsCmd() *cobra.Command {
 
 	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target iOS app (required)")
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (overrides the app ID)")
+	cmd.Flags().StringVarP(&country, "country", "c", "", "Country code to use for lookup (e.g. US, GB); defaults to the account's country")
 
 	return cmd
 }

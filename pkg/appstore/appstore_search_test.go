@@ -74,6 +74,14 @@ var _ = Describe("AppStore (Search)", func() {
 				Price:    testPrice,
 			}))
 		})
+
+		It("returns output with country code", func() {
+			out, err := as.Search(SearchInput{
+				CountryCode: "US",
+			})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out.Count).To(Equal(1))
+		})
 	})
 
 	When("store front is invalid", func() {

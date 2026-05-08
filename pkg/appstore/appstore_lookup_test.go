@@ -82,6 +82,14 @@ var _ = Describe("AppStore (Lookup)", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(app).To(Equal(LookupOutput{App: testApp}))
 			})
+
+			It("returns app with country code", func() {
+				app, err := as.Lookup(LookupInput{
+					CountryCode: "US",
+				})
+				Expect(err).ToNot(HaveOccurred())
+				Expect(app).To(Equal(LookupOutput{App: testApp}))
+			})
 		})
 	})
 
