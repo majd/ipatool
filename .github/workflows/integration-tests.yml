@@ -31,7 +31,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        command: [auth, download, purchase, search]
+        command: [auth, download, purchase, search, list-versions, get-version-metadata]
     steps:
       - uses: actions/download-artifact@v4
         with:
