@@ -190,6 +190,43 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 	})
 
+	When("primary endpoint returns FailureType 5002", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("", nil)
+
+			gomock.InOrder(
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(ContainSubstring(PrivateAppStoreAPIPathDownload))
+					}).
+					Return(http.Result[downloadResult]{
+						Data: downloadResult{
+							FailureType: FailureTypeLicenseAlreadyExists,
+						},
+					}, nil),
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(ContainSubstring(PrivateDownloadDispatchAPIDomain))
+					}).
+					Return(http.Result[downloadResult]{
+						Data: downloadResult{
+							FailureType: "secondary-failure",
+						},
+					}, nil),
+			)
+		})
+
+		It("falls back to the redownload endpoint and surfaces its error", func() {
+			_, err := as.Download(DownloadInput{})
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("secondary-failure"))
+		})
+	})
+
 	When("store API returns error", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().

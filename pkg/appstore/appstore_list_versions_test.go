@@ -277,6 +277,57 @@ var _ = Describe("AppStore (ListVersions)", func() {
 		})
 	})
 
+	When("primary endpoint returns FailureType 5002", func() {
+		const (
+			testVersion1 = "12345678"
+			testVersion2 = "87654321"
+			testLatest   = "87654321"
+		)
+
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
+			gomock.InOrder(
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(ContainSubstring(PrivateAppStoreAPIPathDownload))
+					}).
+					Return(http.Result[downloadResult]{
+						Data: downloadResult{
+							FailureType: FailureTypeLicenseAlreadyExists,
+						},
+					}, nil),
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(ContainSubstring(PrivateDownloadDispatchAPIDomain))
+					}).
+					Return(http.Result[downloadResult]{
+						Data: downloadResult{
+							Items: []downloadItemResult{
+								{
+									Metadata: map[string]interface{}{
+										"softwareVersionExternalIdentifiers": []interface{}{testVersion1, testVersion2},
+										"softwareVersionExternalIdentifier":  testLatest,
+									},
+								},
+							},
+						},
+					}, nil),
+			)
+		})
+
+		It("falls back to the redownload endpoint and returns versions", func() {
+			out, err := as.ListVersions(ListVersionsInput{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out.ExternalVersionIdentifiers).To(Equal([]string{testVersion1, testVersion2}))
+			Expect(out.LatestExternalVersionID).To(Equal(testLatest))
+		})
+	})
+
 	When("successfully lists versions", func() {
 		const (
 			testVersion1 = "12345678"

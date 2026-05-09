@@ -25,6 +25,9 @@ const (
 	PrivateAppStoreAPIPathPurchase = "/WebObjects/MZFinance.woa/wa/buyProduct"
 	PrivateAppStoreAPIPathDownload = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 
+	PrivateDownloadDispatchAPIDomain = "downloaddispatch." + iTunesAPIDomain
+	PrivateDownloadDispatchAPIPath   = "/r/redownload"
+
 	HTTPHeaderStoreFront = "X-Set-Apple-Store-Front"
 	HTTPHeaderPod        = "pod"
 

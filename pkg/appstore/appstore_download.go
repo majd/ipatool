@@ -46,10 +46,18 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		return DownloadOutput{}, fmt.Errorf("failed to send http request: %w", err)
 	}
 
+	if res.Data.FailureType == FailureTypeLicenseAlreadyExists {
+		req = t.redownloadRequest(input.Account, input.App, guid, input.ExternalVersionID)
+
+		res, err = t.downloadClient.Send(req)
+		if err != nil {
+			return DownloadOutput{}, fmt.Errorf("failed to send http request: %w", err)
+		}
+	}
+
 	if res.Data.FailureType == FailureTypePasswordTokenExpired ||
 		res.Data.FailureType == FailureTypeSignInRequired ||
-		res.Data.FailureType == FailureTypeDeviceVerificationFailed ||
-		res.Data.FailureType == FailureTypeLicenseAlreadyExists {
+		res.Data.FailureType == FailureTypeDeviceVerificationFailed {
 		return DownloadOutput{}, ErrPasswordTokenExpired
 	}
 
@@ -66,6 +74,10 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	}
 
 	if len(res.Data.Items) == 0 {
+		if res.Data.CustomerMessage != "" {
+			return DownloadOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.CustomerMessage), res)
+		}
+
 		return DownloadOutput{}, NewErrorWithMetadata(errors.New("invalid response"), res)
 	}
 
@@ -190,6 +202,36 @@ func (*appstore) downloadRequest(acc Account, app App, guid string, externalVers
 
 	return http.Request{
 		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
+		Method:         http.MethodPOST,
+		ResponseFormat: http.ResponseFormatXML,
+		Headers: map[string]string{
+			"Content-Type": "application/x-apple-plist",
+			"iCloud-DSID":  acc.DirectoryServicesID,
+			"X-Dsid":       acc.DirectoryServicesID,
+		},
+		Payload: &http.XMLPayload{
+			Content: payload,
+		},
+	}
+}
+
+// redownloadRequest builds a request against the redownload dispatcher endpoint.
+// Some apps (notably Microsoft Teams/Office and other VPP-eligible apps) reject
+// the volumeStoreDownloadProduct path with FailureType 5002, but accept this
+// per-account redownload endpoint when the user already owns a license.
+func (*appstore) redownloadRequest(acc Account, app App, guid string, externalVersionID string) http.Request {
+	payload := map[string]interface{}{
+		"creditDisplay": "",
+		"guid":          guid,
+		"salableAdamId": app.ID,
+	}
+
+	if externalVersionID != "" {
+		payload["appExtVrsId"] = externalVersionID
+	}
+
+	return http.Request{
+		URL:            fmt.Sprintf("https://%s%s", PrivateDownloadDispatchAPIDomain, PrivateDownloadDispatchAPIPath),
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
