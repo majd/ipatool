@@ -24,6 +24,7 @@ type DownloadInput struct {
 	OutputPath        string
 	Progress          *progressbar.ProgressBar
 	ExternalVersionID string
+	Endpoint          string
 }
 
 type DownloadOutput struct {
@@ -39,7 +40,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.downloadRequest(input.Account, input.App, guid, input.ExternalVersionID)
+	req := t.downloadRequest(input.Endpoint, input.Account, input.App, guid, input.ExternalVersionID)
 
 	res, err := t.downloadClient.Send(req)
 	if err != nil {
@@ -48,8 +49,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 
 	if res.Data.FailureType == FailureTypePasswordTokenExpired ||
 		res.Data.FailureType == FailureTypeSignInRequired ||
-		res.Data.FailureType == FailureTypeDeviceVerificationFailed ||
-		res.Data.FailureType == FailureTypeLicenseAlreadyExists {
+		res.Data.FailureType == FailureTypeDeviceVerificationFailed {
 		return DownloadOutput{}, ErrPasswordTokenExpired
 	}
 
@@ -172,7 +172,7 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	return nil
 }
 
-func (*appstore) downloadRequest(acc Account, app App, guid string, externalVersionID string) http.Request {
+func (*appstore) downloadRequest(endpoint string, acc Account, app App, guid string, externalVersionID string) http.Request {
 	payload := map[string]interface{}{
 		"creditDisplay": "",
 		"guid":          guid,
@@ -180,16 +180,11 @@ func (*appstore) downloadRequest(acc Account, app App, guid string, externalVers
 	}
 
 	if externalVersionID != "" {
-		payload["externalVersionId"] = externalVersionID
-	}
-
-	podPrefix := ""
-	if acc.Pod != "" {
-		podPrefix = "p" + acc.Pod + "-"
+		payload["appExtVrsId"] = externalVersionID
 	}
 
 	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
+		URL:            fmt.Sprintf("%s?guid=%s", endpoint, guid),
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{

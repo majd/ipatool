@@ -97,10 +97,10 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 	})
 
-	When("request uses a custom pod", func() {
+	When("request is sent", func() {
 		const (
-			testPod  = "42"
-			testGUID = "001122334455"
+			testEndpoint = "https://downloaddispatch.example.com/r/redownload"
+			testGUID     = "001122334455"
 		)
 
 		BeforeEach(func() {
@@ -111,18 +111,13 @@ var _ = Describe("AppStore (Download)", func() {
 			mockDownloadClient.EXPECT().
 				Send(gomock.Any()).
 				Do(func(req http.Request) {
-					expectedURL := "https://p" + testPod + "-" + PrivateAppStoreAPIDomain + PrivateAppStoreAPIPathDownload + "?guid=" + testGUID
-					Expect(req.URL).To(Equal(expectedURL))
+					Expect(req.URL).To(Equal(testEndpoint + "?guid=" + testGUID))
 				}).
 				Return(http.Result[downloadResult]{}, errors.New(""))
 		})
 
-		It("sends the download request to the pod-specific host", func() {
-			_, err := as.Download(DownloadInput{
-				Account: Account{
-					Pod: testPod,
-				},
-			})
+		It("sends the download request to the endpoint provided by the caller", func() {
+			_, err := as.Download(DownloadInput{Endpoint: testEndpoint})
 			Expect(err).To(HaveOccurred())
 		})
 	})
