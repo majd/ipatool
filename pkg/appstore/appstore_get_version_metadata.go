@@ -13,6 +13,7 @@ type GetVersionMetadataInput struct {
 	Account   Account
 	App       App
 	VersionID string
+	Endpoint  string
 }
 
 type GetVersionMetadataOutput struct {
@@ -28,7 +29,7 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.getVersionMetadataRequest(input.Account, input.App, guid, input.VersionID)
+	req := t.getVersionMetadataRequest(input.Endpoint, input.Account, input.App, guid, input.VersionID)
 	res, err := t.downloadClient.Send(req)
 
 	if err != nil {
@@ -68,21 +69,16 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 	return GetVersionMetadataOutput(metadata), nil
 }
 
-func (t *appstore) getVersionMetadataRequest(acc Account, app App, guid string, version string) http.Request {
+func (t *appstore) getVersionMetadataRequest(endpoint string, acc Account, app App, guid string, version string) http.Request {
 	payload := map[string]interface{}{
-		"creditDisplay":     "",
-		"guid":              guid,
-		"salableAdamId":     app.ID,
-		"externalVersionId": version,
-	}
-
-	podPrefix := ""
-	if acc.Pod != "" {
-		podPrefix = "p" + acc.Pod + "-"
+		"creditDisplay": "",
+		"guid":          guid,
+		"salableAdamId": app.ID,
+		"appExtVrsId":   version,
 	}
 
 	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
+		URL:            fmt.Sprintf("%s?guid=%s", endpoint, guid),
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
