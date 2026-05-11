@@ -81,7 +81,7 @@ func downloadCmd() *cobra.Command {
 						Msg("purchase")
 				}
 
-				interactive, _ := cmd.Context().Value(interactiveKey).(bool)
+				interactive, _ := cmd.Context().Value("interactive").(bool)
 				var progress *progressbar.ProgressBar
 				if interactive {
 					progress = progressbar.NewOptions64(1,

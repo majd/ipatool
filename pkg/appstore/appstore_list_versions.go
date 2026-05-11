@@ -33,15 +33,6 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 		return ListVersionsOutput{}, fmt.Errorf("failed to send http request: %w", err)
 	}
 
-	if res.Data.FailureType == FailureTypeLicenseAlreadyExists {
-		req = t.redownloadRequest(input.Account, input.App, guid, "")
-
-		res, err = t.downloadClient.Send(req)
-		if err != nil {
-			return ListVersionsOutput{}, fmt.Errorf("failed to send http request: %w", err)
-		}
-	}
-
 	if res.Data.FailureType == FailureTypePasswordTokenExpired || res.Data.FailureType == FailureTypeSignInRequired {
 		return ListVersionsOutput{}, ErrPasswordTokenExpired
 	}
@@ -59,10 +50,6 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 	}
 
 	if len(res.Data.Items) == 0 {
-		if res.Data.CustomerMessage != "" {
-			return ListVersionsOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.CustomerMessage), res)
-		}
-
 		return ListVersionsOutput{}, NewErrorWithMetadata(errors.New("invalid response"), res)
 	}
 
