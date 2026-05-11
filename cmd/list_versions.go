@@ -29,6 +29,11 @@ func ListVersionsCmd() *cobra.Command {
 			var acc appstore.Account
 
 			return retry.Do(func() error {
+				bag, err := dependencies.AppStore.Bag(appstore.BagInput{})
+				if err != nil {
+					return fmt.Errorf("failed to get bag: %w", err)
+				}
+
 				infoResult, err := dependencies.AppStore.AccountInfo()
 				if err != nil {
 					return err
@@ -37,15 +42,10 @@ func ListVersionsCmd() *cobra.Command {
 				acc = infoResult.Account
 
 				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
-					bagOutput, err := dependencies.AppStore.Bag(appstore.BagInput{})
-					if err != nil {
-						return fmt.Errorf("failed to get bag: %w", err)
-					}
-
 					loginResult, err := dependencies.AppStore.Login(appstore.LoginInput{
 						Email:    acc.Email,
 						Password: acc.Password,
-						Endpoint: bagOutput.AuthEndpoint,
+						Endpoint: bag.AuthEndpoint,
 					})
 					if err != nil {
 						return err
@@ -64,7 +64,7 @@ func ListVersionsCmd() *cobra.Command {
 					app = lookupResult.App
 				}
 
-				out, err := dependencies.AppStore.ListVersions(appstore.ListVersionsInput{Account: acc, App: app})
+				out, err := dependencies.AppStore.ListVersions(appstore.ListVersionsInput{Account: acc, App: app, Endpoint: bag.DownloadEndpoint})
 				if err != nil {
 					return err
 				}

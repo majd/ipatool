@@ -9,8 +9,9 @@ import (
 )
 
 type ListVersionsInput struct {
-	Account Account
-	App     App
+	Account  Account
+	App      App
+	Endpoint string
 }
 
 type ListVersionsOutput struct {
@@ -26,7 +27,7 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.listVersionsRequest(input.Account, input.App, guid)
+	req := t.listVersionsRequest(input.Endpoint, input.Account, input.App, guid)
 	res, err := t.downloadClient.Send(req)
 
 	if err != nil {
@@ -76,20 +77,15 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 	}, nil
 }
 
-func (t *appstore) listVersionsRequest(acc Account, app App, guid string) http.Request {
+func (t *appstore) listVersionsRequest(endpoint string, acc Account, app App, guid string) http.Request {
 	payload := map[string]interface{}{
 		"creditDisplay": "",
 		"guid":          guid,
 		"salableAdamId": app.ID,
 	}
 
-	podPrefix := ""
-	if acc.Pod != "" {
-		podPrefix = "p" + acc.Pod + "-"
-	}
-
 	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
+		URL:            fmt.Sprintf("%s?guid=%s", endpoint, guid),
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
