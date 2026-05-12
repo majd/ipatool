@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	gohttp "net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -35,6 +36,7 @@ var _ = Describe("AppStore (Download)", func() {
 		ctrl               *gomock.Controller
 		mockKeychain       *keychain.MockKeychain
 		mockDownloadClient *http.MockClient[downloadResult]
+		mockPlatformClient *http.MockClient[platformVersionLookupResult]
 		mockPurchaseClient *http.MockClient[purchaseResult]
 		mockLoginClient    *http.MockClient[loginResult]
 		mockHTTPClient     *http.MockClient[interface{}]
@@ -47,6 +49,7 @@ var _ = Describe("AppStore (Download)", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
 		mockDownloadClient = http.NewMockClient[downloadResult](ctrl)
+		mockPlatformClient = http.NewMockClient[platformVersionLookupResult](ctrl)
 		mockLoginClient = http.NewMockClient[loginResult](ctrl)
 		mockPurchaseClient = http.NewMockClient[purchaseResult](ctrl)
 		mockHTTPClient = http.NewMockClient[interface{}](ctrl)
@@ -57,6 +60,7 @@ var _ = Describe("AppStore (Download)", func() {
 			loginClient:    mockLoginClient,
 			purchaseClient: mockPurchaseClient,
 			downloadClient: mockDownloadClient,
+			platformClient: mockPlatformClient,
 			httpClient:     mockHTTPClient,
 			machine:        mockMachine,
 			os:             mockOS,
@@ -122,6 +126,62 @@ var _ = Describe("AppStore (Download)", func() {
 				Account: Account{
 					Pod: testPod,
 				},
+			})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	When("platform is AppleTV", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockPlatformClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					parsedURL, err := url.Parse(req.URL)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(parsedURL.Host).To(Equal("uclient-api.itunes.apple.com"))
+					Expect(parsedURL.Query().Get("platform")).To(Equal("atv9"))
+					Expect(parsedURL.Query().Get("cc")).To(Equal("us"))
+				}).
+				Return(http.Result[platformVersionLookupResult]{
+					StatusCode: 200,
+					Data: platformVersionLookupResult{
+						Results: map[string]platformVersionLookupItem{
+							"42": {
+								Offers: []platformVersionLookupOffer{
+									{
+										Version: platformVersionLookupVersion{
+											ExternalID: platformVersionExternalID("123456"),
+										},
+									},
+								},
+							},
+						},
+					},
+				}, nil)
+
+			mockDownloadClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					payload, ok := req.Payload.(*http.XMLPayload)
+					Expect(ok).To(BeTrue())
+					Expect(payload.Content["externalVersionId"]).To(Equal("123456"))
+				}).
+				Return(http.Result[downloadResult]{}, errors.New("request error"))
+		})
+
+		It("resolves and sends the tvOS external version id", func() {
+			_, err := as.Download(DownloadInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+				App: App{
+					ID: 42,
+				},
+				Platform: PlatformAppleTV,
 			})
 			Expect(err).To(HaveOccurred())
 		})
@@ -531,6 +591,46 @@ var _ = Describe("AppStore (Download)", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(out.DestinationPath).ToNot(BeEmpty())
 			})
+		})
+	})
+
+	Describe("package platform validation", func() {
+		writePackage := func(platforms []string) string {
+			file, err := os.CreateTemp("", "ipatool-platform-*.ipa")
+			Expect(err).ToNot(HaveOccurred())
+			defer file.Close()
+
+			zipFile := zip.NewWriter(file)
+			w, err := zipFile.Create("Payload/Test.app/Info.plist")
+			Expect(err).ToNot(HaveOccurred())
+
+			info, err := plist.Marshal(map[string]interface{}{
+				"CFBundleSupportedPlatforms": platforms,
+			}, plist.BinaryFormat)
+			Expect(err).ToNot(HaveOccurred())
+
+			_, err = w.Write(info)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(zipFile.Close()).To(Succeed())
+
+			return file.Name()
+		}
+
+		It("accepts AppleTVOS packages", func() {
+			path := writePackage([]string{"AppleTVOS"})
+			defer os.Remove(path)
+
+			err := (&appstore{}).validatePackagePlatform(path, PlatformAppleTV)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("returns an error for packages without AppleTVOS support", func() {
+			path := writePackage([]string{"iPhoneOS"})
+			defer os.Remove(path)
+
+			err := (&appstore{}).validatePackagePlatform(path, PlatformAppleTV)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("AppleTVOS"))
 		})
 	})
 })

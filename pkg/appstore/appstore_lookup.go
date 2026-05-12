@@ -12,6 +12,7 @@ import (
 type LookupInput struct {
 	Account  Account
 	BundleID string
+	Platform Platform
 }
 
 type LookupOutput struct {
@@ -24,7 +25,10 @@ func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
 		return LookupOutput{}, fmt.Errorf("failed to resolve the country code: %w", err)
 	}
 
-	request := t.lookupRequest(input.BundleID, countryCode)
+	request, err := t.lookupRequest(input.BundleID, countryCode, input.Platform)
+	if err != nil {
+		return LookupOutput{}, fmt.Errorf("failed to create lookup request: %w", err)
+	}
 
 	res, err := t.searchClient.Send(request)
 	if err != nil {
@@ -44,21 +48,31 @@ func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
 	}, nil
 }
 
-func (t *appstore) lookupRequest(bundleID, countryCode string) http.Request {
+func (t *appstore) lookupRequest(bundleID, countryCode string, platform Platform) (http.Request, error) {
+	url, err := t.lookupURL(bundleID, countryCode, platform)
+	if err != nil {
+		return http.Request{}, err
+	}
+
 	return http.Request{
-		URL:            t.lookupURL(bundleID, countryCode),
+		URL:            url,
 		Method:         http.MethodGET,
 		ResponseFormat: http.ResponseFormatJSON,
-	}
+	}, nil
 }
 
-func (t *appstore) lookupURL(bundleID, countryCode string) string {
+func (t *appstore) lookupURL(bundleID, countryCode string, platform Platform) (string, error) {
+	entity, err := platform.lookupEntity()
+	if err != nil {
+		return "", err
+	}
+
 	params := url.Values{}
-	params.Add("entity", "software,iPadSoftware")
+	params.Add("entity", entity)
 	params.Add("limit", "1")
 	params.Add("media", "software")
 	params.Add("bundleId", bundleID)
 	params.Add("country", countryCode)
 
-	return fmt.Sprintf("https://%s%s?%s", iTunesAPIDomain, iTunesAPIPathLookup, params.Encode())
+	return fmt.Sprintf("https://%s%s?%s", iTunesAPIDomain, iTunesAPIPathLookup, params.Encode()), nil
 }
