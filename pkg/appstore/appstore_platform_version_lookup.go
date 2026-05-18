@@ -91,6 +91,7 @@ func (t *appstore) lookupLatestExternalVersionID(acc Account, app App, platform 
 
 	offer := item.Offers[0]
 	externalVersionID := string(offer.Version.ExternalID)
+
 	if externalVersionID == "" {
 		externalVersionID, err = externalVersionIDFromBuyParams(offer.BuyParams)
 		if err != nil {
@@ -134,7 +135,7 @@ func externalVersionIDFromBuyParams(buyParams string) (string, error) {
 
 	values, err := url.ParseQuery(buyParams)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to parse query: %w", err)
 	}
 
 	return values.Get("appExtVrsId"), nil

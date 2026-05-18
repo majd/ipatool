@@ -145,16 +145,19 @@ func (*appstore) validatePackagePlatform(path string, platform Platform) error {
 			return fmt.Errorf("failed to open info plist: %w", err)
 		}
 
-		data, err := io.ReadAll(infoFile)
+		data, readErr := io.ReadAll(infoFile)
 		closeErr := infoFile.Close()
-		if err != nil {
-			return fmt.Errorf("failed to read info plist: %w", err)
+
+		if readErr != nil {
+			return fmt.Errorf("failed to read info plist: %w", readErr)
 		}
+
 		if closeErr != nil {
 			return fmt.Errorf("failed to close info plist: %w", closeErr)
 		}
 
 		var info platformPackageInfo
+
 		_, err = plist.Unmarshal(data, &info)
 		if err != nil {
 			return fmt.Errorf("failed to decode info plist: %w", err)

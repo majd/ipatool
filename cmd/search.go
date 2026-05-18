@@ -7,8 +7,10 @@ import (
 
 // nolint:wrapcheck
 func searchCmd() *cobra.Command {
-	var limit int64
-	var platformValue string
+	var (
+		limit         int64
+		platformValue string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "search <term>",
