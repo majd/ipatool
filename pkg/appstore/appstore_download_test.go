@@ -187,6 +187,36 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 	})
 
+	DescribeTable("platform uses the standard download request",
+		func(platform Platform) {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockDownloadClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					payload, ok := req.Payload.(*http.XMLPayload)
+					Expect(ok).To(BeTrue())
+					Expect(payload.Content).ToNot(HaveKey("externalVersionId"))
+				}).
+				Return(http.Result[downloadResult]{}, errors.New("request error"))
+
+			_, err := as.Download(DownloadInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+				App: App{
+					ID: 42,
+				},
+				Platform: platform,
+			})
+			Expect(err).To(HaveOccurred())
+		},
+		Entry("iPhone", PlatformIPhone),
+		Entry("iPad", PlatformIPad),
+	)
+
 	When("password token is expired", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().

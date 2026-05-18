@@ -41,7 +41,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
 	externalVersionID := input.ExternalVersionID
-	if externalVersionID == "" && input.Platform != "" {
+	if externalVersionID == "" && input.Platform == PlatformAppleTV {
 		externalVersionID, err = t.lookupLatestExternalVersionID(input.Account, input.App, input.Platform)
 		if err != nil {
 			return DownloadOutput{}, fmt.Errorf("failed to resolve platform version: %w", err)
