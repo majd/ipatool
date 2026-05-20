@@ -160,6 +160,10 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 		return Result[R]{}, fmt.Errorf("failed to read response body: %w", err)
 	}
 
+	if res.StatusCode == http.StatusTooManyRequests {
+		return Result[R]{}, fmt.Errorf("rate limited by Apple (HTTP %d): %s", res.StatusCode, strings.TrimSpace(string(body)))
+	}
+
 	var data R
 
 	normalizedBody := normalizeXMLPlistBody(body)
