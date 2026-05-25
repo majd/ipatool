@@ -11,9 +11,10 @@ import (
 )
 
 type SearchInput struct {
-	Account Account
-	Term    string
-	Limit   int64
+	Account  Account
+	Term     string
+	Limit    int64
+	Platform Platform
 }
 
 type SearchOutput struct {
@@ -27,7 +28,10 @@ func (t *appstore) Search(input SearchInput) (SearchOutput, error) {
 		return SearchOutput{}, fmt.Errorf("country code is invalid: %w", err)
 	}
 
-	request := t.searchRequest(input.Term, countryCode, input.Limit)
+	request, err := t.searchRequest(input.Term, countryCode, input.Limit, input.Platform)
+	if err != nil {
+		return SearchOutput{}, fmt.Errorf("failed to create search request: %w", err)
+	}
 
 	res, err := t.searchClient.Send(request)
 	if err != nil {
@@ -49,21 +53,31 @@ type searchResult struct {
 	Results []App `json:"results,omitempty"`
 }
 
-func (t *appstore) searchRequest(term, countryCode string, limit int64) http.Request {
+func (t *appstore) searchRequest(term, countryCode string, limit int64, platform Platform) (http.Request, error) {
+	url, err := t.searchURL(term, countryCode, limit, platform)
+	if err != nil {
+		return http.Request{}, err
+	}
+
 	return http.Request{
-		URL:            t.searchURL(term, countryCode, limit),
+		URL:            url,
 		Method:         http.MethodGET,
 		ResponseFormat: http.ResponseFormatJSON,
-	}
+	}, nil
 }
 
-func (t *appstore) searchURL(term, countryCode string, limit int64) string {
+func (t *appstore) searchURL(term, countryCode string, limit int64, platform Platform) (string, error) {
+	entity, err := platform.searchEntity()
+	if err != nil {
+		return "", err
+	}
+
 	params := url.Values{}
-	params.Add("entity", "software,iPadSoftware")
+	params.Add("entity", entity)
 	params.Add("limit", strconv.Itoa(int(limit)))
 	params.Add("media", "software")
 	params.Add("term", term)
 	params.Add("country", countryCode)
 
-	return fmt.Sprintf("https://%s%s?%s", iTunesAPIDomain, iTunesAPIPathSearch, params.Encode())
+	return fmt.Sprintf("https://%s%s?%s", iTunesAPIDomain, iTunesAPIPathSearch, params.Encode()), nil
 }

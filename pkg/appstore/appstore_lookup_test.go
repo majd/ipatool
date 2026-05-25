@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"errors"
+	"net/url"
 
 	"github.com/majd/ipatool/v2/pkg/http"
 	. "github.com/onsi/ginkgo/v2"
@@ -82,6 +83,29 @@ var _ = Describe("AppStore (Lookup)", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(app).To(Equal(LookupOutput{App: testApp}))
 			})
+		})
+	})
+
+	When("platform is AppleTV", func() {
+		BeforeEach(func() {
+			mockClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					parsedURL, err := url.Parse(req.URL)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(parsedURL.Query().Get("entity")).To(Equal("tvSoftware"))
+				}).
+				Return(http.Result[searchResult]{}, errors.New("request error"))
+		})
+
+		It("uses the tvOS lookup entity", func() {
+			_, err := as.Lookup(LookupInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+				Platform: PlatformAppleTV,
+			})
+			Expect(err).To(HaveOccurred())
 		})
 	})
 
