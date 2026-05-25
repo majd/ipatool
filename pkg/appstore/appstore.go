@@ -39,6 +39,7 @@ type appstore struct {
 	searchClient   http.Client[searchResult]
 	purchaseClient http.Client[purchaseResult]
 	downloadClient http.Client[downloadResult]
+	platformClient http.Client[platformVersionLookupResult]
 	bagClient      http.Client[bagResult]
 	httpClient     http.Client[interface{}]
 	machine        machine.Machine
@@ -63,6 +64,7 @@ func NewAppStore(args Args) AppStore {
 		searchClient:   http.NewClient[searchResult](clientArgs),
 		purchaseClient: http.NewClient[purchaseResult](clientArgs),
 		downloadClient: http.NewClient[downloadResult](clientArgs),
+		platformClient: http.NewClient[platformVersionLookupResult](clientArgs),
 		bagClient:      http.NewClient[bagResult](clientArgs),
 		httpClient:     http.NewClient[interface{}](clientArgs),
 		machine:        args.Machine,

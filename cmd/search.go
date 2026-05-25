@@ -7,11 +7,14 @@ import (
 
 // nolint:wrapcheck
 func searchCmd() *cobra.Command {
-	var limit int64
+	var (
+		limit         int64
+		platformValue string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "search <term>",
-		Short: "Search for iOS apps available on the App Store",
+		Short: "Search for iOS and tvOS apps available on the App Store",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			infoResult, err := dependencies.AppStore.AccountInfo()
@@ -19,10 +22,16 @@ func searchCmd() *cobra.Command {
 				return err
 			}
 
+			platform, err := appstore.ParsePlatform(platformValue)
+			if err != nil {
+				return err
+			}
+
 			output, err := dependencies.AppStore.Search(appstore.SearchInput{
-				Account: infoResult.Account,
-				Term:    args[0],
-				Limit:   limit,
+				Account:  infoResult.Account,
+				Term:     args[0],
+				Limit:    limit,
+				Platform: platform,
 			})
 			if err != nil {
 				return err
@@ -38,6 +47,7 @@ func searchCmd() *cobra.Command {
 	}
 
 	cmd.Flags().Int64VarP(&limit, "limit", "l", 5, "maximum amount of search results to retrieve")
+	cmd.Flags().StringVar(&platformValue, "platform", "", "Platform to search: iphone, ipad, or appletv")
 
 	return cmd
 }

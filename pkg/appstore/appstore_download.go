@@ -24,6 +24,7 @@ type DownloadInput struct {
 	OutputPath        string
 	Progress          *progressbar.ProgressBar
 	ExternalVersionID string
+	Platform          Platform
 }
 
 type DownloadOutput struct {
@@ -39,7 +40,15 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.downloadRequest(input.Account, input.App, guid, input.ExternalVersionID)
+	externalVersionID := input.ExternalVersionID
+	if externalVersionID == "" && input.Platform == PlatformAppleTV {
+		externalVersionID, err = t.lookupLatestExternalVersionID(input.Account, input.App, input.Platform)
+		if err != nil {
+			return DownloadOutput{}, fmt.Errorf("failed to resolve platform version: %w", err)
+		}
+	}
+
+	req := t.downloadRequest(input.Account, input.App, guid, externalVersionID)
 
 	res, err := t.downloadClient.Send(req)
 	if err != nil {
@@ -95,6 +104,11 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		return DownloadOutput{}, fmt.Errorf("failed to apply patches: %w", err)
 	}
 
+	err = t.validatePackagePlatform(destination, input.Platform)
+	if err != nil {
+		return DownloadOutput{}, fmt.Errorf("failed to validate package platform: %w", err)
+	}
+
 	err = t.os.Remove(fmt.Sprintf("%s.tmp", destination))
 	if err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to remove file: %w", err)
@@ -104,6 +118,59 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		DestinationPath: destination,
 		Sinfs:           item.Sinfs,
 	}, nil
+}
+
+type platformPackageInfo struct {
+	SupportedPlatforms []string `plist:"CFBundleSupportedPlatforms,omitempty"`
+}
+
+func (*appstore) validatePackagePlatform(path string, platform Platform) error {
+	if platform != PlatformAppleTV {
+		return nil
+	}
+
+	reader, err := zip.OpenReader(path)
+	if err != nil {
+		return fmt.Errorf("failed to open zip reader: %w", err)
+	}
+	defer reader.Close()
+
+	for _, file := range reader.File {
+		if !strings.HasPrefix(file.Name, "Payload/") || !strings.HasSuffix(file.Name, ".app/Info.plist") {
+			continue
+		}
+
+		infoFile, err := file.Open()
+		if err != nil {
+			return fmt.Errorf("failed to open info plist: %w", err)
+		}
+
+		data, readErr := io.ReadAll(infoFile)
+		closeErr := infoFile.Close()
+
+		if readErr != nil {
+			return fmt.Errorf("failed to read info plist: %w", readErr)
+		}
+
+		if closeErr != nil {
+			return fmt.Errorf("failed to close info plist: %w", closeErr)
+		}
+
+		var info platformPackageInfo
+
+		_, err = plist.Unmarshal(data, &info)
+		if err != nil {
+			return fmt.Errorf("failed to decode info plist: %w", err)
+		}
+
+		for _, supportedPlatform := range info.SupportedPlatforms {
+			if supportedPlatform == "AppleTVOS" {
+				return nil
+			}
+		}
+	}
+
+	return errors.New("downloaded package does not declare AppleTVOS support")
 }
 
 type downloadItemResult struct {
