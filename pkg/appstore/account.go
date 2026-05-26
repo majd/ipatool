@@ -9,3 +9,8 @@ type Account struct {
 	Password            string `json:"password,omitempty"`
 	Pod                 string `json:"pod,omitempty"`
 }
+
+type AccountStorage struct {
+	Accounts []Account `json:"accounts,omitempty"`
+	Current  string    `json:"current,omitempty"`
+}

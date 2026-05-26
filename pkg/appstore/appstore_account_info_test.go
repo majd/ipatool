@@ -1,8 +1,8 @@
 package appstore
 
 import (
+	"encoding/json"
 	"errors"
-	"fmt"
 
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	. "github.com/onsi/ginkgo/v2"
@@ -15,6 +15,11 @@ var _ = Describe("AppStore (AccountInfo)", func() {
 		ctrl         *gomock.Controller
 		appstore     AppStore
 		mockKeychain *keychain.MockKeychain
+	)
+
+	var (
+		testEmail = "test-email"
+		testName  = "test-name"
 	)
 
 	BeforeEach(func() {
@@ -30,15 +35,17 @@ var _ = Describe("AppStore (AccountInfo)", func() {
 	})
 
 	When("keychain returns valid data", func() {
-		const (
-			testEmail = "test-email"
-			testName  = "test-name"
-		)
 
 		BeforeEach(func() {
+			var defaultAccount = Account{
+				Email: testEmail,
+				Name:  testName,
+			}
+			var expectedResult, _ = json.Marshal(defaultAccount)
 			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte(fmt.Sprintf("{\"email\": \"%s\", \"name\": \"%s\"}", testEmail, testName)), nil)
+				Get(AccountKey).
+				Return(expectedResult, nil).
+				AnyTimes()
 		})
 
 		It("returns output", func() {
@@ -49,11 +56,31 @@ var _ = Describe("AppStore (AccountInfo)", func() {
 		})
 	})
 
+	When("keychain returns new version valid data", func() {
+		BeforeEach(func() {
+			var defaultAccount = Account{
+				Email: testEmail,
+				Name:  testName,
+			}
+			var accountStorage = AccountStorage{
+				Current:  testEmail,
+				Accounts: []Account{defaultAccount},
+			}
+			var expectedResult, _ = json.Marshal(accountStorage)
+			mockKeychain.EXPECT().
+				Get(AccountKey).
+				Return(expectedResult, nil).
+				AnyTimes()
+		})
+	})
+
 	When("keychain returns error", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte{}, errors.New(""))
+				Get(AccountKey).
+				Return([]byte{}, errors.New("")).
+				AnyTimes()
+
 		})
 
 		It("returns wrapped error", func() {
@@ -65,8 +92,9 @@ var _ = Describe("AppStore (AccountInfo)", func() {
 	When("keychain returns invalid data", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
-				Get("account").
-				Return([]byte("..."), nil)
+				Get(AccountKey).
+				Return([]byte("..."), nil).
+				AnyTimes()
 		})
 
 		It("fails to unmarshall JSON data", func() {

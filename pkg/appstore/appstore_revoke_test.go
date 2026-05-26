@@ -1,7 +1,7 @@
 package appstore
 
 import (
-	"errors"
+	"encoding/json"
 
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	. "github.com/onsi/ginkgo/v2"
@@ -14,6 +14,11 @@ var _ = Describe("AppStore (Revoke)", func() {
 		ctrl         *gomock.Controller
 		appstore     AppStore
 		mockKeychain *keychain.MockKeychain
+	)
+
+	var (
+		testEmail = "test-email"
+		testName  = "test-name"
 	)
 
 	BeforeEach(func() {
@@ -30,9 +35,27 @@ var _ = Describe("AppStore (Revoke)", func() {
 
 	When("keychain removes item", func() {
 		BeforeEach(func() {
+
+			var accountStorage = AccountStorage{
+				Accounts: []Account{
+					{
+						Email: testEmail,
+						Name:  testName,
+					},
+				},
+				Current: testEmail,
+			}
+
+			expectedData, _ := json.Marshal(accountStorage)
+
 			mockKeychain.EXPECT().
-				Remove("account").
-				Return(nil)
+				Get(AccountKey).
+				Return(expectedData, nil).
+				AnyTimes()
+			mockKeychain.EXPECT().
+				Set(AccountKey, gomock.Any()).
+				Return(nil).
+				AnyTimes()
 		})
 
 		It("returns data", func() {
@@ -44,8 +67,13 @@ var _ = Describe("AppStore (Revoke)", func() {
 	When("keychain returns error", func() {
 		BeforeEach(func() {
 			mockKeychain.EXPECT().
-				Remove("account").
-				Return(errors.New(""))
+				Get(AccountKey).
+				Return([]byte("..."), nil).
+				AnyTimes()
+			mockKeychain.EXPECT().
+				Set(AccountKey, gomock.Any()).
+				Return(nil).
+				AnyTimes()
 		})
 
 		It("returns wrapped error", func() {
