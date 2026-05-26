@@ -47,7 +47,7 @@ func loginCmd() *cobra.Command {
 		Use:   "login",
 		Short: "Login to the App Store",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			interactive, _ := cmd.Context().Value(interactiveKey).(bool)
+			interactive := cmd.Context().Value(interactiveKey).(bool)
 
 			if password == "" && !interactive {
 				return errors.New("password is required when not running in interactive mode; use the \"--password\" flag")
