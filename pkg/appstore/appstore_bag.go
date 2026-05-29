@@ -11,7 +11,8 @@ import (
 type BagInput struct{}
 
 type BagOutput struct {
-	AuthEndpoint string
+	AuthEndpoint       string
+	RedownloadEndpoint string
 }
 
 func (t *appstore) Bag(input BagInput) (BagOutput, error) {
@@ -33,7 +34,8 @@ func (t *appstore) Bag(input BagInput) (BagOutput, error) {
 	}
 
 	return BagOutput{
-		AuthEndpoint: res.Data.URLBag.AuthEndpoint,
+		AuthEndpoint:       res.Data.URLBag.AuthEndpoint,
+		RedownloadEndpoint: res.Data.URLBag.RedownloadEndpoint,
 	}, nil
 }
 
@@ -42,7 +44,8 @@ type bagResult struct {
 }
 
 type urlBag struct {
-	AuthEndpoint string `plist:"authenticateAccount,omitempty"`
+	AuthEndpoint       string `plist:"authenticateAccount,omitempty"`
+	RedownloadEndpoint string `plist:"redownloadProduct,omitempty"`
 }
 
 func (*appstore) bagRequest(guid string) http.Request {

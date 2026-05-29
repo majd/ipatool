@@ -187,6 +187,62 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 	})
 
+	When("a licensed tvOS app falls back to the redownload endpoint", func() {
+		const testRedownload = "https://downloaddispatch.itunes.apple.com/r/redownload"
+
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockPlatformClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[platformVersionLookupResult]{
+					StatusCode: 200,
+					Data: platformVersionLookupResult{
+						Results: map[string]platformVersionLookupItem{
+							"42": {
+								Offers: []platformVersionLookupOffer{
+									{Version: platformVersionLookupVersion{ExternalID: platformVersionExternalID("123456")}},
+								},
+							},
+						},
+					},
+				}, nil)
+
+			gomock.InOrder(
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(ContainSubstring(PrivateAppStoreAPIPathDownload))
+						payload := req.Payload.(*http.XMLPayload)
+						Expect(payload.Content).To(HaveKeyWithValue(downloadVersionKeyVolumeStore, "123456"))
+						Expect(payload.Content).ToNot(HaveKey(downloadVersionKeyRedownload))
+					}).
+					Return(http.Result[downloadResult]{Data: downloadResult{FailureType: FailureTypeLicenseAlreadyExists}}, nil),
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(HavePrefix(testRedownload))
+						payload := req.Payload.(*http.XMLPayload)
+						Expect(payload.Content).To(HaveKeyWithValue(downloadVersionKeyRedownload, "123456"))
+						Expect(payload.Content).ToNot(HaveKey(downloadVersionKeyVolumeStore))
+					}).
+					Return(http.Result[downloadResult]{}, errors.New("stop after fallback")),
+			)
+		})
+
+		It("retries on redownload translating externalVersionId to appExtVrsId", func() {
+			_, err := as.Download(DownloadInput{
+				Account:            Account{StoreFront: "143441"},
+				App:                App{ID: 42},
+				Platform:           PlatformAppleTV,
+				RedownloadEndpoint: testRedownload,
+			})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	DescribeTable("platform uses the standard download request",
 		func(platform Platform) {
 			mockMachine.EXPECT().

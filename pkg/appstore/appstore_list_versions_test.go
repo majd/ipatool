@@ -312,4 +312,49 @@ var _ = Describe("AppStore (ListVersions)", func() {
 			Expect(out.LatestExternalVersionID).To(Equal(testLatest))
 		})
 	})
+
+	When("the volumeStore endpoint returns 5002 and a redownload endpoint is available", func() {
+		const (
+			testRedownload = "https://downloaddispatch.itunes.apple.com/r/redownload"
+			testLatest     = "87654321"
+		)
+
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:00:00:00:00:00", nil)
+
+			gomock.InOrder(
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(ContainSubstring(PrivateAppStoreAPIPathDownload))
+					}).
+					Return(http.Result[downloadResult]{Data: downloadResult{FailureType: FailureTypeLicenseAlreadyExists}}, nil),
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(HavePrefix(testRedownload))
+					}).
+					Return(http.Result[downloadResult]{
+						Data: downloadResult{
+							Items: []downloadItemResult{
+								{
+									Metadata: map[string]interface{}{
+										"softwareVersionExternalIdentifiers": []interface{}{"12345678", testLatest},
+										"softwareVersionExternalIdentifier":  testLatest,
+									},
+								},
+							},
+						},
+					}, nil),
+			)
+		})
+
+		It("falls back to the redownload endpoint and returns versions", func() {
+			out, err := as.ListVersions(ListVersionsInput{RedownloadEndpoint: testRedownload})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out.LatestExternalVersionID).To(Equal(testLatest))
+		})
+	})
 })

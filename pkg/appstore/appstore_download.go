@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/schollz/progressbar/v3"
 	"howett.net/plist"
 )
@@ -19,12 +18,13 @@ var (
 )
 
 type DownloadInput struct {
-	Account           Account
-	App               App
-	OutputPath        string
-	Progress          *progressbar.ProgressBar
-	ExternalVersionID string
-	Platform          Platform
+	Account            Account
+	App                App
+	OutputPath         string
+	Progress           *progressbar.ProgressBar
+	ExternalVersionID  string
+	Platform           Platform
+	RedownloadEndpoint string
 }
 
 type DownloadOutput struct {
@@ -48,37 +48,15 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		}
 	}
 
-	req := t.downloadRequest(input.Account, input.App, guid, externalVersionID)
-
-	res, err := t.downloadClient.Send(req)
+	res, err := t.sendDownloadProduct(input.Account, input.App, guid, externalVersionID, input.RedownloadEndpoint)
 	if err != nil {
-		return DownloadOutput{}, fmt.Errorf("failed to send http request: %w", err)
+		return DownloadOutput{}, err
 	}
 
-	if res.Data.FailureType == FailureTypePasswordTokenExpired ||
-		res.Data.FailureType == FailureTypeSignInRequired ||
-		res.Data.FailureType == FailureTypeDeviceVerificationFailed ||
-		res.Data.FailureType == FailureTypeLicenseAlreadyExists {
-		return DownloadOutput{}, ErrPasswordTokenExpired
+	item, err := downloadProductItem(res)
+	if err != nil {
+		return DownloadOutput{}, err
 	}
-
-	if res.Data.FailureType == FailureTypeLicenseNotFound {
-		return DownloadOutput{}, ErrLicenseRequired
-	}
-
-	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		return DownloadOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.CustomerMessage), res)
-	}
-
-	if res.Data.FailureType != "" {
-		return DownloadOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.FailureType), res)
-	}
-
-	if len(res.Data.Items) == 0 {
-		return DownloadOutput{}, NewErrorWithMetadata(errors.New("invalid response"), res)
-	}
-
-	item := res.Data.Items[0]
 
 	version := "unknown"
 
@@ -237,37 +215,6 @@ func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressB
 	}
 
 	return nil
-}
-
-func (*appstore) downloadRequest(acc Account, app App, guid string, externalVersionID string) http.Request {
-	payload := map[string]interface{}{
-		"creditDisplay": "",
-		"guid":          guid,
-		"salableAdamId": app.ID,
-	}
-
-	if externalVersionID != "" {
-		payload["externalVersionId"] = externalVersionID
-	}
-
-	podPrefix := ""
-	if acc.Pod != "" {
-		podPrefix = "p" + acc.Pod + "-"
-	}
-
-	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
-		Method:         http.MethodPOST,
-		ResponseFormat: http.ResponseFormatXML,
-		Headers: map[string]string{
-			"Content-Type": "application/x-apple-plist",
-			"iCloud-DSID":  acc.DirectoryServicesID,
-			"X-Dsid":       acc.DirectoryServicesID,
-		},
-		Payload: &http.XMLPayload{
-			Content: payload,
-		},
-	}
 }
 
 func fileName(app App, version string) string {

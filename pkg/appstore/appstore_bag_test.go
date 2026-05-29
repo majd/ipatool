@@ -86,7 +86,10 @@ var _ = Describe("AppStore (Bag)", func() {
 	})
 
 	When("request is successful with authenticateAccount in urlBag", func() {
-		const testAuthEndpoint = "https://example.com"
+		const (
+			testAuthEndpoint       = "https://example.com"
+			testRedownloadEndpoint = "https://downloaddispatch.itunes.apple.com/r/redownload"
+		)
 
 		BeforeEach(func() {
 			mockMachine.EXPECT().
@@ -105,7 +108,8 @@ var _ = Describe("AppStore (Bag)", func() {
 					StatusCode: gohttp.StatusOK,
 					Data: bagResult{
 						URLBag: urlBag{
-							AuthEndpoint: testAuthEndpoint,
+							AuthEndpoint:       testAuthEndpoint,
+							RedownloadEndpoint: testRedownloadEndpoint,
 						},
 					},
 				}, nil)
@@ -115,6 +119,7 @@ var _ = Describe("AppStore (Bag)", func() {
 			out, err := as.Bag(BagInput{})
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out.AuthEndpoint).To(Equal(testAuthEndpoint))
+			Expect(out.RedownloadEndpoint).To(Equal(testRedownloadEndpoint))
 		})
 	})
 

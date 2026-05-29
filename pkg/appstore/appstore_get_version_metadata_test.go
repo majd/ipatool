@@ -521,4 +521,71 @@ var _ = Describe("AppStore (GetVersionMetadata)", func() {
 			Expect(atomic.LoadInt64(servedBytes)).To(BeNumerically("<", int64(len(ipa)/2)))
 		})
 	})
+
+	When("the volumeStore endpoint returns 5002 and a redownload endpoint is available", func() {
+		const testRedownload = "https://downloaddispatch.itunes.apple.com/r/redownload"
+
+		var (
+			server         *httptest.Server
+			releaseDate    time.Time
+			displayVersion string
+		)
+
+		BeforeEach(func() {
+			releaseDate = time.Date(2024, 4, 2, 12, 0, 0, 0, time.UTC)
+			displayVersion = "2.0.0"
+			ipa := testIPA(displayVersion, releaseDate.Format(time.RFC3339), time.Date(2020, 1, 1, 0, 0, 0, 0, time.UTC))
+			server, _, _ = testIPAServer(ipa)
+
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			gomock.InOrder(
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(ContainSubstring(PrivateAppStoreAPIPathDownload))
+						payload := req.Payload.(*http.XMLPayload)
+						Expect(payload.Content).To(HaveKeyWithValue(downloadVersionKeyVolumeStore, "test-version"))
+					}).
+					Return(http.Result[downloadResult]{Data: downloadResult{FailureType: FailureTypeLicenseAlreadyExists}}, nil),
+				mockDownloadClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(HavePrefix(testRedownload))
+						payload := req.Payload.(*http.XMLPayload)
+						Expect(payload.Content).To(HaveKeyWithValue(downloadVersionKeyRedownload, "test-version"))
+					}).
+					Return(http.Result[downloadResult]{
+						Data: downloadResult{
+							Items: []downloadItemResult{
+								{
+									URL: server.URL,
+									Metadata: map[string]interface{}{
+										"releaseDate":              "2020-01-01T00:00:00Z",
+										"bundleShortVersionString": "1.0.0",
+									},
+								},
+							},
+						},
+					}, nil),
+			)
+		})
+
+		AfterEach(func() {
+			server.Close()
+		})
+
+		It("falls back to the redownload endpoint and returns metadata", func() {
+			output, err := as.GetVersionMetadata(GetVersionMetadataInput{
+				App:                App{ID: 1234567890},
+				VersionID:          "test-version",
+				RedownloadEndpoint: testRedownload,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(output.DisplayVersion).To(Equal(displayVersion))
+			Expect(output.ReleaseDate).To(Equal(releaseDate))
+		})
+	})
 })

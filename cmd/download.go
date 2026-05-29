@@ -43,12 +43,12 @@ func downloadCmd() *cobra.Command {
 
 				acc = infoResult.Account
 
-				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
-					bagOutput, err := dependencies.AppStore.Bag(appstore.BagInput{})
-					if err != nil {
-						return fmt.Errorf("failed to get bag: %w", err)
-					}
+				bagOutput, err := dependencies.AppStore.Bag(appstore.BagInput{})
+				if err != nil {
+					return fmt.Errorf("failed to get bag: %w", err)
+				}
 
+				if errors.Is(lastErr, appstore.ErrPasswordTokenExpired) {
 					loginResult, err := dependencies.AppStore.Login(appstore.LoginInput{
 						Email:    acc.Email,
 						Password: acc.Password,
@@ -111,12 +111,13 @@ func downloadCmd() *cobra.Command {
 				}
 
 				out, err := dependencies.AppStore.Download(appstore.DownloadInput{
-					Account:           acc,
-					App:               app,
-					OutputPath:        outputPath,
-					Progress:          progress,
-					ExternalVersionID: externalVersionID,
-					Platform:          platform,
+					Account:            acc,
+					App:                app,
+					OutputPath:         outputPath,
+					Progress:           progress,
+					ExternalVersionID:  externalVersionID,
+					Platform:           platform,
+					RedownloadEndpoint: bagOutput.RedownloadEndpoint,
 				})
 				if err != nil {
 					return err

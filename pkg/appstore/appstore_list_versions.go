@@ -1,16 +1,14 @@
 package appstore
 
 import (
-	"errors"
 	"fmt"
 	"strings"
-
-	"github.com/majd/ipatool/v2/pkg/http"
 )
 
 type ListVersionsInput struct {
-	Account Account
-	App     App
+	Account            Account
+	App                App
+	RedownloadEndpoint string
 }
 
 type ListVersionsOutput struct {
@@ -26,34 +24,15 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.listVersionsRequest(input.Account, input.App, guid)
-	res, err := t.downloadClient.Send(req)
-
+	res, err := t.sendDownloadProduct(input.Account, input.App, guid, "", input.RedownloadEndpoint)
 	if err != nil {
-		return ListVersionsOutput{}, fmt.Errorf("failed to send http request: %w", err)
+		return ListVersionsOutput{}, err
 	}
 
-	if res.Data.FailureType == FailureTypePasswordTokenExpired || res.Data.FailureType == FailureTypeSignInRequired {
-		return ListVersionsOutput{}, ErrPasswordTokenExpired
+	item, err := downloadProductItem(res)
+	if err != nil {
+		return ListVersionsOutput{}, err
 	}
-
-	if res.Data.FailureType == FailureTypeLicenseNotFound {
-		return ListVersionsOutput{}, ErrLicenseRequired
-	}
-
-	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		return ListVersionsOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.CustomerMessage), res)
-	}
-
-	if res.Data.FailureType != "" {
-		return ListVersionsOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.FailureType), res)
-	}
-
-	if len(res.Data.Items) == 0 {
-		return ListVersionsOutput{}, NewErrorWithMetadata(errors.New("invalid response"), res)
-	}
-
-	item := res.Data.Items[0]
 
 	rawIdentifiers, ok := item.Metadata["softwareVersionExternalIdentifiers"].([]interface{})
 	if !ok {
@@ -74,31 +53,4 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 		ExternalVersionIdentifiers: externalVersionIdentifiers,
 		LatestExternalVersionID:    fmt.Sprintf("%v", latestExternalVersionID),
 	}, nil
-}
-
-func (t *appstore) listVersionsRequest(acc Account, app App, guid string) http.Request {
-	payload := map[string]interface{}{
-		"creditDisplay": "",
-		"guid":          guid,
-		"salableAdamId": app.ID,
-	}
-
-	podPrefix := ""
-	if acc.Pod != "" {
-		podPrefix = "p" + acc.Pod + "-"
-	}
-
-	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
-		Method:         http.MethodPOST,
-		ResponseFormat: http.ResponseFormatXML,
-		Headers: map[string]string{
-			"Content-Type": "application/x-apple-plist",
-			"iCloud-DSID":  acc.DirectoryServicesID,
-			"X-Dsid":       acc.DirectoryServicesID,
-		},
-		Payload: &http.XMLPayload{
-			Content: payload,
-		},
-	}
 }

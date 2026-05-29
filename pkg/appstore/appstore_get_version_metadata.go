@@ -1,18 +1,16 @@
 package appstore
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/majd/ipatool/v2/pkg/http"
 )
 
 type GetVersionMetadataInput struct {
-	Account   Account
-	App       App
-	VersionID string
+	Account            Account
+	App                App
+	VersionID          string
+	RedownloadEndpoint string
 }
 
 type GetVersionMetadataOutput struct {
@@ -28,34 +26,15 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	req := t.getVersionMetadataRequest(input.Account, input.App, guid, input.VersionID)
-	res, err := t.downloadClient.Send(req)
-
+	res, err := t.sendDownloadProduct(input.Account, input.App, guid, input.VersionID, input.RedownloadEndpoint)
 	if err != nil {
-		return GetVersionMetadataOutput{}, fmt.Errorf("failed to send http request: %w", err)
+		return GetVersionMetadataOutput{}, err
 	}
 
-	if res.Data.FailureType == FailureTypePasswordTokenExpired || res.Data.FailureType == FailureTypeSignInRequired {
-		return GetVersionMetadataOutput{}, ErrPasswordTokenExpired
+	item, err := downloadProductItem(res)
+	if err != nil {
+		return GetVersionMetadataOutput{}, err
 	}
-
-	if res.Data.FailureType == FailureTypeLicenseNotFound {
-		return GetVersionMetadataOutput{}, ErrLicenseRequired
-	}
-
-	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
-		return GetVersionMetadataOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.CustomerMessage), res)
-	}
-
-	if res.Data.FailureType != "" {
-		return GetVersionMetadataOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.FailureType), res)
-	}
-
-	if len(res.Data.Items) == 0 {
-		return GetVersionMetadataOutput{}, NewErrorWithMetadata(errors.New("invalid response"), res)
-	}
-
-	item := res.Data.Items[0]
 
 	// Do not fall back to item.Metadata here. The App Store download API can
 	// return stale version and release date values, so the IPA Info.plist is the
@@ -66,32 +45,4 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 	}
 
 	return GetVersionMetadataOutput(metadata), nil
-}
-
-func (t *appstore) getVersionMetadataRequest(acc Account, app App, guid string, version string) http.Request {
-	payload := map[string]interface{}{
-		"creditDisplay":     "",
-		"guid":              guid,
-		"salableAdamId":     app.ID,
-		"externalVersionId": version,
-	}
-
-	podPrefix := ""
-	if acc.Pod != "" {
-		podPrefix = "p" + acc.Pod + "-"
-	}
-
-	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
-		Method:         http.MethodPOST,
-		ResponseFormat: http.ResponseFormatXML,
-		Headers: map[string]string{
-			"Content-Type": "application/x-apple-plist",
-			"iCloud-DSID":  acc.DirectoryServicesID,
-			"X-Dsid":       acc.DirectoryServicesID,
-		},
-		Payload: &http.XMLPayload{
-			Content: payload,
-		},
-	}
 }
