@@ -54,8 +54,16 @@ func newLogger(format OutputFormat, verbose bool) log.Logger {
 
 // newCookieJar returns a new cookie jar instance.
 func newCookieJar(machine machine.Machine) http.CookieJar {
+	cookiePath := filepath.Join(machine.HomeDirectory(), ConfigDirectoryName, CookieJarFileName)
+	// Remove stale zero-byte lock files. The juju/go4/lock library only does
+	// PID-based stale detection when the file has content; a 0-byte lock file
+	// (left by a process killed between O_TRUNC and PID write) blocks forever.
+	lockPath := cookiePath + ".lock"
+	if fi, err := os.Stat(lockPath); err == nil && fi.Size() == 0 {
+		os.Remove(lockPath)
+	}
 	return util.Must(cookiejar.New(&cookiejar.Options{
-		Filename: filepath.Join(machine.HomeDirectory(), ConfigDirectoryName, CookieJarFileName),
+		Filename: cookiePath,
 	}))
 }
 
