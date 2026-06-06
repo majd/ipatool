@@ -160,7 +160,7 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string, attempt int) http.Request {
 	return http.Request{
 		Method:         http.MethodPOST,
-		URL:            endpoint,
+		URL:            util.IfEmpty(endpoint, fmt.Sprintf("https://%s%s", PrivateAuthDomain, PrivateAuthPathNative)),
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",

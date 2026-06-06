@@ -32,13 +32,23 @@ func (t *appstore) Bag(input BagInput) (BagOutput, error) {
 		return BagOutput{}, fmt.Errorf("received unexpected status code: %d", res.StatusCode)
 	}
 
+	endpoint := res.Data.AuthEndpoint
+	if endpoint == "" {
+		endpoint = res.Data.URLBag.AuthEndpoint
+	}
+	// The new auth endpoint base requires the /fast sub-path
+	if strings.Contains(endpoint, "auth.itunes.apple.com") && !strings.HasSuffix(endpoint, "/fast") {
+		endpoint = endpoint + "/fast"
+	}
+
 	return BagOutput{
-		AuthEndpoint: res.Data.URLBag.AuthEndpoint,
+		AuthEndpoint: endpoint,
 	}, nil
 }
 
 type bagResult struct {
-	URLBag urlBag `plist:"urlBag,omitempty"`
+	URLBag       urlBag `plist:"urlBag,omitempty"`
+	AuthEndpoint string `plist:"authenticateAccount,omitempty"`
 }
 
 type urlBag struct {
