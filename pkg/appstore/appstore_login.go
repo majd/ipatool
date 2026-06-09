@@ -150,8 +150,14 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		} else {
 			err = NewErrorWithMetadata(errors.New("something went wrong"), res)
 		}
-	} else if res.StatusCode != gohttp.StatusOK || res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
-		err = NewErrorWithMetadata(errors.New("something went wrong"), res)
+	} else if res.StatusCode != gohttp.StatusOK {
+		err = NewErrorWithMetadata(fmt.Errorf("unexpected login status: %d", res.StatusCode), res)
+	} else if res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
+		if authCode == "" {
+			err = ErrAuthCodeRequired
+		} else {
+			err = NewErrorWithMetadata(errors.New("login response did not include an App Store session token"), res)
+		}
 	}
 
 	return retry, redirect, err

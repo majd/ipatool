@@ -124,6 +124,42 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 		})
 
+		When("store API returns OK without a session token before 2FA", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						StatusCode: 200,
+					}, nil)
+			})
+
+			It("requests an auth code", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(Equal(ErrAuthCodeRequired))
+			})
+		})
+
+		When("store API returns OK without a session token after 2FA", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						StatusCode: 200,
+					}, nil)
+			})
+
+			It("returns an actionable invalid session response error", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+					AuthCode: "123456",
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("login response did not include an App Store session token"))
+			})
+		})
+
 		When("store API indicates account is disabled", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().

@@ -78,7 +78,7 @@ func loginCmd() *cobra.Command {
 				}
 
 				dependencies.Logger.Verbose().
-					Str("password", password).
+					Bool("passwordProvided", password != "").
 					Str("email", email).
 					Str("authCode", util.IfEmpty(authCode, "<nil>")).
 					Msg("logging in")
