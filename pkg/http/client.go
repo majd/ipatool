@@ -20,7 +20,24 @@ var (
 	documentXMLPattern = regexp.MustCompile(`(?is)<Document\b[^>]*>(.*)</Document>`)
 	plistXMLPattern    = regexp.MustCompile(`(?is)<plist\b[^>]*>.*?</plist>`)
 	dictXMLPattern     = regexp.MustCompile(`(?is)<dict\b[^>]*>.*</dict>`)
+	urlPattern         = regexp.MustCompile(`https?://[^\s"'<>]+`)
 )
+
+type ResponseDecodeError struct {
+	Cause       error
+	StatusCode  int
+	ContentType string
+	Body        string
+	URLs        []string
+}
+
+func (e *ResponseDecodeError) Error() string {
+	return fmt.Sprintf("failed to unmarshal xml: %v", e.Cause)
+}
+
+func (e *ResponseDecodeError) Unwrap() error {
+	return e.Cause
+}
 
 //go:generate go run go.uber.org/mock/mockgen -source=client.go -destination=client_mock.go -package=http
 type Client[R interface{}] interface {
@@ -170,7 +187,13 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 
 	_, err = plist.Unmarshal(normalizedBody, &data)
 	if err != nil {
-		return Result[R]{}, fmt.Errorf("failed to unmarshal xml: %w", err)
+		return Result[R]{}, &ResponseDecodeError{
+			Cause:       err,
+			StatusCode:  res.StatusCode,
+			ContentType: res.Header.Get("Content-Type"),
+			Body:        truncateBody(body, 500),
+			URLs:        extractURLs(body),
+		}
 	}
 
 	headers := map[string]string{}
@@ -183,6 +206,25 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 		Headers:    headers,
 		Data:       data,
 	}, nil
+}
+
+func extractURLs(body []byte) []string {
+	matches := urlPattern.FindAll(body, -1)
+	urls := make([]string, 0, len(matches))
+	for _, match := range matches {
+		urls = append(urls, string(match))
+	}
+
+	return urls
+}
+
+func truncateBody(body []byte, max int) string {
+	trimmed := strings.TrimSpace(string(body))
+	if len(trimmed) <= max {
+		return trimmed
+	}
+
+	return trimmed[:max] + "..."
 }
 
 func normalizeXMLPlistBody(body []byte) []byte {
