@@ -65,6 +65,7 @@ type loginResult struct {
 
 func (t *appstore) login(email, password, authCode, guid, endpoint string) (Account, error) {
 	redirect := ""
+	authEndpoint := normalizeAuthEndpoint(endpoint)
 
 	var (
 		err error
@@ -74,11 +75,18 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 	retry := true
 
 	for attempt := 1; retry && attempt <= 4; attempt++ {
-		request := t.loginRequest(email, password, authCode, guid, endpoint, attempt)
+		request := t.loginRequest(email, password, authCode, guid, authEndpoint, attempt)
 		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
 
 		if err != nil {
+			if discoveredEndpoint := authEndpointFromResponseError(err); discoveredEndpoint != "" && discoveredEndpoint != authEndpoint {
+				authEndpoint = discoveredEndpoint
+				redirect = ""
+				retry = true
+				continue
+			}
+
 			return Account{}, fmt.Errorf("request failed: %w", err)
 		}
 
