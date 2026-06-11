@@ -65,7 +65,7 @@ type loginResult struct {
 
 func (t *appstore) login(email, password, authCode, guid, endpoint string) (Account, error) {
 	redirect := ""
-
+	fastEndpoint := strings.Replace(endpoint, "/auth/v1/native", "/auth/v1/native/fast/", 1)
 	var (
 		err error
 		res http.Result[loginResult]
@@ -83,6 +83,13 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 		}
 
 		if retry, redirect, err = t.parseLoginResponse(&res, attempt, authCode); err != nil {
+			if authCode != "" && endpoint != fastEndpoint && missingLoginCredentials(res.Data) {
+				endpoint = fastEndpoint
+				redirect = ""
+				retry = true
+				err = nil
+				continue
+			}
 			return Account{}, err
 		}
 	}
@@ -150,11 +157,19 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		} else {
 			err = NewErrorWithMetadata(errors.New("something went wrong"), res)
 		}
+	} else if (res.StatusCode == gohttp.StatusOK || res.StatusCode == gohttp.StatusNoContent) && authCode == "" && missingLoginCredentials(res.Data) {
+		err = ErrAuthCodeRequired
+	} else if (res.StatusCode == gohttp.StatusOK || res.StatusCode == gohttp.StatusNoContent) && missingLoginCredentials(res.Data) {
+		err = NewErrorWithMetadata(errors.New("login response is missing password token and directory services id"), res)
 	} else if res.StatusCode != gohttp.StatusOK || res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
 		err = NewErrorWithMetadata(errors.New("something went wrong"), res)
 	}
 
 	return retry, redirect, err
+}
+
+func missingLoginCredentials(data loginResult) bool {
+	return data.PasswordToken == "" && data.DirectoryServicesID == ""
 }
 
 func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string, attempt int) http.Request {
