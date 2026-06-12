@@ -144,6 +144,8 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		err = ErrAuthCodeRequired
 	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageAccountDisabled {
 		err = NewErrorWithMetadata(errors.New("account is disabled"), res)
+	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageActionSignInPage {
+		err = NewErrorWithMetadata(errors.New("account requires browser sign-in (2FA or Apple ID review required)"), res)
 	} else if res.Data.FailureType != "" {
 		if res.Data.CustomerMessage != "" {
 			err = NewErrorWithMetadata(errors.New(res.Data.CustomerMessage), res)

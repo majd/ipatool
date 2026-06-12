@@ -13,6 +13,7 @@ const (
 	CustomerMessageAccountDisabled      = "Your account is disabled."
 	CustomerMessageSubscriptionRequired = "Subscription Required"
 	CustomerMessagePasswordChanged      = "Your password has changed."
+	CustomerMessageActionSignInPage     = "AMD-Action::SP"
 
 	iTunesAPIDomain     = "itunes.apple.com"
 	iTunesAPIPathSearch = "/search"
@@ -26,7 +27,7 @@ const (
 	PrivateAppStoreAPIPathDownload = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 
 	PrivateAuthDomain     = "auth." + iTunesAPIDomain
-	PrivateAuthPathNative = "/auth/v1/native/fast"
+	PrivateAuthPathNative = "/auth/v1/native/fast/"
 
 	HTTPHeaderStoreFront = "X-Set-Apple-Store-Front"
 	HTTPHeaderPod        = "pod"
