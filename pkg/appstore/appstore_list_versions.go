@@ -81,7 +81,7 @@ func (t *appstore) listVersionsRequest(acc Account, app App, guid string) http.R
 		"creditDisplay": "",
 		"guid":          guid,
 		"salableAdamId": app.ID,
-		"serialNumber": "0",
+		"serialNumber":  "0",
 	}
 
 	podPrefix := ""
