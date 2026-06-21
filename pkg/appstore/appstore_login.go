@@ -35,7 +35,12 @@ func (t *appstore) Login(input LoginInput) (LoginOutput, error) {
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	acc, err := t.login(input.Email, input.Password, input.AuthCode, guid, input.Endpoint)
+	endpoint := input.Endpoint
+	if strings.Contains(endpoint, "/auth/v1/native") && !strings.HasSuffix(endpoint, "/fast/") {
+		endpoint = strings.TrimSuffix(endpoint, "/") + "/fast/"
+	}
+
+	acc, err := t.login(input.Email, input.Password, input.AuthCode, guid, endpoint)
 	if err != nil {
 		return LoginOutput{}, err
 	}
@@ -163,7 +168,7 @@ func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string
 		URL:            endpoint,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
-			"Content-Type": "application/x-www-form-urlencoded",
+			"Content-Type": "application/x-apple-plist",
 		},
 		Payload: &http.XMLPayload{
 			Content: map[string]interface{}{

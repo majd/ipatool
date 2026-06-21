@@ -63,6 +63,11 @@ func loginCmd() *cobra.Command {
 				password = string(bytes)
 			}
 
+			bag, err := dependencies.AppStore.Bag(appstore.BagInput{})
+			if err != nil {
+				return fmt.Errorf("failed to get bag: %w", err)
+			}
+
 			var lastErr error
 
 			// nolint:wrapcheck
@@ -82,11 +87,6 @@ func loginCmd() *cobra.Command {
 					Str("email", email).
 					Str("authCode", util.IfEmpty(authCode, "<nil>")).
 					Msg("logging in")
-
-				bag, err := dependencies.AppStore.Bag(appstore.BagInput{})
-				if err != nil {
-					return fmt.Errorf("failed to get bag: %w", err)
-				}
 
 				output, err := dependencies.AppStore.Login(appstore.LoginInput{
 					Email:    email,
