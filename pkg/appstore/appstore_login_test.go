@@ -73,6 +73,9 @@ var _ = Describe("AppStore (Login)", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(Equal("https://auth.itunes.apple.com/auth/v1/native/fast/"))
+					}).
 					Return(http.Result[loginResult]{}, errors.New(""))
 			})
 
@@ -121,6 +124,24 @@ var _ = Describe("AppStore (Login)", func() {
 					Password: testPassword,
 				})
 				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(Equal("authentication failed with failure type random-error"))
+			})
+		})
+
+		When("store API returns an empty successful response", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						StatusCode: 200,
+					}, nil)
+			})
+
+			It("returns a diagnostic error", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(MatchError("authentication response did not include account credentials"))
 			})
 		})
 

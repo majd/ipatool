@@ -65,6 +65,7 @@ type loginResult struct {
 
 func (t *appstore) login(email, password, authCode, guid, endpoint string) (Account, error) {
 	redirect := ""
+	authEndpoint := normalizeAuthEndpoint(endpoint)
 
 	var (
 		err error
@@ -74,7 +75,7 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 	retry := true
 
 	for attempt := 1; retry && attempt <= 4; attempt++ {
-		request := t.loginRequest(email, password, authCode, guid, endpoint, attempt)
+		request := t.loginRequest(email, password, authCode, guid, authEndpoint, attempt)
 		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
 
@@ -148,10 +149,10 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		if res.Data.CustomerMessage != "" {
 			err = NewErrorWithMetadata(errors.New(res.Data.CustomerMessage), res)
 		} else {
-			err = NewErrorWithMetadata(errors.New("something went wrong"), res)
+			err = NewErrorWithMetadata(fmt.Errorf("authentication failed with failure type %s", res.Data.FailureType), res)
 		}
 	} else if res.StatusCode != gohttp.StatusOK || res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
-		err = NewErrorWithMetadata(errors.New("something went wrong"), res)
+		err = NewErrorWithMetadata(errors.New("authentication response did not include account credentials"), res)
 	}
 
 	return retry, redirect, err

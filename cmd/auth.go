@@ -10,7 +10,6 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/v2/pkg/appstore"
-	"github.com/majd/ipatool/v2/pkg/util"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -77,10 +76,10 @@ func loginCmd() *cobra.Command {
 					}
 				}
 
+				// 密码和验证码属于高敏感凭据，即使开启 verbose 也不能写入日志。
 				dependencies.Logger.Verbose().
-					Str("password", password).
 					Str("email", email).
-					Str("authCode", util.IfEmpty(authCode, "<nil>")).
+					Bool("authCodeProvided", authCode != "").
 					Msg("logging in")
 
 				bag, err := dependencies.AppStore.Bag(appstore.BagInput{})
