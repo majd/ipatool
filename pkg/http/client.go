@@ -170,6 +170,19 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 
 	_, err = plist.Unmarshal(normalizedBody, &data)
 	if err != nil {
+		// Apple occasionally responds with an HTML error page (e.g. HTTP 404/5xx)
+		// instead of a property list, usually when the request is rate limited or
+		// temporarily blocked. Detect that case and surface a clear error rather
+		// than the misleading "failed to unmarshal xml" message.
+		if !looksLikePlist(normalizedBody) {
+			return Result[R]{}, fmt.Errorf(
+				"unexpected response from Apple (HTTP %d): the server did not return a property list, "+
+					"which usually means the request was rate limited or temporarily blocked - "+
+					"please wait a moment and try again",
+				res.StatusCode,
+			)
+		}
+
 		return Result[R]{}, fmt.Errorf("failed to unmarshal xml: %w", err)
 	}
 
@@ -208,6 +221,24 @@ func normalizeXMLPlistBody(body []byte) []byte {
 	}
 
 	return normalized
+}
+
+// looksLikePlist reports whether the body resembles a property list document.
+// It is used to distinguish a malformed plist from a completely unrelated
+// response (such as an HTML error page returned by Apple's edge servers).
+func looksLikePlist(body []byte) bool {
+	for _, marker := range [][]byte{
+		[]byte("<plist"),
+		[]byte("<dict"),
+		[]byte("<key>"),
+		[]byte("<Document"),
+	} {
+		if bytes.Contains(body, marker) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func extractEmbeddedPlist(body []byte) []byte {

@@ -183,6 +183,29 @@ var _ = Describe("Client", Ordered, func() {
 				Expect(res.Data.Foo).To(Equal("bar"))
 			})
 
+			It("returns a clear error when Apple responds with a non-plist body", func() {
+				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
+					w.Header().Add("Content-Type", "text/html")
+					w.WriteHeader(http.StatusNotFound)
+					_, err := w.Write([]byte("<html><head><title>404 Not Found</title></head>" +
+						"<body><center><h1>404 Not Found</h1></center></body></html>"))
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				sut := NewClient[xmlResult](Args{
+					CookieJar: mockCookieJar,
+				})
+				_, err := sut.Send(Request{
+					URL:            srv.URL,
+					Method:         MethodPOST,
+					ResponseFormat: ResponseFormatXML,
+				})
+
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("unexpected response from Apple (HTTP 404)"))
+				Expect(err.Error()).ToNot(ContainSubstring("failed to unmarshal xml"))
+			})
+
 			It("returns error when content type is not supported", func() {
 				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
 					w.Header().Add("Content-Type", "application/xyz")
