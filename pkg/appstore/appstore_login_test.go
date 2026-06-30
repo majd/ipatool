@@ -73,6 +73,9 @@ var _ = Describe("AppStore (Login)", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(Equal("https://auth.itunes.apple.com/auth/v1/native/fast/"))
+					}).
 					Return(http.Result[loginResult]{}, errors.New(""))
 			})
 
@@ -164,6 +167,26 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 		})
 
+		When("store API requires browser sign-in", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						Data: loginResult{
+							CustomerMessage: CustomerMessageActionSignInPage,
+						},
+					}, nil)
+			})
+
+			It("returns browser sign-in error", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+				})
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("browser sign-in"))
+			})
+		})
+
 		When("store API redirects", func() {
 			const (
 				testRedirectLocation = "https://test-redirect-url.com"
@@ -198,6 +221,32 @@ var _ = Describe("AppStore (Login)", func() {
 					Password: testPassword,
 				})
 				Expect(err).To(MatchError("request failed: test complete"))
+			})
+		})
+
+		When("store API response contains a new auth endpoint", func() {
+			BeforeEach(func() {
+				firstCall := mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{}, &http.ResponseDecodeError{
+						Cause: errors.New("decode failed"),
+						URLs:  []string{"https://auth.itunes.apple.com/auth/v1/native"},
+					})
+				secondCall := mockClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(Equal("https://auth.itunes.apple.com/auth/v1/native/fast/"))
+					}).
+					Return(http.Result[loginResult]{}, errors.New("test complete"))
+				gomock.InOrder(firstCall, secondCall)
+			})
+
+			It("retries with the discovered endpoint", func() {
+				_, err := as.Login(LoginInput{
+					Endpoint: "https://example.com/authenticate",
+					Password: testPassword,
+				})
+				Expect(err).To(MatchError(ContainSubstring("test complete")))
 			})
 		})
 

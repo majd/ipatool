@@ -54,9 +54,23 @@ func newLogger(format OutputFormat, verbose bool) log.Logger {
 
 // newCookieJar returns a new cookie jar instance.
 func newCookieJar(machine machine.Machine) http.CookieJar {
+	cookiePath := filepath.Join(machine.HomeDirectory(), ConfigDirectoryName, CookieJarFileName)
+	removeStaleZeroByteLock(cookiePath + ".lock")
 	return util.Must(cookiejar.New(&cookiejar.Options{
-		Filename: filepath.Join(machine.HomeDirectory(), ConfigDirectoryName, CookieJarFileName),
+		Filename: cookiePath,
 	}))
+}
+
+// removeStaleZeroByteLock removes a zero-byte lock file left behind when a process
+// is killed between O_TRUNC and writing its PID. The juju/go4/lock library only
+// performs PID-based stale detection when the file has content.
+func removeStaleZeroByteLock(lockPath string) {
+	fi, err := os.Stat(lockPath)
+	if err != nil || fi.Size() != 0 {
+		return
+	}
+
+	_ = os.Remove(lockPath)
 }
 
 // newKeychain returns a new keychain instance.

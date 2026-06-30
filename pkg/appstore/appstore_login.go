@@ -65,6 +65,7 @@ type loginResult struct {
 
 func (t *appstore) login(email, password, authCode, guid, endpoint string) (Account, error) {
 	redirect := ""
+	authEndpoint := normalizeAuthEndpoint(endpoint)
 
 	var (
 		err error
@@ -74,11 +75,17 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 	retry := true
 
 	for attempt := 1; retry && attempt <= 4; attempt++ {
-		request := t.loginRequest(email, password, authCode, guid, endpoint, attempt)
+		request := t.loginRequest(email, password, authCode, guid, authEndpoint, attempt)
 		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
 
 		if err != nil {
+			if discoveredEndpoint := authEndpointFromResponseError(err); discoveredEndpoint != "" && discoveredEndpoint != authEndpoint {
+				authEndpoint = discoveredEndpoint
+				redirect = ""
+				continue
+			}
+
 			return Account{}, fmt.Errorf("request failed: %w", err)
 		}
 
@@ -144,6 +151,8 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		err = ErrAuthCodeRequired
 	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageAccountDisabled {
 		err = NewErrorWithMetadata(errors.New("account is disabled"), res)
+	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageActionSignInPage {
+		err = NewErrorWithMetadata(errors.New("account requires browser sign-in (2FA or Apple ID review required)"), res)
 	} else if res.Data.FailureType != "" {
 		if res.Data.CustomerMessage != "" {
 			err = NewErrorWithMetadata(errors.New(res.Data.CustomerMessage), res)

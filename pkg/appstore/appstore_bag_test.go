@@ -118,6 +118,29 @@ var _ = Describe("AppStore (Bag)", func() {
 		})
 	})
 
+	When("request is successful with authenticateAccount at the root", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("aa:bb:cc:dd:ee:ff", nil)
+
+			mockBagClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[bagResult]{
+					StatusCode: gohttp.StatusOK,
+					Data: bagResult{
+						AuthEndpoint: "https://auth.itunes.apple.com/auth/v1/native",
+					},
+				}, nil)
+		})
+
+		It("returns the normalized native auth endpoint", func() {
+			out, err := as.Bag(BagInput{})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out.AuthEndpoint).To(Equal("https://auth.itunes.apple.com/auth/v1/native/fast/"))
+		})
+	})
+
 	When("request is successful but authenticateAccount is empty", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
@@ -132,10 +155,10 @@ var _ = Describe("AppStore (Bag)", func() {
 				}, nil)
 		})
 
-		It("returns empty auth endpoint", func() {
+		It("returns the fallback auth endpoint", func() {
 			out, err := as.Bag(BagInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(out.AuthEndpoint).To(BeEmpty())
+			Expect(out.AuthEndpoint).To(Equal("https://auth.itunes.apple.com/auth/v1/native/fast/"))
 		})
 	})
 })

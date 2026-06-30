@@ -203,7 +203,7 @@ var _ = Describe("Client", Ordered, func() {
 	})
 
 	When("payload fails to decode", func() {
-		It("returns error", func() {
+		It("returns error when payload cannot be encoded", func() {
 			sut := NewClient[xmlResult](Args{
 				CookieJar: mockCookieJar,
 			})
@@ -219,6 +219,36 @@ var _ = Describe("Client", Ordered, func() {
 			})
 
 			Expect(err).To(HaveOccurred())
+		})
+
+		When("response body is not valid XML", func() {
+			BeforeEach(func() {
+				mockCookieJar.EXPECT().
+					Save().
+					Return(nil)
+			})
+
+			It("returns ResponseDecodeError with extracted URLs", func() {
+				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
+					w.Header().Add("Content-Type", "application/xml")
+					_, err := w.Write([]byte(`redirect to https://auth.itunes.apple.com/auth/v1/native`))
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				sut := NewClient[xmlResult](Args{
+					CookieJar: mockCookieJar,
+				})
+				_, err := sut.Send(Request{
+					URL:            srv.URL,
+					Method:         MethodPOST,
+					ResponseFormat: ResponseFormatXML,
+				})
+
+				var decodeErr *ResponseDecodeError
+				Expect(errors.As(err, &decodeErr)).To(BeTrue())
+				Expect(decodeErr.URLs).To(ContainElement("https://auth.itunes.apple.com/auth/v1/native"))
+				Expect(errors.Unwrap(decodeErr)).To(HaveOccurred())
+			})
 		})
 	})
 })
