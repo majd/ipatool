@@ -160,7 +160,7 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string, attempt int) http.Request {
 	return http.Request{
 		Method:         http.MethodPOST,
-		URL:            endpoint,
+		URL:            authenticateURL(endpoint),
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",
@@ -176,4 +176,21 @@ func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string
 			},
 		},
 	}
+}
+
+// authenticateURL normalizes the bag-provided authentication endpoint. Apple's
+// current endpoint (https://auth.itunes.apple.com/auth/v1/native/fast) only
+// responds correctly when the path has a trailing slash; without it the request
+// is redirected/dropped and the login silently fails. The legacy MZFinance
+// authenticate endpoint is left untouched.
+func authenticateURL(endpoint string) string {
+	if endpoint == "" {
+		return endpoint
+	}
+
+	if strings.Contains(endpoint, "/native/") && !strings.HasSuffix(endpoint, "/") {
+		return endpoint + "/"
+	}
+
+	return endpoint
 }
