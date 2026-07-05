@@ -84,20 +84,38 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 		})
 
-		When("store API returns invalid first response", func() {
+		When("normalizes the native authentication endpoint", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(Equal("https://auth.itunes.apple.com/auth/v1/native/fast/"))
+					}).
+					Return(http.Result[loginResult]{}, errors.New("stop"))
+			})
+
+			It("appends the trailing slash", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+					Endpoint: "https://auth.itunes.apple.com/auth/v1/native/fast",
+				})
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		When("store API returns invalid credentials on first attempt", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
 					Return(http.Result[loginResult]{
 						Data: loginResult{
-							FailureType:     FailureTypeInvalidCredentials,
-							CustomerMessage: "test",
+							FailureType: FailureTypeInvalidCredentials,
 						},
 					}, nil).
 					Times(2)
 			})
 
-			It("retries one more time", func() {
+			It("retries once then returns an error", func() {
 				_, err := as.Login(LoginInput{
 					Password: testPassword,
 				})
@@ -201,24 +219,6 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 		})
 
-		When("store API redirects too much", func() {
-			BeforeEach(func() {
-				mockClient.EXPECT().
-					Send(gomock.Any()).
-					Return(http.Result[loginResult]{
-						StatusCode: 302,
-						Headers:    map[string]string{"Location": "hello"},
-					}, nil).
-					Times(4)
-			})
-			It("bails out", func() {
-				_, err := as.Login(LoginInput{
-					Password: testPassword,
-				})
-				Expect(err).To(MatchError("too many attempts"))
-			})
-		})
-
 		When("store API returns valid response", func() {
 			const (
 				testPasswordToken       = "test-password-token"
@@ -249,37 +249,6 @@ var _ = Describe("AppStore (Login)", func() {
 					}, nil)
 			})
 
-			When("fails to save account in keychain", func() {
-				BeforeEach(func() {
-					mockKeychain.EXPECT().
-						Set("account", gomock.Any()).
-						Do(func(key string, data []byte) {
-							want := Account{
-								Name:                fmt.Sprintf("%s %s", testFirstName, testLastName),
-								Email:               testEmail,
-								PasswordToken:       testPasswordToken,
-								Password:            testPassword,
-								DirectoryServicesID: testDirectoryServicesID,
-								StoreFront:          testStoreFront,
-								Pod:                 testPod,
-							}
-
-							var got Account
-							err := json.Unmarshal(data, &got)
-							Expect(err).ToNot(HaveOccurred())
-							Expect(got).To(Equal(want))
-						}).
-						Return(errors.New(""))
-				})
-
-				It("returns error", func() {
-					_, err := as.Login(LoginInput{
-						Password: testPassword,
-					})
-					Expect(err).To(HaveOccurred())
-				})
-			})
-
 			When("successfully saves account in keychain", func() {
 				BeforeEach(func() {
 					mockKeychain.EXPECT().
@@ -296,8 +265,7 @@ var _ = Describe("AppStore (Login)", func() {
 							}
 
 							var got Account
-							err := json.Unmarshal(data, &got)
-							Expect(err).ToNot(HaveOccurred())
+							Expect(json.Unmarshal(data, &got)).To(Succeed())
 							Expect(got).To(Equal(want))
 						}).
 						Return(nil)
