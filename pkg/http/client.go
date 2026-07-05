@@ -20,6 +20,7 @@ var (
 	documentXMLPattern = regexp.MustCompile(`(?is)<Document\b[^>]*>(.*)</Document>`)
 	plistXMLPattern    = regexp.MustCompile(`(?is)<plist\b[^>]*>.*?</plist>`)
 	dictXMLPattern     = regexp.MustCompile(`(?is)<dict\b[^>]*>.*</dict>`)
+	htmlTagPattern     = regexp.MustCompile(`(?is)<[^>]*>`)
 )
 
 //go:generate go run go.uber.org/mock/mockgen -source=client.go -destination=client_mock.go -package=http
@@ -168,6 +169,15 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 
 	normalizedBody := normalizeXMLPlistBody(body)
 
+	if !looksLikePropertyList(normalizedBody) {
+		snippet := bodySnippet(body)
+		if snippet == "" {
+			return Result[R]{}, fmt.Errorf("unexpected response from Apple (HTTP %d): empty or non-plist body", res.StatusCode)
+		}
+
+		return Result[R]{}, fmt.Errorf("unexpected response from Apple (HTTP %d): %s", res.StatusCode, snippet)
+	}
+
 	_, err = plist.Unmarshal(normalizedBody, &data)
 	if err != nil {
 		return Result[R]{}, fmt.Errorf("failed to unmarshal xml: %w", err)
@@ -208,6 +218,51 @@ func normalizeXMLPlistBody(body []byte) []byte {
 	}
 
 	return normalized
+}
+
+// looksLikePropertyList reports whether body appears to be a (binary or XML)
+// property list. Apple occasionally answers with an HTML error page or a plain
+// text message; those must not be handed to plist.Unmarshal, which would
+// misinterpret a leading "<h..." as an OpenStep hex-data block and fail with an
+// opaque "unexpected hex digit" error instead of surfacing Apple's actual response.
+func looksLikePropertyList(body []byte) bool {
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 {
+		return false
+	}
+
+	if bytes.HasPrefix(trimmed, []byte("bplist")) {
+		return true
+	}
+
+	lower := bytes.ToLower(trimmed)
+	for _, marker := range [][]byte{
+		[]byte("<?xml"),
+		[]byte("<plist"),
+		[]byte("<dict"),
+		[]byte("<key"),
+	} {
+		if bytes.Contains(lower, marker) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// bodySnippet returns a compact, single-line excerpt of a non-plist response
+// body suitable for embedding in an error message. HTML markup is stripped so
+// the underlying message (if any) is readable.
+func bodySnippet(body []byte) string {
+	text := htmlTagPattern.ReplaceAll(body, []byte(" "))
+	snippet := strings.Join(strings.Fields(string(text)), " ")
+
+	const maxLen = 200
+	if len(snippet) > maxLen {
+		snippet = snippet[:maxLen] + "…"
+	}
+
+	return snippet
 }
 
 func extractEmbeddedPlist(body []byte) []byte {

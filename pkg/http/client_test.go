@@ -183,6 +183,28 @@ var _ = Describe("Client", Ordered, func() {
 				Expect(res.Data.Foo).To(Equal("bar"))
 			})
 
+			It("returns a readable error when Apple responds with an HTML page instead of a plist", func() {
+				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
+					w.Header().Add("Content-Type", "text/html")
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_, err := w.Write([]byte("<html><body><h1>Service Unavailable</h1></body></html>"))
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				sut := NewClient[xmlResult](Args{
+					CookieJar: mockCookieJar,
+				})
+				_, err := sut.Send(Request{
+					URL:            srv.URL,
+					Method:         MethodPOST,
+					ResponseFormat: ResponseFormatXML,
+				})
+
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).ToNot(ContainSubstring("hex digit"))
+				Expect(err.Error()).To(ContainSubstring("Service Unavailable"))
+			})
+
 			It("returns error when content type is not supported", func() {
 				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
 					w.Header().Add("Content-Type", "application/xyz")
