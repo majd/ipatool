@@ -103,6 +103,47 @@ var _ = Describe("AppStore (Login)", func() {
 			})
 		})
 
+		When("native authentication returns an empty response", func() {
+			const podURL = "https://p7-buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate?Pod=7&PRH=7"
+
+			BeforeEach(func() {
+				native := mockClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(Equal("https://auth.itunes.apple.com/auth/v1/native/fast/"))
+					}).
+					Return(http.Result[loginResult]{}, &http.UnexpectedResponseError{StatusCode: 204})
+				legacy := mockClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(Equal(legacyAuthenticateEndpoint))
+						payload := req.Payload.(*http.XMLPayload)
+						Expect(payload.Content).To(HaveKeyWithValue("attempt", "1"))
+					}).
+					Return(http.Result[loginResult]{
+						StatusCode: 302,
+						Headers:    map[string]string{"Location": podURL},
+					}, nil)
+				pod := mockClient.EXPECT().
+					Send(gomock.Any()).
+					Do(func(req http.Request) {
+						Expect(req.URL).To(Equal(podURL))
+						payload := req.Payload.(*http.XMLPayload)
+						Expect(payload.Content).To(HaveKeyWithValue("attempt", "1"))
+					}).
+					Return(http.Result[loginResult]{}, errors.New("stop after pod redirect"))
+				gomock.InOrder(native, legacy, pod)
+			})
+
+			It("falls back to legacy authentication and reposts the plist to the assigned pod", func() {
+				_, err := as.Login(LoginInput{
+					Password: testPassword,
+					Endpoint: "https://auth.itunes.apple.com/auth/v1/native/fast",
+				})
+				Expect(err).To(MatchError("request failed: stop after pod redirect"))
+			})
+		})
+
 		When("store API returns invalid credentials on first attempt", func() {
 			BeforeEach(func() {
 				mockClient.EXPECT().
@@ -205,13 +246,13 @@ var _ = Describe("AppStore (Login)", func() {
 						Expect(req.URL).To(Equal(testRedirectLocation))
 						Expect(req.Payload).To(BeAssignableToTypeOf(&http.XMLPayload{}))
 						x := req.Payload.(*http.XMLPayload)
-						Expect(x.Content).To(HaveKeyWithValue("attempt", "2"))
+						Expect(x.Content).To(HaveKeyWithValue("attempt", "1"))
 					}).
 					Return(http.Result[loginResult]{}, errors.New("test complete"))
 				gomock.InOrder(firstCall, secondCall)
 			})
 
-			It("follows the redirect and increments attempt", func() {
+			It("follows the redirect while preserving the original request body", func() {
 				_, err := as.Login(LoginInput{
 					Password: testPassword,
 				})

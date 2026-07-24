@@ -224,6 +224,19 @@ var _ = Describe("Client", Ordered, func() {
 		})
 	})
 
+	It("preserves an XML redirect response and its location header", func() {
+		recorder := httptest.NewRecorder()
+		recorder.Header().Set("Location", "https://p7-buy.itunes.apple.com/authenticate")
+		recorder.WriteHeader(http.StatusFound)
+
+		sut := &client[xmlResult]{}
+		res, err := sut.handleXMLResponse(recorder.Result())
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(res.StatusCode).To(Equal(http.StatusFound))
+		Expect(res.Headers).To(HaveKeyWithValue("Location", "https://p7-buy.itunes.apple.com/authenticate"))
+	})
+
 	When("payload fails to decode", func() {
 		It("returns error", func() {
 			sut := NewClient[xmlResult](Args{
