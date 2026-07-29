@@ -7,4 +7,5 @@ type CookieJar interface {
 	http.CookieJar
 
 	Save() error
+	RemoveAll()
 }

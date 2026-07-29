@@ -134,6 +134,13 @@ func (t *appstore) SwitchAccount(email string) (Account, error) {
 
 	accountStorage.Current = email
 
+	if t.cookieJar != nil {
+		t.cookieJar.RemoveAll()
+		if err := t.cookieJar.Save(); err != nil {
+			return Account{}, fmt.Errorf("failed to clear account cookies: %w", err)
+		}
+	}
+
 	rootData, err := json.Marshal(accountStorage)
 	if err != nil {
 		return Account{}, fmt.Errorf("failed to marshal json: %w", err)

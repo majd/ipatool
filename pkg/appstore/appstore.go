@@ -46,6 +46,7 @@ type appstore struct {
 	platformClient http.Client[platformVersionLookupResult]
 	bagClient      http.Client[bagResult]
 	httpClient     http.Client[interface{}]
+	cookieJar      http.CookieJar
 	machine        machine.Machine
 	os             operatingsystem.OperatingSystem
 }
@@ -71,6 +72,7 @@ func NewAppStore(args Args) AppStore {
 		platformClient: http.NewClient[platformVersionLookupResult](clientArgs),
 		bagClient:      http.NewClient[bagResult](clientArgs),
 		httpClient:     http.NewClient[interface{}](clientArgs),
+		cookieJar:      args.CookieJar,
 		machine:        args.Machine,
 		os:             args.OperatingSystem,
 	}

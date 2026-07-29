@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -71,6 +72,46 @@ var _ = Describe("AppStore (AccountInfo)", func() {
 				Get(AccountKey).
 				Return(expectedResult, nil).
 				AnyTimes()
+		})
+	})
+
+	When("switching accounts", func() {
+		var mockCookieJar *http.MockCookieJar
+
+		BeforeEach(func() {
+			mockCookieJar = http.NewMockCookieJar(ctrl)
+			appstore = NewAppStore(Args{
+				Keychain:  mockKeychain,
+				CookieJar: mockCookieJar,
+			})
+
+			accountStorage := AccountStorage{
+				Current: testEmail,
+				Accounts: []Account{
+					{Email: testEmail, Name: testName},
+					{Email: "other@example.com", Name: "Other"},
+				},
+			}
+			storageData, err := json.Marshal(accountStorage)
+			Expect(err).ToNot(HaveOccurred())
+
+			mockKeychain.EXPECT().
+				Get(AccountKey).
+				Return(storageData, nil).
+				AnyTimes()
+			mockKeychain.EXPECT().
+				Set(AccountKey, gomock.Any()).
+				Return(nil)
+			mockCookieJar.EXPECT().
+				RemoveAll()
+			mockCookieJar.EXPECT().
+				Save().
+				Return(nil)
+		})
+
+		It("resets session cookies before switching", func() {
+			_, err := appstore.SwitchAccount("other@example.com")
+			Expect(err).ToNot(HaveOccurred())
 		})
 	})
 
