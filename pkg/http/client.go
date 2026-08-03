@@ -39,6 +39,21 @@ type Args struct {
 	CookieJar CookieJar
 }
 
+// UnexpectedResponseError preserves the HTTP status when Apple returns an
+// HTML or empty response where an XML plist was expected.
+type UnexpectedResponseError struct {
+	StatusCode int
+	Snippet    string
+}
+
+func (e *UnexpectedResponseError) Error() string {
+	if e.Snippet == "" {
+		return fmt.Sprintf("unexpected response from Apple (HTTP %d): empty or non-plist body", e.StatusCode)
+	}
+
+	return fmt.Sprintf("unexpected response from Apple (HTTP %d): %s", e.StatusCode, e.Snippet)
+}
+
 type AddHeaderTransport struct {
 	T http.RoundTripper
 }
@@ -165,17 +180,27 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 		return Result[R]{}, fmt.Errorf("rate limited by Apple (HTTP %d): %s", res.StatusCode, strings.TrimSpace(string(body)))
 	}
 
+	// The legacy authentication endpoint redirects to an assigned Store pod.
+	// Preserve the redirect response and its Location header so callers can
+	// repeat the original POST request at that pod.
+	if res.StatusCode >= http.StatusMultipleChoices && res.StatusCode < http.StatusBadRequest {
+		return Result[R]{
+			StatusCode: res.StatusCode,
+			Headers:    responseHeaders(res),
+		}, nil
+	}
+
 	var data R
 
 	normalizedBody := normalizeXMLPlistBody(body)
 
 	if !looksLikePropertyList(normalizedBody) {
 		snippet := bodySnippet(body)
-		if snippet == "" {
-			return Result[R]{}, fmt.Errorf("unexpected response from Apple (HTTP %d): empty or non-plist body", res.StatusCode)
-		}
 
-		return Result[R]{}, fmt.Errorf("unexpected response from Apple (HTTP %d): %s", res.StatusCode, snippet)
+		return Result[R]{}, &UnexpectedResponseError{
+			StatusCode: res.StatusCode,
+			Snippet:    snippet,
+		}
 	}
 
 	_, err = plist.Unmarshal(normalizedBody, &data)
@@ -183,16 +208,20 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 		return Result[R]{}, fmt.Errorf("failed to unmarshal xml: %w", err)
 	}
 
+	return Result[R]{
+		StatusCode: res.StatusCode,
+		Headers:    responseHeaders(res),
+		Data:       data,
+	}, nil
+}
+
+func responseHeaders(res *http.Response) map[string]string {
 	headers := map[string]string{}
 	for key, val := range res.Header {
 		headers[key] = strings.Join(val, "; ")
 	}
 
-	return Result[R]{
-		StatusCode: res.StatusCode,
-		Headers:    headers,
-		Data:       data,
-	}, nil
+	return headers
 }
 
 func normalizeXMLPlistBody(body []byte) []byte {
