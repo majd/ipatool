@@ -16,6 +16,8 @@ var (
 	ErrAuthCodeRequired = errors.New("auth code is required")
 )
 
+const legacyAuthenticateEndpoint = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
+
 type LoginInput struct {
 	Email    string
 	Password string
@@ -74,11 +76,22 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 	retry := true
 
 	for attempt := 1; retry && attempt <= 4; attempt++ {
-		request := t.loginRequest(email, password, authCode, guid, endpoint, attempt)
+		requestAttempt := attempt
+		if redirect != "" {
+			// The pod redirect is part of the same authentication attempt. Apple
+			// expects the original XML plist body, including its attempt value.
+			requestAttempt = 1
+		}
+
+		request := t.loginRequest(email, password, authCode, guid, endpoint, requestAttempt)
 		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
 
 		if err != nil {
+			if shouldRetryWithLegacyAuthenticate(endpoint, err) {
+				return t.login(email, password, authCode, guid, legacyAuthenticateEndpoint)
+			}
+
 			return Account{}, fmt.Errorf("request failed: %w", err)
 		}
 
@@ -123,6 +136,24 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 	}
 
 	return acc, nil
+}
+
+func shouldRetryWithLegacyAuthenticate(endpoint string, err error) bool {
+	if !strings.Contains(endpoint, "/native/") {
+		return false
+	}
+
+	var responseErr *http.UnexpectedResponseError
+	if !errors.As(err, &responseErr) {
+		return false
+	}
+
+	switch responseErr.StatusCode {
+	case gohttp.StatusNoContent, gohttp.StatusForbidden, gohttp.StatusNotFound, gohttp.StatusServiceUnavailable:
+		return true
+	default:
+		return false
+	}
 }
 
 func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int, authCode string) (bool, string, error) {
