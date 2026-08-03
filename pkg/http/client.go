@@ -196,6 +196,7 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 
 	if !looksLikePropertyList(normalizedBody) {
 		snippet := bodySnippet(body)
+
 		return Result[R]{}, &UnexpectedResponseError{
 			StatusCode: res.StatusCode,
 			Snippet:    snippet,

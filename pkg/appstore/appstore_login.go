@@ -82,6 +82,7 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 			// expects the original XML plist body, including its attempt value.
 			requestAttempt = 1
 		}
+
 		request := t.loginRequest(email, password, authCode, guid, endpoint, requestAttempt)
 		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
