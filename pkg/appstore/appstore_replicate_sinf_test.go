@@ -58,7 +58,8 @@ var _ = Describe("AppStore (ReplicateSinf)", func() {
 	})
 
 	JustBeforeEach(func() {
-		testZip.Close()
+		Expect(testZip.Close()).To(Succeed())
+		Expect(testFile.Close()).To(Succeed())
 	})
 
 	AfterEach(func() {

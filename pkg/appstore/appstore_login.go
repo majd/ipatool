@@ -16,12 +16,12 @@ var (
 	ErrAuthCodeRequired = errors.New("auth code is required")
 )
 
-const legacyAuthenticateEndpoint = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
-
 type LoginInput struct {
 	Email    string
 	Password string
 	AuthCode string
+	// Endpoint is deprecated. Login always uses the SAP configuration from
+	// Apple's current bag so unsigned or caller-selected fallbacks are impossible.
 	Endpoint string
 }
 
@@ -35,16 +35,50 @@ func (t *appstore) Login(input LoginInput) (LoginOutput, error) {
 		return LoginOutput{}, fmt.Errorf("failed to get mac address: %w", err)
 	}
 
-	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
-
-	acc, err := t.login(input.Email, input.Password, input.AuthCode, guid, input.Endpoint)
+	guid, machineID, err := machineIdentity(macAddr)
 	if err != nil {
 		return LoginOutput{}, err
 	}
 
-	return LoginOutput{
-		Account: acc,
-	}, nil
+	bag, err := t.bag(guid)
+	if err != nil {
+		return LoginOutput{}, fmt.Errorf("failed to get bag: %w", err)
+	}
+
+	if t.actionSignerFactory == nil {
+		return LoginOutput{}, errors.New("SAP action signer is not configured")
+	}
+
+	signer, err := t.actionSignerFactory(bag.SAPConfig, machineID)
+	if err != nil {
+		return LoginOutput{}, fmt.Errorf("failed to initialize SAP action signer: %w", err)
+	}
+
+	if signer == nil {
+		return LoginOutput{}, errors.New("SAP action signer factory returned nil")
+	}
+
+	acc, loginErr := t.login(input.Email, input.Password, input.AuthCode, guid, bag.SAPConfig.AuthEndpoint, signer)
+	closeErr := signer.Close()
+
+	if closeErr != nil {
+		closeErr = fmt.Errorf("failed to close SAP action signer: %w", closeErr)
+	}
+
+	if loginErr != nil {
+		if closeErr != nil {
+			return LoginOutput{}, errors.Join(loginErr, closeErr)
+		}
+
+		return LoginOutput{}, loginErr
+	}
+
+	output := LoginOutput{Account: acc}
+	if closeErr != nil {
+		return output, closeErr
+	}
+
+	return output, nil
 }
 
 type loginAddressResult struct {
@@ -65,7 +99,7 @@ type loginResult struct {
 	PasswordToken       string             `plist:"passwordToken,omitempty"`
 }
 
-func (t *appstore) login(email, password, authCode, guid, endpoint string) (Account, error) {
+func (t *appstore) login(email, password, authCode, guid, endpoint string, signer ActionSigner) (Account, error) {
 	redirect := ""
 
 	var (
@@ -83,15 +117,11 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 			requestAttempt = 1
 		}
 
-		request := t.loginRequest(email, password, authCode, guid, endpoint, requestAttempt)
+		request := t.loginRequest(email, password, authCode, guid, endpoint, requestAttempt, signer)
 		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
 		res, err = t.loginClient.Send(request)
 
 		if err != nil {
-			if shouldRetryWithLegacyAuthenticate(endpoint, err) {
-				return t.login(email, password, authCode, guid, legacyAuthenticateEndpoint)
-			}
-
 			return Account{}, fmt.Errorf("request failed: %w", err)
 		}
 
@@ -138,24 +168,6 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string) (Acco
 	return acc, nil
 }
 
-func shouldRetryWithLegacyAuthenticate(endpoint string, err error) bool {
-	if !strings.Contains(endpoint, "/native/") {
-		return false
-	}
-
-	var responseErr *http.UnexpectedResponseError
-	if !errors.As(err, &responseErr) {
-		return false
-	}
-
-	switch responseErr.StatusCode {
-	case gohttp.StatusNoContent, gohttp.StatusForbidden, gohttp.StatusNotFound, gohttp.StatusServiceUnavailable:
-		return true
-	default:
-		return false
-	}
-}
-
 func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int, authCode string) (bool, string, error) {
 	var (
 		retry    bool
@@ -166,6 +178,8 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 	if res.StatusCode == gohttp.StatusFound {
 		if redirect, err = res.GetHeader("location"); err != nil {
 			err = fmt.Errorf("failed to retrieve redirect location: %w", err)
+		} else if err = validateAuthenticationEndpoint(redirect); err != nil {
+			err = fmt.Errorf("invalid authentication redirect: %w", err)
 		} else {
 			retry = true
 		}
@@ -188,11 +202,12 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 	return retry, redirect, err
 }
 
-func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string, attempt int) http.Request {
+func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string, attempt int, signer ActionSigner) http.Request {
 	return http.Request{
 		Method:         http.MethodPOST,
-		URL:            authenticateURL(endpoint),
+		URL:            endpoint,
 		ResponseFormat: http.ResponseFormatXML,
+		ActionSigner:   signer,
 		Headers: map[string]string{
 			"Content-Type": "application/x-www-form-urlencoded",
 		},
@@ -207,21 +222,4 @@ func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string
 			},
 		},
 	}
-}
-
-// authenticateURL normalizes the bag-provided authentication endpoint. Apple's
-// current endpoint (https://auth.itunes.apple.com/auth/v1/native/fast) only
-// responds correctly when the path has a trailing slash; without it the request
-// is redirected/dropped and the login silently fails. The legacy MZFinance
-// authenticate endpoint is left untouched.
-func authenticateURL(endpoint string) string {
-	if endpoint == "" {
-		return endpoint
-	}
-
-	if strings.Contains(endpoint, "/native/") && !strings.HasSuffix(endpoint, "/") {
-		return endpoint + "/"
-	}
-
-	return endpoint
 }
