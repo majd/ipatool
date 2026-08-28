@@ -607,6 +607,9 @@ var _ = Describe("AppStore (Download)", func() {
 
 				err = zipFile.Close()
 				Expect(err).ToNot(HaveOccurred())
+
+				err = tmpFile.Close()
+				Expect(err).ToNot(HaveOccurred())
 			})
 
 			AfterEach(func() {

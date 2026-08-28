@@ -1,13 +1,10 @@
 package operatingsystem
 
 import (
-	"fmt"
 	"io/fs"
-	"math/rand"
 	"os"
-	"path"
+	"path/filepath"
 	"testing"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,45 +35,47 @@ var _ = Describe("OperatingSystem", func() {
 	})
 
 	When("file exists", func() {
-		var file *os.File
+		var filePath string
 
 		BeforeEach(func() {
-			var err error
-
-			file, err = os.CreateTemp("", "test_file")
+			file, err := os.CreateTemp("", "test_file")
 			Expect(err).ToNot(HaveOccurred())
+
+			filePath = file.Name()
+			Expect(file.Close()).To(Succeed())
 		})
 
 		AfterEach(func() {
-			err := file.Close()
-			Expect(err).ToNot(HaveOccurred())
+			if err := os.Remove(filePath); err != nil && !os.IsNotExist(err) {
+				Expect(err).ToNot(HaveOccurred())
+			}
 		})
 
 		It("returns file info", func() {
-			res, err := sut.Stat(file.Name())
+			res, err := sut.Stat(filePath)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Name()).To(Equal(path.Base(file.Name())))
+			Expect(res.Name()).To(Equal(filepath.Base(filePath)))
 		})
 
 		It("opens file", func() {
-			res, err := sut.OpenFile(file.Name(), os.O_WRONLY, 0644)
+			res, err := sut.OpenFile(filePath, os.O_WRONLY, 0644)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(res.Name()).To(Equal(file.Name()))
+			Expect(res.Name()).To(Equal(filePath))
+			Expect(res.Close()).To(Succeed())
 		})
 
 		It("removes file", func() {
-			err := sut.Remove(file.Name())
+			err := sut.Remove(filePath)
 			Expect(err).ToNot(HaveOccurred())
 
-			_, err = sut.Stat(file.Name())
+			_, err = sut.Stat(filePath)
 			Expect(os.IsNotExist(err)).To(BeTrue())
 		})
 
 		It("renames file", func() {
-			r := rand.New(rand.NewSource(time.Now().UnixNano()))
-			newPath := fmt.Sprintf("%s/%d", os.TempDir(), r.Intn(100))
+			newPath := filePath + ".renamed"
 
-			err := sut.Rename(file.Name(), newPath)
+			err := sut.Rename(filePath, newPath)
 			defer func() {
 				_ = sut.Remove(newPath)
 			}()

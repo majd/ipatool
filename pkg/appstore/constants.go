@@ -22,6 +22,7 @@ const (
 	PrivateInitPath   = "/bag.xml"
 
 	PrivateAppStoreAPIDomain       = "buy." + iTunesAPIDomain
+	PrivateAppStoreAPIPathAuth     = "/WebObjects/MZFinance.woa/wa/authenticate"
 	PrivateAppStoreAPIPathPurchase = "/WebObjects/MZFinance.woa/wa/buyProduct"
 	PrivateAppStoreAPIPathDownload = "/WebObjects/MZFinance.woa/wa/volumeStoreDownloadProduct"
 
