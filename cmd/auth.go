@@ -62,6 +62,8 @@ func loginCmd() *cobra.Command {
 				password = string(bytes)
 			}
 
+			dependencies.Logger.Log().Msg("preparing authentication; the first login may take a few minutes")
+
 			var lastErr error
 
 			// nolint:wrapcheck

@@ -12,6 +12,8 @@ import (
 	"github.com/ebitengine/purego"
 )
 
+const queryTimeout = 4
+
 const (
 	archX86 = 4
 	mode64  = 8
@@ -28,12 +30,16 @@ const (
 	RegR9  = 107
 )
 
-var errEngineClosed = errors.New("unicorn engine is closed")
+var (
+	errTimeout      = errors.New("unicorn emulation timed out")
+	errEngineClosed = errors.New("unicorn engine is closed")
+)
 
 type api struct {
 	version  func(*uint32, *uint32) uint32
 	open     func(int32, int32, *uintptr) int32
 	close    func(uintptr) int32
+	query    func(uintptr, int32, *uint64) int32
 	ctl      func(uintptr, uint32, uint32) int32
 	strerror func(int32) string
 	memMap   func(uintptr, uint64, uint64, uint32) int32
@@ -126,6 +132,7 @@ func (e *Engine) register(handle uintptr) {
 	purego.RegisterLibFunc(&e.api.version, handle, "uc_version")
 	purego.RegisterLibFunc(&e.api.open, handle, "uc_open")
 	purego.RegisterLibFunc(&e.api.close, handle, "uc_close")
+	purego.RegisterLibFunc(&e.api.query, handle, "uc_query")
 	purego.RegisterLibFunc(&e.api.ctl, handle, "uc_ctl")
 	purego.RegisterLibFunc(&e.api.strerror, handle, "uc_strerror")
 	purego.RegisterLibFunc(&e.api.memMap, handle, "uc_mem_map")
@@ -259,7 +266,20 @@ func (e *Engine) StartBounded(begin, end uint64, timeout time.Duration, instruct
 
 	defer done()
 
-	return e.err(e.api.emuStart(handle, begin, end, microseconds, instructionLimit))
+	if err := e.err(e.api.emuStart(handle, begin, end, microseconds, instructionLimit)); err != nil {
+		return err
+	}
+
+	var timedOut uint64
+	if err := e.err(e.api.query(handle, queryTimeout, &timedOut)); err != nil {
+		return fmt.Errorf("query Unicorn timeout: %w", err)
+	}
+
+	if timedOut != 0 {
+		return fmt.Errorf("%w after %s", errTimeout, timeout)
+	}
+
+	return nil
 }
 
 func (e *Engine) Stop() error {

@@ -13,6 +13,8 @@ import (
 	"github.com/majd/ipatool/v2/internal/sap/unicorn"
 )
 
+const sapGuestTimeout = time.Minute
+
 const (
 	returnAddress = uint64(0x0000000100000000)
 	coreFPBase    = uint64(0x0000100000000000)
@@ -431,7 +433,10 @@ func (m *Machine) invoke(function uint64, arguments ...uint64) (uint64, error) {
 
 	m.services.resetFault()
 
-	if err := m.engine.StartBounded(function, returnAddress, 10*time.Second, 100_000_000); err != nil {
+	// SAP's cryptographic routines have input- and host-dependent instruction
+	// counts. Bound execution by wall time without rejecting legitimate work on
+	// slower machines for crossing a fixed instruction limit.
+	if err := m.engine.StartBounded(function, returnAddress, sapGuestTimeout, 0); err != nil {
 		if m.services.fault != nil {
 			return 0, m.services.fault
 		}
