@@ -242,3 +242,32 @@ func TestEngineExecutesX8664(t *testing.T) {
 		t.Fatalf("RAX = %#x, want %#x", value, uint64(0x1234))
 	}
 }
+
+func TestStartBoundedReportsTimeout(t *testing.T) {
+	engine := newTestEngine(t)
+	defer engine.Close()
+
+	const address = uint64(0x1100000)
+	if err := engine.MemMap(address, 0x1000); err != nil {
+		t.Fatal(err)
+	}
+
+	// jmp $-2
+	if err := engine.MemWrite(address, []byte{0xeb, 0xfe}); err != nil {
+		t.Fatal(err)
+	}
+
+	err := engine.StartBounded(address, address+2, 10*time.Millisecond, 0)
+	if !errors.Is(err, errTimeout) {
+		t.Fatalf("StartBounded error = %v, want %v", err, errTimeout)
+	}
+
+	const completionAddress = address + 0x10
+	if err := engine.MemWrite(completionAddress, []byte{0xf4}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := engine.StartBounded(completionAddress, completionAddress+1, time.Second, 0); err != nil {
+		t.Fatalf("StartBounded after timeout: %v", err)
+	}
+}
