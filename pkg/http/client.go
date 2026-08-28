@@ -2,6 +2,7 @@ package http
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,9 +13,7 @@ import (
 	"howett.net/plist"
 )
 
-const (
-	appStoreAuthURL = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
-)
+const appStoreAuthPath = "/WebObjects/MZFinance.woa/wa/authenticate"
 
 var (
 	documentXMLPattern = regexp.MustCompile(`(?is)<Document\b[^>]*>(.*)</Document>`)
@@ -77,7 +76,7 @@ func NewClient[R interface{}](args Args) Client[R] {
 			Timeout: 0,
 			Jar:     args.CookieJar,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				if req.Referer() == appStoreAuthURL {
+				if len(via) > 0 && via[len(via)-1].URL.Path == appStoreAuthPath {
 					return http.ErrUseLastResponse
 				}
 
@@ -109,6 +108,15 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 
 	for key, val := range req.Headers {
 		request.Header.Set(key, val)
+	}
+
+	if req.ActionSigner != nil {
+		signature, err := req.ActionSigner.Sign(data)
+		if err != nil {
+			return Result[R]{}, fmt.Errorf("failed to sign Apple action: %w", err)
+		}
+
+		request.Header.Set(HeaderAppleActionSignature, base64.StdEncoding.EncodeToString(signature))
 	}
 
 	res, err := c.internalClient.Do(request)

@@ -85,9 +85,7 @@ var _ = Describe("AppStore (Bag)", func() {
 		})
 	})
 
-	When("request is successful with authenticateAccount in urlBag", func() {
-		const testAuthEndpoint = "https://example.com"
-
+	When("request contains valid SAP configuration", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
 				MacAddress().
@@ -103,22 +101,18 @@ var _ = Describe("AppStore (Bag)", func() {
 				}).
 				Return(http.Result[bagResult]{
 					StatusCode: gohttp.StatusOK,
-					Data: bagResult{
-						URLBag: urlBag{
-							AuthEndpoint: testAuthEndpoint,
-						},
-					},
+					Data:       validBagResult(),
 				}, nil)
 		})
 
-		It("returns output", func() {
+		It("returns parsed SAP configuration", func() {
 			out, err := as.Bag(BagInput{})
 			Expect(err).ToNot(HaveOccurred())
-			Expect(out.AuthEndpoint).To(Equal(testAuthEndpoint))
+			Expect(out.SAPConfig).To(Equal(validSAPConfig()))
 		})
 	})
 
-	When("request is successful but authenticateAccount is empty", func() {
+	When("the authentication endpoint is missing", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
 				MacAddress().
@@ -128,14 +122,64 @@ var _ = Describe("AppStore (Bag)", func() {
 				Send(gomock.Any()).
 				Return(http.Result[bagResult]{
 					StatusCode: gohttp.StatusOK,
-					Data:       bagResult{},
+					Data: bagResult{URLBag: urlBag{
+						SAPSetupEndpoint:     testSAPSetupEndpoint,
+						SAPSetupCertEndpoint: testSAPSetupCertEndpoint,
+						SAPVersion:           testSAPVersion,
+					}},
 				}, nil)
 		})
 
-		It("returns empty auth endpoint", func() {
-			out, err := as.Bag(BagInput{})
-			Expect(err).ToNot(HaveOccurred())
-			Expect(out.AuthEndpoint).To(BeEmpty())
+		It("returns an error", func() {
+			_, err := as.Bag(BagInput{})
+			Expect(err).To(MatchError(ContainSubstring("invalid authentication endpoint")))
+		})
+	})
+
+	When("the SAP version is invalid", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("aa:bb:cc:dd:ee:ff", nil)
+
+			result := validBagResult()
+			result.URLBag.SAPVersion = "invalid"
+			mockBagClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[bagResult]{
+					StatusCode: gohttp.StatusOK,
+					Data:       result,
+				}, nil)
+		})
+
+		It("returns an error", func() {
+			_, err := as.Bag(BagInput{})
+			Expect(err).To(MatchError(ContainSubstring("invalid SAP version")))
 		})
 	})
 })
+
+const (
+	testAuthEndpoint         = "https://buy.itunes.apple.com/WebObjects/MZFinance.woa/wa/authenticate"
+	testSAPSetupEndpoint     = "https://fpinit.example.com/v1/signSapSetup/legacy"
+	testSAPSetupCertEndpoint = "https://static.example.com/sap/setupCert.plist"
+	testSAPVersion           = "200"
+)
+
+func validBagResult() bagResult {
+	return bagResult{URLBag: urlBag{
+		AuthEndpoint:         testAuthEndpoint,
+		SAPSetupEndpoint:     testSAPSetupEndpoint,
+		SAPSetupCertEndpoint: testSAPSetupCertEndpoint,
+		SAPVersion:           testSAPVersion,
+	}}
+}
+
+func validSAPConfig() SAPConfig {
+	return SAPConfig{
+		AuthEndpoint:   testAuthEndpoint,
+		SetupURL:       testSAPSetupEndpoint,
+		CertificateURL: testSAPSetupCertEndpoint,
+		Version:        200,
+	}
+}

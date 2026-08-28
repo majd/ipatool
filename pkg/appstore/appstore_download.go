@@ -244,6 +244,7 @@ func (*appstore) downloadRequest(acc Account, app App, guid string, externalVers
 		"creditDisplay": "",
 		"guid":          guid,
 		"salableAdamId": app.ID,
+		"serialNumber":  "0",
 	}
 
 	if externalVersionID != "" {

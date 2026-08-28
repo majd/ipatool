@@ -10,7 +10,6 @@ import (
 
 	"github.com/avast/retry-go"
 	"github.com/majd/ipatool/v2/pkg/appstore"
-	"github.com/majd/ipatool/v2/pkg/util"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -78,21 +77,14 @@ func loginCmd() *cobra.Command {
 				}
 
 				dependencies.Logger.Verbose().
-					Str("password", password).
 					Str("email", email).
-					Str("authCode", util.IfEmpty(authCode, "<nil>")).
+					Bool("authCodeProvided", authCode != "").
 					Msg("logging in")
-
-				bag, err := dependencies.AppStore.Bag(appstore.BagInput{})
-				if err != nil {
-					return fmt.Errorf("failed to get bag: %w", err)
-				}
 
 				output, err := dependencies.AppStore.Login(appstore.LoginInput{
 					Email:    email,
 					Password: password,
 					AuthCode: authCode,
-					Endpoint: bag.AuthEndpoint,
 				})
 				if err != nil {
 					if errors.Is(err, appstore.ErrAuthCodeRequired) && !interactive {

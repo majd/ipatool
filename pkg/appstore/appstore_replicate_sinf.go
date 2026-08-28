@@ -25,19 +25,52 @@ type ReplicateSinfInput struct {
 }
 
 func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
+	tmpPath := fmt.Sprintf("%s.tmp", input.PackagePath)
+	if err := t.writeReplicatedZip(input, tmpPath); err != nil {
+		return err
+	}
+
+	if err := t.os.Remove(input.PackagePath); err != nil {
+		return fmt.Errorf("failed to remove original file: %w", err)
+	}
+
+	if err := t.os.Rename(tmpPath, input.PackagePath); err != nil {
+		return fmt.Errorf("failed to rename replicated file: %w", err)
+	}
+
+	return nil
+}
+
+//nolint:nonamedreturns // Deferred cleanup must update the returned error.
+func (t *appstore) writeReplicatedZip(input ReplicateSinfInput, tmpPath string) (err error) {
 	zipReader, err := zip.OpenReader(input.PackagePath)
 	if err != nil {
 		return errors.New("failed to open zip reader")
 	}
 
-	tmpPath := fmt.Sprintf("%s.tmp", input.PackagePath)
-	tmpFile, err := t.os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY, 0644)
+	defer func() {
+		if closeErr := zipReader.Close(); closeErr != nil {
+			err = joinCleanupError(err, "failed to close zip reader", closeErr)
+		}
+	}()
 
+	tmpFile, err := t.os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 
+	defer func() {
+		if closeErr := tmpFile.Close(); closeErr != nil {
+			err = joinCleanupError(err, "failed to close replicated file", closeErr)
+		}
+	}()
+
 	zipWriter := zip.NewWriter(tmpFile)
+	defer func() {
+		if closeErr := zipWriter.Close(); closeErr != nil {
+			err = joinCleanupError(err, "failed to close zip writer", closeErr)
+		}
+	}()
 
 	err = t.replicateZip(zipReader, zipWriter)
 	if err != nil {
@@ -69,21 +102,16 @@ func (t *appstore) ReplicateSinf(input ReplicateSinfInput) error {
 		return fmt.Errorf("failed to replicate sinf: %w", err)
 	}
 
-	zipReader.Close()
-	zipWriter.Close()
-	tmpFile.Close()
-
-	err = t.os.Remove(input.PackagePath)
-	if err != nil {
-		return fmt.Errorf("failed to remove original file: %w", err)
-	}
-
-	err = t.os.Rename(tmpPath, input.PackagePath)
-	if err != nil {
-		return fmt.Errorf("failed to remove original file: %w", err)
-	}
-
 	return nil
+}
+
+func joinCleanupError(err error, message string, cleanupErr error) error {
+	wrapped := fmt.Errorf("%s: %w", message, cleanupErr)
+	if err == nil {
+		return wrapped
+	}
+
+	return errors.Join(err, wrapped)
 }
 
 type packageManifest struct {

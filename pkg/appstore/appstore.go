@@ -34,23 +34,25 @@ type AppStore interface {
 }
 
 type appstore struct {
-	keychain       keychain.Keychain
-	loginClient    http.Client[loginResult]
-	searchClient   http.Client[searchResult]
-	purchaseClient http.Client[purchaseResult]
-	downloadClient http.Client[downloadResult]
-	platformClient http.Client[platformVersionLookupResult]
-	bagClient      http.Client[bagResult]
-	httpClient     http.Client[interface{}]
-	machine        machine.Machine
-	os             operatingsystem.OperatingSystem
+	keychain            keychain.Keychain
+	loginClient         http.Client[loginResult]
+	searchClient        http.Client[searchResult]
+	purchaseClient      http.Client[purchaseResult]
+	downloadClient      http.Client[downloadResult]
+	platformClient      http.Client[platformVersionLookupResult]
+	bagClient           http.Client[bagResult]
+	httpClient          http.Client[interface{}]
+	actionSignerFactory ActionSignerFactory
+	machine             machine.Machine
+	os                  operatingsystem.OperatingSystem
 }
 
 type Args struct {
-	Keychain        keychain.Keychain
-	CookieJar       http.CookieJar
-	OperatingSystem operatingsystem.OperatingSystem
-	Machine         machine.Machine
+	Keychain            keychain.Keychain
+	CookieJar           http.CookieJar
+	OperatingSystem     operatingsystem.OperatingSystem
+	Machine             machine.Machine
+	ActionSignerFactory ActionSignerFactory
 }
 
 func NewAppStore(args Args) AppStore {
@@ -58,16 +60,22 @@ func NewAppStore(args Args) AppStore {
 		CookieJar: args.CookieJar,
 	}
 
+	actionSignerFactory := args.ActionSignerFactory
+	if actionSignerFactory == nil {
+		actionSignerFactory = defaultActionSignerFactory
+	}
+
 	return &appstore{
-		keychain:       args.Keychain,
-		loginClient:    http.NewClient[loginResult](clientArgs),
-		searchClient:   http.NewClient[searchResult](clientArgs),
-		purchaseClient: http.NewClient[purchaseResult](clientArgs),
-		downloadClient: http.NewClient[downloadResult](clientArgs),
-		platformClient: http.NewClient[platformVersionLookupResult](clientArgs),
-		bagClient:      http.NewClient[bagResult](clientArgs),
-		httpClient:     http.NewClient[interface{}](clientArgs),
-		machine:        args.Machine,
-		os:             args.OperatingSystem,
+		keychain:            args.Keychain,
+		loginClient:         http.NewClient[loginResult](clientArgs),
+		searchClient:        http.NewClient[searchResult](clientArgs),
+		purchaseClient:      http.NewClient[purchaseResult](clientArgs),
+		downloadClient:      http.NewClient[downloadResult](clientArgs),
+		platformClient:      http.NewClient[platformVersionLookupResult](clientArgs),
+		bagClient:           http.NewClient[bagResult](clientArgs),
+		httpClient:          http.NewClient[interface{}](clientArgs),
+		actionSignerFactory: actionSignerFactory,
+		machine:             args.Machine,
+		os:                  args.OperatingSystem,
 	}
 }

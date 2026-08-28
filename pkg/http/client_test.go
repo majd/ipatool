@@ -1,7 +1,9 @@
 package http
 
 import (
+	"encoding/base64"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 
@@ -121,6 +123,58 @@ var _ = Describe("Client", Ordered, func() {
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(res.Data.Foo).To(Equal("bar"))
+			})
+
+			It("signs the exact serialized request body", func() {
+				signature := []byte("test-signature")
+				signer := &recordingActionSigner{signature: signature}
+
+				mockHandler = func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+
+					body, err := io.ReadAll(r.Body)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(body).To(Equal(signer.data))
+					Expect(r.Header.Get(HeaderAppleActionSignature)).To(Equal(base64.StdEncoding.EncodeToString(signature)))
+					_, err = w.Write([]byte("{\"foo\":\"bar\"}"))
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				sut := NewClient[jsonResult](Args{CookieJar: mockCookieJar})
+				_, err := sut.Send(Request{
+					URL:            srv.URL,
+					Method:         MethodPOST,
+					ResponseFormat: ResponseFormatJSON,
+					ActionSigner:   signer,
+					Payload: &XMLPayload{Content: map[string]interface{}{
+						"appleId": "test@example.com",
+						"attempt": "1",
+					}},
+				})
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(signer.calls).To(Equal(1))
+			})
+
+			It("preserves an authentication pod redirect", func() {
+				podURL := srv.URL + "/pod"
+				mockHandler = func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+					Expect(r.URL.Path).To(Equal(appStoreAuthPath))
+					w.Header().Set("Location", podURL)
+					w.WriteHeader(http.StatusFound)
+				}
+
+				sut := NewClient[xmlResult](Args{CookieJar: mockCookieJar})
+				result, err := sut.Send(Request{
+					URL:            srv.URL + appStoreAuthPath,
+					Method:         MethodPOST,
+					ResponseFormat: ResponseFormatXML,
+				})
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(result.StatusCode).To(Equal(http.StatusFound))
+				Expect(result.Headers).To(HaveKeyWithValue("Location", podURL))
 			})
 
 			It("decodes XML response", func() {
@@ -256,4 +310,37 @@ var _ = Describe("Client", Ordered, func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
+
+	When("action signing fails", func() {
+		It("returns a wrapped error without sending the request", func() {
+			signer := &recordingActionSigner{err: errors.New("signing error")}
+			sut := NewClient[xmlResult](Args{CookieJar: mockCookieJar})
+
+			_, err := sut.Send(Request{
+				URL:            srv.URL,
+				Method:         MethodPOST,
+				ResponseFormat: ResponseFormatXML,
+				ActionSigner:   signer,
+				Payload:        &XMLPayload{Content: map[string]interface{}{"attempt": "1"}},
+			})
+
+			Expect(err).To(MatchError("failed to sign Apple action: signing error"))
+			Expect(signer.calls).To(Equal(1))
+		})
+	})
 })
+
+type recordingActionSigner struct {
+	data      []byte
+	signature []byte
+	err       error
+	calls     int
+}
+
+func (s *recordingActionSigner) Sign(data []byte) ([]byte, error) {
+	s.calls++
+
+	s.data = append([]byte(nil), data...)
+
+	return s.signature, s.err
+}
