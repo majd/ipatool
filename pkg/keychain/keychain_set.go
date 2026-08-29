@@ -8,8 +8,9 @@ import (
 
 func (k *keychain) Set(key string, data []byte) error {
 	err := k.keyring.Set(keyring.Item{
-		Key:  key,
-		Data: data,
+		Key:   key,
+		Data:  data,
+		Label: k.label,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to set item: %w", err)
