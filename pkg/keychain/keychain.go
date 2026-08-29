@@ -9,14 +9,17 @@ type Keychain interface {
 
 type keychain struct {
 	keyring Keyring
+	label   string
 }
 
 type Args struct {
 	Keyring Keyring
+	Label   string
 }
 
 func New(args Args) Keychain {
 	return &keychain{
 		keyring: args.Keyring,
+		label:   args.Label,
 	}
 }

@@ -10,6 +10,8 @@ import (
 )
 
 var _ = Describe("Keychain (Get)", func() {
+	const testLabel = "test-label"
+
 	var (
 		ctrl        *gomock.Controller
 		keychain    Keychain
@@ -21,6 +23,7 @@ var _ = Describe("Keychain (Get)", func() {
 		mockKeyring = NewMockKeyring(ctrl)
 		keychain = New(Args{
 			Keyring: mockKeyring,
+			Label:   testLabel,
 		})
 	})
 
@@ -44,7 +47,7 @@ var _ = Describe("Keychain (Get)", func() {
 		})
 	})
 
-	When("keyring returns item", func() {
+	When("keyring returns a legacy unlabeled item", func() {
 		const testKey = "test-key"
 		var testData = []byte("test")
 
@@ -52,7 +55,8 @@ var _ = Describe("Keychain (Get)", func() {
 			mockKeyring.EXPECT().
 				Get(testKey).
 				Return(keyring.Item{
-					Data: testData,
+					Data:  testData,
+					Label: "",
 				}, nil)
 		})
 

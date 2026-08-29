@@ -10,6 +10,8 @@ import (
 )
 
 var _ = Describe("Keychain (Set)", func() {
+	const testLabel = "test-label"
+
 	var (
 		ctrl        *gomock.Controller
 		keychain    Keychain
@@ -21,6 +23,7 @@ var _ = Describe("Keychain (Set)", func() {
 		mockKeyring = NewMockKeyring(ctrl)
 		keychain = New(Args{
 			Keyring: mockKeyring,
+			Label:   testLabel,
 		})
 	})
 
@@ -35,8 +38,9 @@ var _ = Describe("Keychain (Set)", func() {
 		BeforeEach(func() {
 			mockKeyring.EXPECT().
 				Set(keyring.Item{
-					Key:  testKey,
-					Data: testData,
+					Key:   testKey,
+					Data:  testData,
+					Label: testLabel,
 				}).
 				Return(errors.New(""))
 		})
@@ -54,8 +58,9 @@ var _ = Describe("Keychain (Set)", func() {
 		BeforeEach(func() {
 			mockKeyring.EXPECT().
 				Set(keyring.Item{
-					Key:  testKey,
-					Data: testData,
+					Key:   testKey,
+					Data:  testData,
+					Label: testLabel,
 				}).
 				Return(nil)
 		})

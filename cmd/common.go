@@ -93,7 +93,10 @@ func newKeychain(machine machine.Machine, logger log.Logger, interactive bool) k
 		},
 	}))
 
-	return keychain.New(keychain.Args{Keyring: ring})
+	return keychain.New(keychain.Args{
+		Keyring: ring,
+		Label:   KeychainServiceName,
+	})
 }
 
 // initWithCommand initializes the dependencies of the command.
