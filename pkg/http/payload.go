@@ -21,6 +21,12 @@ type URLPayload struct {
 	Content map[string]interface{}
 }
 
+// RawPayload sends Content without applying an encoding. It is used by Apple
+// services whose request body is already serialized, such as DAAP/DMAP.
+type RawPayload struct {
+	Content []byte
+}
+
 func (p *XMLPayload) data() ([]byte, error) {
 	buffer := new(bytes.Buffer)
 
@@ -47,4 +53,8 @@ func (p *URLPayload) data() ([]byte, error) {
 	}
 
 	return []byte(params.Encode()), nil
+}
+
+func (p *RawPayload) data() ([]byte, error) {
+	return append([]byte(nil), p.Content...), nil
 }
