@@ -67,8 +67,9 @@ func newKeychain(machine machine.Machine, logger log.Logger, interactive bool) k
 			keyring.SecretServiceBackend,
 			keyring.FileBackend,
 		},
-		ServiceName: KeychainServiceName,
-		FileDir:     filepath.Join(machine.HomeDirectory(), ConfigDirectoryName),
+		ServiceName:              KeychainServiceName,
+		KeychainTrustApplication: true,
+		FileDir:                  filepath.Join(machine.HomeDirectory(), ConfigDirectoryName),
 		FilePasswordFunc: func(s string) (string, error) {
 			if keychainPassphrase == "" && !interactive {
 				return "", errors.New("keychain passphrase is required when not running in interactive mode; use the \"--keychain-passphrase\" flag")
