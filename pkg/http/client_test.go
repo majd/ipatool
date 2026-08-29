@@ -125,6 +125,43 @@ var _ = Describe("Client", Ordered, func() {
 				Expect(res.Data.Foo).To(Equal("bar"))
 			})
 
+			It("returns a raw response body", func() {
+				body := []byte{0x00, 0x01, 0xff}
+				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
+					w.Header().Set("X-Test", "raw")
+					_, err := w.Write(body)
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				sut := NewClient[[]byte](Args{CookieJar: mockCookieJar})
+				res, err := sut.Send(Request{
+					URL:            srv.URL,
+					Method:         MethodGET,
+					ResponseFormat: ResponseFormatRaw,
+				})
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(res.Data).To(Equal(body))
+				Expect(res.StatusCode).To(Equal(http.StatusOK))
+				Expect(res.Headers).To(HaveKeyWithValue("X-Test", "raw"))
+			})
+
+			It("rejects a raw response when the result type is not bytes", func() {
+				mockHandler = func(w http.ResponseWriter, _r *http.Request) {
+					_, err := w.Write([]byte("raw"))
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				sut := NewClient[struct{}](Args{CookieJar: mockCookieJar})
+				_, err := sut.Send(Request{
+					URL:            srv.URL,
+					Method:         MethodGET,
+					ResponseFormat: ResponseFormatRaw,
+				})
+
+				Expect(err).To(MatchError("raw response format requires a []byte result type"))
+			})
+
 			It("signs the exact serialized request body", func() {
 				signature := []byte("test-signature")
 				signer := &recordingActionSigner{signature: signature}
@@ -154,6 +191,36 @@ var _ = Describe("Client", Ordered, func() {
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(signer.calls).To(Equal(1))
+			})
+
+			It("signs an exact raw request body", func() {
+				body := []byte{0x61, 0x64, 0x73, 0x72, 0x00, 0x00, 0x00, 0x00}
+				signature := []byte("raw-signature")
+				signer := &recordingActionSigner{signature: signature}
+
+				mockHandler = func(w http.ResponseWriter, r *http.Request) {
+					defer GinkgoRecover()
+
+					actual, err := io.ReadAll(r.Body)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(actual).To(Equal(body))
+					Expect(r.Header.Get(HeaderAppleActionSignature)).To(Equal(base64.StdEncoding.EncodeToString(signature)))
+					_, err = w.Write([]byte("response"))
+					Expect(err).ToNot(HaveOccurred())
+				}
+
+				sut := NewClient[[]byte](Args{CookieJar: mockCookieJar})
+				_, err := sut.Send(Request{
+					URL:            srv.URL,
+					Method:         MethodPOST,
+					ResponseFormat: ResponseFormatRaw,
+					ActionSigner:   signer,
+					Payload:        &RawPayload{Content: body},
+				})
+
+				Expect(err).ToNot(HaveOccurred())
+				Expect(signer.calls).To(Equal(1))
+				Expect(signer.data).To(Equal(body))
 			})
 
 			It("preserves an authentication pod redirect", func() {

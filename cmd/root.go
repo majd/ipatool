@@ -47,6 +47,7 @@ func rootCmd() *cobra.Command {
 
 	cmd.AddCommand(authCmd())
 	cmd.AddCommand(downloadCmd())
+	cmd.AddCommand(listPurchasesCmd())
 	cmd.AddCommand(purchaseCmd())
 	cmd.AddCommand(searchCmd())
 	cmd.AddCommand(ListVersionsCmd())

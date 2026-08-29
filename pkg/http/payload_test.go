@@ -61,4 +61,18 @@ var _ = Describe("Payload", func() {
 			Expect(data).To(BeNil())
 		})
 	})
+
+	Context("Raw Payload", func() {
+		It("returns a copy of the data without encoding it", func() {
+			payload := &RawPayload{Content: []byte{0x00, 0x01, 0xff}}
+			sut = payload
+
+			data, err := sut.data()
+			Expect(err).ToNot(HaveOccurred())
+			Expect(data).To(Equal([]byte{0x00, 0x01, 0xff}))
+
+			data[0] = 0xff
+			Expect(payload.Content).To(Equal([]byte{0x00, 0x01, 0xff}))
+		})
+	})
 })

@@ -99,6 +99,26 @@ Global Flags:
       --verbose           enables verbose logs
 ```
 
+To list apps owned by the authenticated account, use the `list-purchases` command. Results are ordered by purchase date, newest first.
+
+```
+List apps owned by the authenticated App Store account
+
+Usage:
+  ipatool list-purchases [flags]
+
+Flags:
+  -h, --help              help for list-purchases
+  -l, --max-results int   maximum number of apps to return per page (default 10)
+  -p, --page int          page of owned apps to return (default 1)
+
+Global Flags:
+      --format format                sets output format for command; can be 'text', 'json' (default text)
+      --keychain-passphrase string   passphrase for unlocking keychain
+      --non-interactive              run in non-interactive session
+      --verbose                      enables verbose logs
+```
+
 To obtain a list of availble app versions to download, use the `list-versions` command.
 
 ```

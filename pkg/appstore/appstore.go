@@ -18,6 +18,8 @@ type AppStore interface {
 	Lookup(input LookupInput) (LookupOutput, error)
 	// Search searches the App Store for apps matching the specified term.
 	Search(input SearchInput) (SearchOutput, error)
+	// OwnedApps lists apps owned by the authenticated account.
+	OwnedApps(input OwnedAppsInput) (OwnedAppsOutput, error)
 	// Purchase acquires a license for the desired app.
 	// Note: only free apps are supported.
 	Purchase(input PurchaseInput) error
@@ -41,6 +43,7 @@ type appstore struct {
 	downloadClient      http.Client[downloadResult]
 	platformClient      http.Client[platformVersionLookupResult]
 	bagClient           http.Client[bagResult]
+	ownedAppsClient     http.Client[[]byte]
 	httpClient          http.Client[interface{}]
 	actionSignerFactory ActionSignerFactory
 	machine             machine.Machine
@@ -73,6 +76,7 @@ func NewAppStore(args Args) AppStore {
 		downloadClient:      http.NewClient[downloadResult](clientArgs),
 		platformClient:      http.NewClient[platformVersionLookupResult](clientArgs),
 		bagClient:           http.NewClient[bagResult](clientArgs),
+		ownedAppsClient:     http.NewClient[[]byte](clientArgs),
 		httpClient:          http.NewClient[interface{}](clientArgs),
 		actionSignerFactory: actionSignerFactory,
 		machine:             args.Machine,
