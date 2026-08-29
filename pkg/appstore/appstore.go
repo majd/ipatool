@@ -1,6 +1,8 @@
 package appstore
 
 import (
+	"time"
+
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	"github.com/majd/ipatool/v2/pkg/util/machine"
@@ -46,6 +48,7 @@ type appstore struct {
 	ownedAppsClient     http.Client[[]byte]
 	httpClient          http.Client[interface{}]
 	actionSignerFactory ActionSignerFactory
+	authRetrySleep      func(time.Duration)
 	machine             machine.Machine
 	os                  operatingsystem.OperatingSystem
 }
@@ -79,6 +82,7 @@ func NewAppStore(args Args) AppStore {
 		ownedAppsClient:     http.NewClient[[]byte](clientArgs),
 		httpClient:          http.NewClient[interface{}](clientArgs),
 		actionSignerFactory: actionSignerFactory,
+		authRetrySleep:      time.Sleep,
 		machine:             args.Machine,
 		os:                  args.OperatingSystem,
 	}

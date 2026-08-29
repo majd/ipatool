@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
@@ -41,10 +42,11 @@ var _ = Describe("AppStore (Login)", func() {
 		mockMachine = machine.NewMockMachine(ctrl)
 		signer = &stubActionSigner{}
 		as = &appstore{
-			keychain:    mockKeychain,
-			loginClient: mockClient,
-			bagClient:   mockBagClient,
-			machine:     mockMachine,
+			keychain:       mockKeychain,
+			loginClient:    mockClient,
+			bagClient:      mockBagClient,
+			machine:        mockMachine,
+			authRetrySleep: func(time.Duration) {},
 			actionSignerFactory: func(config SAPConfig, machineID []byte) (ActionSigner, error) {
 				Expect(config).To(Equal(validSAPConfig()))
 				Expect(machineID).To(Equal([]byte{0, 0, 0, 0, 0, 0}))
@@ -56,6 +58,59 @@ var _ = Describe("AppStore (Login)", func() {
 
 	AfterEach(func() {
 		ctrl.Finish()
+	})
+
+	Describe("transient authentication responses", func() {
+		It("retries the same request until it succeeds", func() {
+			request := as.loginRequest(testEmail, testPassword, "", "guid", testAuthEndpoint, 1, signer)
+			responses := []struct {
+				result http.Result[loginResult]
+				err    error
+			}{
+				{err: &http.UnexpectedResponseError{StatusCode: 204}},
+				{err: &http.UnexpectedResponseError{StatusCode: 404}},
+				{result: http.Result[loginResult]{StatusCode: 200}},
+			}
+			call := 0
+			mockClient.EXPECT().
+				Send(gomock.Any()).
+				DoAndReturn(func(actual http.Request) (http.Result[loginResult], error) {
+					Expect(actual.URL).To(Equal(request.URL))
+					Expect(actual.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("attempt", "1"))
+					response := responses[call]
+					call++
+
+					return response.result, response.err
+				}).
+				Times(3)
+
+			result, err := as.sendAuthenticationRequest(request)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.StatusCode).To(Equal(200))
+		})
+
+		DescribeTable("bounds retries to transient statuses",
+			func(status, expectedCalls int) {
+				request := as.loginRequest(testEmail, testPassword, "", "guid", testAuthEndpoint, 1, signer)
+				responseErr := &http.UnexpectedResponseError{StatusCode: status}
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{}, responseErr).
+					Times(expectedCalls)
+
+				_, err := as.sendAuthenticationRequest(request)
+
+				Expect(errors.Is(err, responseErr)).To(BeTrue())
+				if expectedCalls == maxAuthenticationRequestAttempts {
+					Expect(err.Error()).To(ContainSubstring("after 3 attempts"))
+					Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("HTTP %d, %d, %d", status, status, status)))
+				}
+			},
+			Entry("retries and then stops for HTTP 204", 204, maxAuthenticationRequestAttempts),
+			Entry("retries and then stops for HTTP 503", 503, maxAuthenticationRequestAttempts),
+			Entry("does not retry HTTP 403", 403, 1),
+		)
 	})
 
 	When("fails to read Machine's MAC address", func() {
