@@ -7,6 +7,7 @@ import (
 	gohttp "net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/util"
@@ -14,6 +15,11 @@ import (
 
 var (
 	ErrAuthCodeRequired = errors.New("auth code is required")
+)
+
+const (
+	maxAuthenticationRequestAttempts = 3
+	authenticationRetryDelay         = 250 * time.Millisecond
 )
 
 type LoginInput struct {
@@ -119,7 +125,7 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string, signe
 
 		request := t.loginRequest(email, password, authCode, guid, endpoint, requestAttempt, signer)
 		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
-		res, err = t.loginClient.Send(request)
+		res, err = t.sendAuthenticationRequest(request)
 
 		if err != nil {
 			return Account{}, fmt.Errorf("request failed: %w", err)
@@ -166,6 +172,53 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string, signe
 	}
 
 	return acc, nil
+}
+
+func (t *appstore) sendAuthenticationRequest(request http.Request) (http.Result[loginResult], error) {
+	statuses := make([]string, 0, maxAuthenticationRequestAttempts)
+
+	sleep := t.authRetrySleep
+	if sleep == nil {
+		sleep = time.Sleep
+	}
+
+	for attempt := 1; ; attempt++ {
+		result, err := t.loginClient.Send(request)
+
+		status, retry := retryableAuthenticationError(err)
+		if !retry {
+			if err != nil {
+				return result, fmt.Errorf("%w", err)
+			}
+
+			return result, nil
+		}
+
+		statuses = append(statuses, strconv.Itoa(status))
+
+		if attempt == maxAuthenticationRequestAttempts {
+			return result, fmt.Errorf(
+				"authentication request failed after %d attempts (HTTP %s): %w",
+				maxAuthenticationRequestAttempts, strings.Join(statuses, ", "), err,
+			)
+		}
+
+		sleep(time.Duration(attempt) * authenticationRetryDelay)
+	}
+}
+
+func retryableAuthenticationError(err error) (int, bool) {
+	var responseErr *http.UnexpectedResponseError
+	if !errors.As(err, &responseErr) {
+		return 0, false
+	}
+
+	status := responseErr.StatusCode
+	retry := status == gohttp.StatusNoContent ||
+		status == gohttp.StatusNotFound ||
+		status/100 == 5
+
+	return status, retry
 }
 
 func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int, authCode string) (bool, string, error) {
