@@ -41,7 +41,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
 	externalVersionID := input.ExternalVersionID
-	if externalVersionID == "" && input.Platform == PlatformAppleTV {
+	if externalVersionID == "" && (input.Platform == PlatformAppleTV || input.Platform == PlatformVisionOS) {
 		externalVersionID, err = t.lookupLatestExternalVersionID(input.Account, input.App, input.Platform)
 		if err != nil {
 			return DownloadOutput{}, fmt.Errorf("failed to resolve platform version: %w", err)
@@ -125,7 +125,14 @@ type platformPackageInfo struct {
 }
 
 func (*appstore) validatePackagePlatform(path string, platform Platform) error {
-	if platform != PlatformAppleTV {
+	var expectedPlatform string
+
+	switch platform {
+	case PlatformAppleTV:
+		expectedPlatform = "AppleTVOS"
+	case PlatformVisionOS:
+		expectedPlatform = "XROS"
+	default:
 		return nil
 	}
 
@@ -136,7 +143,7 @@ func (*appstore) validatePackagePlatform(path string, platform Platform) error {
 	defer reader.Close()
 
 	for _, file := range reader.File {
-		if !strings.HasPrefix(file.Name, "Payload/") || !strings.HasSuffix(file.Name, ".app/Info.plist") {
+		if !isTopLevelAppInfoPlist(file.Name) {
 			continue
 		}
 
@@ -164,13 +171,19 @@ func (*appstore) validatePackagePlatform(path string, platform Platform) error {
 		}
 
 		for _, supportedPlatform := range info.SupportedPlatforms {
-			if supportedPlatform == "AppleTVOS" {
+			if supportedPlatform == expectedPlatform {
 				return nil
 			}
 		}
 	}
 
-	return errors.New("downloaded package does not declare AppleTVOS support")
+	return fmt.Errorf("downloaded package does not declare %s support", expectedPlatform)
+}
+
+func isTopLevelAppInfoPlist(path string) bool {
+	parts := strings.Split(path, "/")
+
+	return len(parts) == 3 && parts[0] == "Payload" && strings.HasSuffix(parts[1], ".app") && parts[2] == "Info.plist"
 }
 
 type downloadItemResult struct {

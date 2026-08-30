@@ -24,7 +24,7 @@ func downloadCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "download",
-		Short: "Download (encrypted) iOS and tvOS app packages from the App Store",
+		Short: "Download (encrypted) iOS, iPadOS, tvOS, and visionOS app packages from the App Store",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if appID == 0 && bundleID == "" {
 				return errors.New("either the app ID or the bundle identifier must be specified")
@@ -149,11 +149,11 @@ func downloadCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target iOS app (required)")
-	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target iOS app (overrides the app ID)")
+	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target app (required)")
+	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target app (overrides the app ID)")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "The destination path of the downloaded app package")
-	cmd.Flags().StringVar(&externalVersionID, "external-version-id", "", "External version identifier of the target iOS app (defaults to latest version when not specified)")
-	cmd.Flags().StringVar(&platformValue, "platform", "", "Platform to download for: iphone, ipad, or appletv")
+	cmd.Flags().StringVar(&externalVersionID, "external-version-id", "", "External version identifier of the target app (defaults to latest version when not specified)")
+	cmd.Flags().StringVar(&platformValue, "platform", "", "Platform to download for: iphone (iOS), ipad (iPadOS), appletv (tvOS), or visionos")
 	cmd.Flags().BoolVar(&acquireLicense, "purchase", false, "Obtain a license for the app if needed")
 
 	return cmd
