@@ -66,6 +66,10 @@ func (t *appstore) lookupLatestExternalVersionID(acc Account, app App, platform 
 		return "", fmt.Errorf("failed to resolve the country code: %w", err)
 	}
 
+	if platform == PlatformVisionOS {
+		return t.lookupLatestVisionOSExternalVersionID(app.ID, countryCode)
+	}
+
 	request, err := t.platformVersionLookupRequest(app.ID, countryCode, platform)
 	if err != nil {
 		return "", fmt.Errorf("failed to create platform version lookup request: %w", err)
@@ -101,6 +105,30 @@ func (t *appstore) lookupLatestExternalVersionID(acc Account, app App, platform 
 
 	if externalVersionID == "" {
 		return "", NewErrorWithMetadata(errors.New("platform version lookup returned no external version id"), res)
+	}
+
+	return externalVersionID, nil
+}
+
+func (t *appstore) lookupLatestVisionOSExternalVersionID(appID int64, countryCode string) (string, error) {
+	request := http.Request{
+		URL:            visionProductURL(appID, countryCode),
+		Method:         http.MethodGET,
+		ResponseFormat: http.ResponseFormatRaw,
+	}
+
+	res, err := t.storefrontClient.Send(request)
+	if err != nil {
+		return "", fmt.Errorf("visionOS version lookup request failed: %w", err)
+	}
+
+	if res.StatusCode != gohttp.StatusOK {
+		return "", NewErrorWithMetadata(errors.New("visionOS version lookup request failed"), res)
+	}
+
+	externalVersionID, err := visionExternalVersionID(res.Data, appID)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse visionOS version lookup response: %w", err)
 	}
 
 	return externalVersionID, nil

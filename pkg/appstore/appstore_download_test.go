@@ -33,16 +33,17 @@ func (d *dummyFileInfo) Sys() interface{}   { return nil }
 
 var _ = Describe("AppStore (Download)", func() {
 	var (
-		ctrl               *gomock.Controller
-		mockKeychain       *keychain.MockKeychain
-		mockDownloadClient *http.MockClient[downloadResult]
-		mockPlatformClient *http.MockClient[platformVersionLookupResult]
-		mockPurchaseClient *http.MockClient[purchaseResult]
-		mockLoginClient    *http.MockClient[loginResult]
-		mockHTTPClient     *http.MockClient[interface{}]
-		mockOS             *operatingsystem.MockOperatingSystem
-		mockMachine        *machine.MockMachine
-		as                 AppStore
+		ctrl                 *gomock.Controller
+		mockKeychain         *keychain.MockKeychain
+		mockDownloadClient   *http.MockClient[downloadResult]
+		mockPlatformClient   *http.MockClient[platformVersionLookupResult]
+		mockStorefrontClient *http.MockClient[[]byte]
+		mockPurchaseClient   *http.MockClient[purchaseResult]
+		mockLoginClient      *http.MockClient[loginResult]
+		mockHTTPClient       *http.MockClient[interface{}]
+		mockOS               *operatingsystem.MockOperatingSystem
+		mockMachine          *machine.MockMachine
+		as                   AppStore
 	)
 
 	BeforeEach(func() {
@@ -50,20 +51,22 @@ var _ = Describe("AppStore (Download)", func() {
 		mockKeychain = keychain.NewMockKeychain(ctrl)
 		mockDownloadClient = http.NewMockClient[downloadResult](ctrl)
 		mockPlatformClient = http.NewMockClient[platformVersionLookupResult](ctrl)
+		mockStorefrontClient = http.NewMockClient[[]byte](ctrl)
 		mockLoginClient = http.NewMockClient[loginResult](ctrl)
 		mockPurchaseClient = http.NewMockClient[purchaseResult](ctrl)
 		mockHTTPClient = http.NewMockClient[interface{}](ctrl)
 		mockOS = operatingsystem.NewMockOperatingSystem(ctrl)
 		mockMachine = machine.NewMockMachine(ctrl)
 		as = &appstore{
-			keychain:       mockKeychain,
-			loginClient:    mockLoginClient,
-			purchaseClient: mockPurchaseClient,
-			downloadClient: mockDownloadClient,
-			platformClient: mockPlatformClient,
-			httpClient:     mockHTTPClient,
-			machine:        mockMachine,
-			os:             mockOS,
+			keychain:         mockKeychain,
+			loginClient:      mockLoginClient,
+			purchaseClient:   mockPurchaseClient,
+			downloadClient:   mockDownloadClient,
+			platformClient:   mockPlatformClient,
+			storefrontClient: mockStorefrontClient,
+			httpClient:       mockHTTPClient,
+			machine:          mockMachine,
+			os:               mockOS,
 		}
 	})
 
@@ -182,6 +185,74 @@ var _ = Describe("AppStore (Download)", func() {
 					ID: 42,
 				},
 				Platform: PlatformAppleTV,
+			})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	When("platform is visionOS", func() {
+		It("resolves and sends the visionOS external version id", func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockStorefrontClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					parsedURL, err := url.Parse(req.URL)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(parsedURL.Host).To(Equal("apps.apple.com"))
+					Expect(parsedURL.Path).To(Equal("/us/app/id42"))
+					Expect(parsedURL.Query().Get("platform")).To(Equal("vision"))
+					Expect(req.Method).To(Equal(http.MethodGET))
+					Expect(req.ResponseFormat).To(Equal(http.ResponseFormatRaw))
+				}).
+				Return(http.Result[[]byte]{
+					StatusCode: 200,
+					Data:       []byte(`<script type="application/json" id="serialized-server-data">[{"data":{"app":{"purchaseConfiguration":{"metricsPlatformDisplayStyle":"vision","appPlatforms":["vision"],"buyParams":"salableAdamId=42&appExtVrsId=987654"}}}}]</script>`),
+				}, nil)
+
+			mockDownloadClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					payload, ok := req.Payload.(*http.XMLPayload)
+					Expect(ok).To(BeTrue())
+					Expect(payload.Content["externalVersionId"]).To(Equal("987654"))
+				}).
+				Return(http.Result[downloadResult]{}, errors.New("request error"))
+
+			_, err := as.Download(DownloadInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+				App: App{
+					ID: 42,
+				},
+				Platform: PlatformVisionOS,
+			})
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("uses an explicit external version id without a storefront lookup", func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockDownloadClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					payload, ok := req.Payload.(*http.XMLPayload)
+					Expect(ok).To(BeTrue())
+					Expect(payload.Content["externalVersionId"]).To(Equal("123456"))
+				}).
+				Return(http.Result[downloadResult]{}, errors.New("request error"))
+
+			_, err := as.Download(DownloadInput{
+				App: App{
+					ID: 42,
+				},
+				Platform:          PlatformVisionOS,
+				ExternalVersionID: "123456",
 			})
 			Expect(err).To(HaveOccurred())
 		})
@@ -628,25 +699,33 @@ var _ = Describe("AppStore (Download)", func() {
 	})
 
 	Describe("package platform validation", func() {
-		writePackage := func(platforms []string) string {
+		writePackageWithInfoPlists := func(infoPlists map[string][]string) string {
 			file, err := os.CreateTemp("", "ipatool-platform-*.ipa")
 			Expect(err).ToNot(HaveOccurred())
 			defer file.Close()
 
 			zipFile := zip.NewWriter(file)
-			w, err := zipFile.Create("Payload/Test.app/Info.plist")
-			Expect(err).ToNot(HaveOccurred())
+			for path, platforms := range infoPlists {
+				w, err := zipFile.Create(path)
+				Expect(err).ToNot(HaveOccurred())
 
-			info, err := plist.Marshal(map[string]interface{}{
-				"CFBundleSupportedPlatforms": platforms,
-			}, plist.BinaryFormat)
-			Expect(err).ToNot(HaveOccurred())
+				info, err := plist.Marshal(map[string]interface{}{
+					"CFBundleSupportedPlatforms": platforms,
+				}, plist.BinaryFormat)
+				Expect(err).ToNot(HaveOccurred())
 
-			_, err = w.Write(info)
-			Expect(err).ToNot(HaveOccurred())
+				_, err = w.Write(info)
+				Expect(err).ToNot(HaveOccurred())
+			}
+
 			Expect(zipFile.Close()).To(Succeed())
 
 			return file.Name()
+		}
+		writePackage := func(platforms []string) string {
+			return writePackageWithInfoPlists(map[string][]string{
+				"Payload/Test.app/Info.plist": platforms,
+			})
 		}
 
 		It("accepts AppleTVOS packages", func() {
@@ -664,6 +743,35 @@ var _ = Describe("AppStore (Download)", func() {
 			err := (&appstore{}).validatePackagePlatform(path, PlatformAppleTV)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("AppleTVOS"))
+		})
+
+		It("accepts XROS packages", func() {
+			path := writePackage([]string{"XROS"})
+			defer os.Remove(path)
+
+			err := (&appstore{}).validatePackagePlatform(path, PlatformVisionOS)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
+		It("returns an error for packages without XROS support", func() {
+			path := writePackage([]string{"iPhoneOS"})
+			defer os.Remove(path)
+
+			err := (&appstore{}).validatePackagePlatform(path, PlatformVisionOS)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("XROS"))
+		})
+
+		It("ignores supported platforms declared only by an embedded app", func() {
+			path := writePackageWithInfoPlists(map[string][]string{
+				"Payload/Test.app/Info.plist":                    {"iPhoneOS"},
+				"Payload/Test.app/PlugIns/Vision.app/Info.plist": {"XROS"},
+			})
+			defer os.Remove(path)
+
+			err := (&appstore{}).validatePackagePlatform(path, PlatformVisionOS)
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("XROS"))
 		})
 	})
 })

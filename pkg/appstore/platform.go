@@ -1,25 +1,31 @@
 package appstore
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type Platform string
 
 const (
-	PlatformIPhone  Platform = "iphone"
-	PlatformIPad    Platform = "ipad"
-	PlatformAppleTV Platform = "appletv"
+	PlatformIPhone   Platform = "iphone"
+	PlatformIPad     Platform = "ipad"
+	PlatformAppleTV  Platform = "appletv"
+	PlatformVisionOS Platform = "visionos"
 )
 
 func ParsePlatform(value string) (Platform, error) {
-	switch value {
+	switch strings.ToLower(value) {
 	case "":
 		return "", nil
-	case "iphone", "iPhone", "ios", "iOS":
+	case "iphone", "ios":
 		return PlatformIPhone, nil
-	case "ipad", "iPad":
+	case "ipad", "ipados":
 		return PlatformIPad, nil
-	case "appletv", "AppleTV", "apple-tv", "tvos", "tvOS":
+	case "appletv", "apple-tv", "tvos":
 		return PlatformAppleTV, nil
+	case "vision", "visionos", "visionpro", "xros", "realitydevice":
+		return PlatformVisionOS, nil
 	default:
 		return "", fmt.Errorf("invalid platform %q", value)
 	}
@@ -35,6 +41,8 @@ func (p Platform) lookupEntity() (string, error) {
 		return "iPadSoftware", nil
 	case PlatformAppleTV:
 		return "tvSoftware", nil
+	case PlatformVisionOS:
+		return "xrosSoftware", nil
 	default:
 		return "", fmt.Errorf("invalid platform %q", p)
 	}
@@ -50,6 +58,8 @@ func (p Platform) searchEntity() (string, error) {
 		return "iPadSoftware", nil
 	case PlatformAppleTV:
 		return "software,tvSoftware", nil
+	case PlatformVisionOS:
+		return "xrosSoftware", nil
 	default:
 		return "", fmt.Errorf("invalid platform %q", p)
 	}
@@ -61,6 +71,8 @@ func (p Platform) metadataPlatform() (string, error) {
 		return "enterprisestore", nil
 	case PlatformAppleTV:
 		return "atv9", nil
+	case PlatformVisionOS:
+		return "realityDevice", nil
 	default:
 		return "", fmt.Errorf("invalid platform %q", p)
 	}
