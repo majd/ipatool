@@ -3,7 +3,7 @@
 [![Release](https://img.shields.io/github/release/majd/ipatool.svg?label=Release)](https://GitHub.com/majd/ipatool/releases/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/majd/ipatool/blob/main/LICENSE)
 
-`ipatool` is a command line tool that allows you to search for iOS, iPadOS, tvOS, and visionOS apps on the [App Store](https://apps.apple.com) and download a copy of the app package, known as an _ipa_ file.
+`ipatool` is a command line tool that allows you to search for iOS, iPadOS, tvOS, visionOS, and macOS apps on the [App Store](https://apps.apple.com), and download `.ipa` or macOS `.pkg` app packages.
 
 ![Demo](./resources/demo.gif)
 
@@ -65,7 +65,7 @@ Use "ipatool auth [command] --help" for more information about a command.
 To search for apps on the App Store, use the `search` command.
 
 ```
-Search for iOS, iPadOS, tvOS, and visionOS apps available on the App Store
+Search for iOS, iPadOS, tvOS, visionOS, and macOS apps available on the App Store
 
 Usage:
   ipatool search <term> [flags]
@@ -73,7 +73,7 @@ Usage:
 Flags:
   -h, --help              help for search
   -l, --limit int         maximum amount of search results to retrieve; visionOS supports up to 12 (default 5)
-      --platform string   Platform to search: iphone (iOS), ipad (iPadOS), appletv (tvOS), or visionos
+      --platform string   Platform to search: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos
 
 Global Flags:
       --format format     sets output format for command; can be 'text', 'json' (default text)
@@ -90,8 +90,9 @@ Usage:
   ipatool purchase [flags]
 
 Flags:
-  -b, --bundle-identifier string   Bundle identifier of the target iOS app (required)
+  -b, --bundle-identifier string   Bundle identifier of the target app (required)
   -h, --help                       help for purchase
+      --platform string            Platform to purchase for: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos
 
 Global Flags:
       --format format     sets output format for command; can be 'text', 'json' (default text)
@@ -139,10 +140,10 @@ Global Flags:
       --verbose                      enables verbose logs
 ```
 
-To download a copy of the ipa file, use the `download` command.
+To download an app package, use the `download` command.
 
 ```
-Download (encrypted) iOS, iPadOS, tvOS, and visionOS app packages from the App Store
+Download iOS, iPadOS, tvOS, visionOS, and macOS app packages from the App Store
 
 Usage:
   ipatool download [flags]
@@ -153,7 +154,7 @@ Flags:
       --external-version-id string   External version identifier of the target app (defaults to latest version when not specified)
   -h, --help                         help for download
   -o, --output string                The destination path of the downloaded app package
-      --platform string              Platform to download for: iphone (iOS), ipad (iPadOS), appletv (tvOS), or visionos
+      --platform string              Platform to download for: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos
       --purchase                     Obtain a license for the app if needed
 
 Global Flags:

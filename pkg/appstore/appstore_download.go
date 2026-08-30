@@ -2,10 +2,12 @@ package appstore
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -19,6 +21,7 @@ var (
 )
 
 type DownloadInput struct {
+	Context           context.Context
 	Account           Account
 	App               App
 	OutputPath        string
@@ -39,6 +42,14 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	}
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
+
+	var machineGUID []byte
+	if input.Platform == PlatformMacOS {
+		guid, machineGUID, err = machineIdentity(macAddr)
+		if err != nil {
+			return DownloadOutput{}, fmt.Errorf("failed to resolve machine identity: %w", err)
+		}
+	}
 
 	externalVersionID := input.ExternalVersionID
 	if externalVersionID == "" && (input.Platform == PlatformAppleTV || input.Platform == PlatformVisionOS) {
@@ -87,30 +98,30 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		version = fmt.Sprintf("%v", itemVersion)
 	}
 
-	destination, err := t.resolveDestinationPath(input.App, version, input.OutputPath)
+	destination, err := t.resolveDestinationPath(input.App, version, input.OutputPath, input.Platform)
 	if err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to resolve destination path: %w", err)
 	}
 
+	if input.Platform == PlatformMacOS {
+		return t.downloadMacPackage(input.Context, item, destination, machineGUID, input.Progress)
+	}
+
 	tmpPath := fmt.Sprintf("%s.tmp", destination)
 
-	err = t.downloadFile(item.URL, tmpPath, input.Progress)
-	if err != nil {
+	if err := t.downloadFile(input.Context, item.URL, tmpPath, input.Progress); err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to download file: %w", err)
 	}
 
-	err = t.applyPatches(item, input.Account, tmpPath, destination)
-	if err != nil {
+	if err := t.applyPatches(item, input.Account, tmpPath, destination); err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to apply patches: %w", err)
 	}
 
-	err = t.validatePackagePlatform(destination, input.Platform)
-	if err != nil {
+	if err := t.validatePackagePlatform(destination, input.Platform); err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to validate package platform: %w", err)
 	}
 
-	err = t.os.Remove(fmt.Sprintf("%s.tmp", destination))
-	if err != nil {
+	if err := t.os.Remove(tmpPath); err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to remove file: %w", err)
 	}
 
@@ -199,10 +210,18 @@ type downloadResult struct {
 	Items           []downloadItemResult `plist:"songList,omitempty"`
 }
 
-func (t *appstore) downloadFile(src, dst string, progress *progressbar.ProgressBar) error {
+func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *progressbar.ProgressBar) error {
 	req, err := t.httpClient.NewRequest("GET", src, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if req != nil {
+		req = req.WithContext(ctx)
 	}
 
 	file, err := t.os.OpenFile(dst, os.O_CREATE|os.O_RDWR, 0644)
@@ -285,6 +304,10 @@ func (*appstore) downloadRequest(acc Account, app App, guid string, externalVers
 }
 
 func fileName(app App, version string) string {
+	return packageFileName(app, version, "")
+}
+
+func packageFileName(app App, version string, platform Platform) string {
 	var parts []string
 
 	if app.BundleID != "" {
@@ -299,11 +322,16 @@ func fileName(app App, version string) string {
 		parts = append(parts, version)
 	}
 
-	return fmt.Sprintf("%s.ipa", strings.Join(parts, "_"))
+	extension := "ipa"
+	if platform == PlatformMacOS {
+		extension = "pkg"
+	}
+
+	return fmt.Sprintf("%s.%s", strings.Join(parts, "_"), extension)
 }
 
-func (t *appstore) resolveDestinationPath(app App, version string, path string) (string, error) {
-	file := fileName(app, version)
+func (t *appstore) resolveDestinationPath(app App, version string, path string, platform Platform) (string, error) {
+	file := packageFileName(app, version, platform)
 
 	if path == "" {
 		workdir, err := t.os.Getwd()
@@ -320,7 +348,7 @@ func (t *appstore) resolveDestinationPath(app App, version string, path string) 
 	}
 
 	if isDir {
-		return fmt.Sprintf("%s/%s", path, file), nil
+		return filepath.Join(path, file), nil
 	}
 
 	return path, nil

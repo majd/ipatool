@@ -56,76 +56,108 @@ type Machine struct {
 	closed        bool
 }
 
+type imageSpec struct {
+	name string
+	data []byte
+	base uint64
+}
+
+type runtimeOptions struct {
+	extraImages []imageSpec
+	shims       shimOptions
+}
+
 func Open(ctx context.Context, bundle assets.Bundle) (*Machine, error) {
+	machine, exports, err := openRuntime(ctx, bundle, runtimeOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	machine.entry = entryPoints{
+		initialize: exports["_cp2g1b9ro"],
+		exchange:   exports["_Mib5yocT"],
+		sign:       exports["_Fc3vhtJDvr"],
+		teardown:   exports["_IPaI1oem5iL"],
+		dispose:    exports["_jEHf8Xzsv8K"],
+	}
+
+	return machine, nil
+}
+
+func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptions) (*Machine, map[string]uint64, error) {
 	if ctx == nil {
-		return nil, errors.New("SAP runtime context is nil")
+		return nil, nil, errors.New("SAP runtime context is nil")
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("open SAP runtime: %w", err)
+		return nil, nil, fmt.Errorf("open SAP runtime: %w", err)
 	}
 
-	coreFP, err := machimage.Open("CoreFP", bundle.CoreFP)
-	if err != nil {
-		return nil, fmt.Errorf("open CoreFP image: %w", err)
-	}
+	imageSpecs := make([]imageSpec, 0, 3+len(options.extraImages))
+	imageSpecs = append(imageSpecs,
+		imageSpec{name: "CoreFP", data: bundle.CoreFP, base: coreFPBase},
+		imageSpec{name: "CommerceCore", data: bundle.CommerceCore, base: commerceBase},
+		imageSpec{name: "CommerceKit", data: bundle.CommerceKit, base: kitBase},
+	)
+	imageSpecs = append(imageSpecs, options.extraImages...)
 
-	commerceCore, err := machimage.Open("CommerceCore", bundle.CommerceCore)
-	if err != nil {
-		return nil, fmt.Errorf("open CommerceCore image: %w", err)
-	}
+	images := make(map[string]*machimage.Image, len(imageSpecs))
 
-	commerceKit, err := machimage.Open("CommerceKit", bundle.CommerceKit)
-	if err != nil {
-		return nil, fmt.Errorf("open CommerceKit image: %w", err)
+	for _, spec := range imageSpecs {
+		image, err := machimage.Open(spec.name, spec.data)
+		if err != nil {
+			return nil, nil, fmt.Errorf("open %s image: %w", spec.name, err)
+		}
+
+		images[spec.name] = image
 	}
 
 	exports := make(map[string]uint64)
 	coreExports := make(map[string]uint64, len(coreExportNames))
+	coreFP := images["CoreFP"]
 
 	for _, name := range coreExportNames {
 		address, err := coreFP.Export(name, coreFPBase)
 		if err != nil {
-			return nil, fmt.Errorf("resolve CoreFP export %s: %w", name, err)
+			return nil, nil, fmt.Errorf("resolve CoreFP export %s: %w", name, err)
 		}
 
 		exports[name] = address
 		coreExports[name] = address
 	}
 
+	commerceCore := images["CommerceCore"]
 	macAddress, err := commerceCore.Export("_get_mac_address", commerceBase)
+
 	if err != nil {
-		return nil, fmt.Errorf("resolve CommerceCore MAC address export: %w", err)
+		return nil, nil, fmt.Errorf("resolve CommerceCore MAC address export: %w", err)
 	}
 
 	exports["_get_mac_address"] = macAddress
 
-	entryNames := []string{
+	commerceKit := images["CommerceKit"]
+	for _, name := range []string{
 		"_cp2g1b9ro",
 		"_Mib5yocT",
 		"_Fc3vhtJDvr",
 		"_IPaI1oem5iL",
 		"_jEHf8Xzsv8K",
-	}
-	resolvedEntries := make(map[string]uint64, len(entryNames))
-
-	for _, name := range entryNames {
+	} {
 		address, err := commerceKit.Export(name, kitBase)
 		if err != nil {
-			return nil, fmt.Errorf("resolve CommerceKit export %s: %w", name, err)
+			return nil, nil, fmt.Errorf("resolve CommerceKit export %s: %w", name, err)
 		}
 
 		exports[name] = address
-		resolvedEntries[name] = address
 	}
 
 	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("open SAP runtime: %w", err)
+		return nil, nil, fmt.Errorf("open SAP runtime: %w", err)
 	}
 
 	engine, err := unicorn.New(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("create Unicorn engine: %w", err)
+		return nil, nil, fmt.Errorf("create Unicorn engine: %w", err)
 	}
 
 	machine := &Machine{engine: engine}
@@ -147,17 +179,17 @@ func Open(ctx context.Context, bundle assets.Bundle) (*Machine, error) {
 		{stackBase, stackSize},
 	} {
 		if err := engine.MemMap(region.address, region.size); err != nil {
-			return nil, fmt.Errorf("map SAP guest memory at %#x: %w", region.address, err)
+			return nil, nil, fmt.Errorf("map SAP guest memory at %#x: %w", region.address, err)
 		}
 	}
 
 	if err := engine.MemWrite(returnAddress, []byte{0xF4}); err != nil {
-		return nil, fmt.Errorf("write SAP guest return instruction: %w", err)
+		return nil, nil, fmt.Errorf("write SAP guest return instruction: %w", err)
 	}
 
-	machine.services, err = newShims(engine, coreExports, bundle.CoreFPICXS)
+	machine.services, err = newShimsWithOptions(engine, coreExports, bundle.CoreFPICXS, options.shims)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	resolver := func(name string) (uint64, error) {
@@ -167,33 +199,21 @@ func Open(ctx context.Context, bundle assets.Bundle) (*Machine, error) {
 
 		return machine.services.resolve(name)
 	}
-	for _, item := range []struct {
-		image *machimage.Image
-		base  uint64
-	}{
-		{coreFP, coreFPBase},
-		{commerceCore, commerceBase},
-		{commerceKit, kitBase},
-	} {
-		if err := item.image.Relocate(item.base, resolver); err != nil {
-			return nil, fmt.Errorf("relocate SAP guest image: %w", err)
+
+	for _, spec := range imageSpecs {
+		image := images[spec.name]
+		if err := image.Relocate(spec.base, resolver); err != nil {
+			return nil, nil, fmt.Errorf("relocate SAP guest image: %w", err)
 		}
 
-		if err := item.image.Load(engine); err != nil {
-			return nil, fmt.Errorf("load SAP guest image: %w", err)
+		if err := image.Load(engine); err != nil {
+			return nil, nil, fmt.Errorf("load SAP guest image: %w", err)
 		}
 	}
 
-	machine.entry = entryPoints{
-		initialize: resolvedEntries["_cp2g1b9ro"],
-		exchange:   resolvedEntries["_Mib5yocT"],
-		sign:       resolvedEntries["_Fc3vhtJDvr"],
-		teardown:   resolvedEntries["_IPaI1oem5iL"],
-		dispose:    resolvedEntries["_jEHf8Xzsv8K"],
-	}
 	ready = true
 
-	return machine, nil
+	return machine, exports, nil
 }
 
 func (m *Machine) Initialize(hardwareID []byte) (uint64, error) {

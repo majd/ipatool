@@ -80,6 +80,29 @@ var _ = Describe("AppStore (Search)", func() {
 		})
 	})
 
+	When("platform is macOS", func() {
+		BeforeEach(func() {
+			mockClient.EXPECT().
+				Send(gomock.Any()).
+				Do(func(req http.Request) {
+					parsedURL, err := url.Parse(req.URL)
+					Expect(err).ToNot(HaveOccurred())
+					Expect(parsedURL.Query().Get("entity")).To(Equal("macSoftware"))
+				}).
+				Return(http.Result[searchResult]{}, errors.New("request error"))
+		})
+
+		It("uses the macOS search entity", func() {
+			_, err := as.Search(SearchInput{
+				Account: Account{
+					StoreFront: "143441",
+				},
+				Platform: PlatformMacOS,
+			})
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
 	When("platform is AppleTV", func() {
 		BeforeEach(func() {
 			mockClient.EXPECT().
