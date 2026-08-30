@@ -25,7 +25,7 @@ type AppStore interface {
 	// Purchase acquires a license for the desired app.
 	// Note: only free apps are supported.
 	Purchase(input PurchaseInput) error
-	// Download downloads the IPA package from the App Store to the desired location.
+	// Download downloads the app package from the App Store to the desired location.
 	Download(input DownloadInput) (DownloadOutput, error)
 	// ReplicateSinf replicates the sinf for the IPA package.
 	ReplicateSinf(input ReplicateSinfInput) error
@@ -48,6 +48,7 @@ type appstore struct {
 	bagClient           http.Client[bagResult]
 	ownedAppsClient     http.Client[[]byte]
 	httpClient          http.Client[interface{}]
+	macDecrypterFactory macPackageDecrypterFactory
 	actionSignerFactory ActionSignerFactory
 	authRetrySleep      func(time.Duration)
 	machine             machine.Machine
@@ -83,6 +84,7 @@ func NewAppStore(args Args) AppStore {
 		bagClient:           http.NewClient[bagResult](clientArgs),
 		ownedAppsClient:     http.NewClient[[]byte](clientArgs),
 		httpClient:          http.NewClient[interface{}](clientArgs),
+		macDecrypterFactory: defaultMacPackageDecrypterFactory,
 		actionSignerFactory: actionSignerFactory,
 		authRetrySleep:      time.Sleep,
 		machine:             args.Machine,

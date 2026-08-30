@@ -368,6 +368,96 @@ var _ = Describe("AppStore (Purchase)", func() {
 		})
 	})
 
+	When("purchasing a macOS app", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(pricingParametersMatcher{PricingParameterAppStore}).
+				Return(http.Result[purchaseResult]{
+					StatusCode: 200,
+					Data: purchaseResult{
+						JingleDocType: "purchaseSuccess",
+						Status:        0,
+					},
+				}, nil)
+		})
+
+		It("uses the standard acquisition pricing parameter", func() {
+			err := as.Purchase(PurchaseInput{
+				Account:  Account{StoreFront: "143441"},
+				App:      App{ID: 42},
+				Platform: PlatformMacOS,
+			})
+			Expect(err).ToNot(HaveOccurred())
+		})
+	})
+
+	When("macOS purchase is temporarily unavailable", func() {
+		BeforeEach(func() {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(pricingParametersMatcher{PricingParameterAppStore}).
+				Return(http.Result[purchaseResult]{
+					StatusCode: 200,
+					Data: purchaseResult{
+						FailureType: FailureTypeTemporarilyUnavailable,
+					},
+				}, nil)
+		})
+
+		It("does not fall back to the GAME pricing parameter", func() {
+			err := as.Purchase(PurchaseInput{
+				Account:  Account{StoreFront: "143441"},
+				App:      App{ID: 42},
+				Platform: PlatformMacOS,
+			})
+			Expect(err).To(MatchError(ContainSubstring(PricingParameterAppStore)))
+		})
+	})
+
+	DescribeTable("falls back to the GAME pricing parameter for non-macOS platforms",
+		func(platform Platform) {
+			mockMachine.EXPECT().
+				MacAddress().
+				Return("00:11:22:33:44:55", nil)
+
+			mockPurchaseClient.EXPECT().
+				Send(pricingParametersMatcher{PricingParameterAppStore}).
+				Return(http.Result[purchaseResult]{
+					StatusCode: 200,
+					Data: purchaseResult{
+						FailureType: FailureTypeTemporarilyUnavailable,
+					},
+				}, nil)
+			mockPurchaseClient.EXPECT().
+				Send(pricingParametersMatcher{PricingParameterAppleArcade}).
+				Return(http.Result[purchaseResult]{
+					StatusCode: 200,
+					Data: purchaseResult{
+						JingleDocType: "purchaseSuccess",
+						Status:        0,
+					},
+				}, nil)
+
+			err := as.Purchase(PurchaseInput{
+				Account:  Account{StoreFront: "143441"},
+				App:      App{ID: 42},
+				Platform: platform,
+			})
+			Expect(err).ToNot(HaveOccurred())
+		},
+		Entry("iPhone", PlatformIPhone),
+		Entry("iPad", PlatformIPad),
+		Entry("Apple TV", PlatformAppleTV),
+		Entry("visionOS", PlatformVisionOS),
+	)
+
 	When("successfully purchases the app", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
