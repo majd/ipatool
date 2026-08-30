@@ -275,6 +275,13 @@ func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *
 
 		_, err = io.Copy(io.MultiWriter(file, progress), res.Body)
 	} else {
+		if stat != nil && stat.Size() > 0 {
+			_, err = file.Seek(0, io.SeekEnd)
+			if err != nil {
+				return fmt.Errorf("can not seek file: %w", err)
+			}
+		}
+
 		_, err = io.Copy(file, res.Body)
 	}
 

@@ -1008,6 +1008,47 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 	})
 
+	When("resuming a download without a progress bar", func() {
+		It("appends the ranged response to the partial file", func() {
+			testFile, err := os.CreateTemp("", "ipatool-download-*")
+			Expect(err).ToNot(HaveOccurred())
+			defer os.Remove(testFile.Name())
+
+			_, err = testFile.WriteString("partial-")
+			Expect(err).ToNot(HaveOccurred())
+			_, err = testFile.Seek(0, io.SeekStart)
+			Expect(err).ToNot(HaveOccurred())
+
+			request := &gohttp.Request{Header: make(gohttp.Header)}
+			info, err := testFile.Stat()
+			Expect(err).ToNot(HaveOccurred())
+
+			mockHTTPClient.EXPECT().
+				NewRequest("GET", "https://example.com/app.ipa", nil).
+				Return(request, nil)
+			mockOS.EXPECT().
+				OpenFile(testFile.Name(), os.O_CREATE|os.O_RDWR, os.FileMode(0644)).
+				Return(testFile, nil)
+			mockOS.EXPECT().
+				Stat(testFile.Name()).
+				Return(info, nil)
+			mockHTTPClient.EXPECT().
+				Do(request).
+				DoAndReturn(func(request *gohttp.Request) (*gohttp.Response, error) {
+					Expect(request.Header.Get("range")).To(Equal("bytes=8-"))
+
+					return &gohttp.Response{Body: io.NopCloser(strings.NewReader("remainder"))}, nil
+				})
+
+			err = as.(*appstore).downloadFile(context.Background(), "https://example.com/app.ipa", testFile.Name(), nil)
+			Expect(err).ToNot(HaveOccurred())
+
+			data, err := os.ReadFile(testFile.Name())
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(data)).To(Equal("partial-remainder"))
+		})
+	})
+
 	Describe("package platform validation", func() {
 		writePackageWithInfoPlists := func(infoPlists map[string][]string) string {
 			file, err := os.CreateTemp("", "ipatool-platform-*.ipa")
