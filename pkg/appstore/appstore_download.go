@@ -98,12 +98,17 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		version = fmt.Sprintf("%v", itemVersion)
 	}
 
-	destination, err := t.resolveDestinationPath(input.App, version, input.OutputPath, input.Platform)
+	packagePlatform, err := downloadPackagePlatform(input.Platform, item)
+	if err != nil {
+		return DownloadOutput{}, err
+	}
+
+	destination, err := t.resolveDestinationPath(input.App, version, input.OutputPath, packagePlatform)
 	if err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to resolve destination path: %w", err)
 	}
 
-	if input.Platform == PlatformMacOS {
+	if packagePlatform == PlatformMacOS {
 		return t.downloadMacPackage(input.Context, item, destination, machineGUID, input.Progress)
 	}
 
