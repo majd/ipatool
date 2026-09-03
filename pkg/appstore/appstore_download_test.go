@@ -828,6 +828,7 @@ var _ = Describe("AppStore (Download)", func() {
 				os:             operatingsystem.New(),
 				macDecrypterFactory: func(context.Context, []byte, []byte) (macPackageDecrypter, error) {
 					Fail("mobile packages must not initialize the macOS package decrypter")
+
 					return nil, nil
 				},
 			}
