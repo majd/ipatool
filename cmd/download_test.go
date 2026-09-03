@@ -26,6 +26,23 @@ var _ = Describe("Download command", func() {
 		Expect(replicator.called).To(BeFalse())
 	})
 
+	It("replicates sinf for mobile packages downloaded for macOS", func() {
+		replicator := &fakeSinfReplicator{}
+		out := appstore.DownloadOutput{
+			DestinationPath: "app.ipa",
+			Sinfs:           []appstore.Sinf{{Data: []byte("sinf")}},
+		}
+
+		err := replicateDownloadSinf(replicator, appstore.PlatformMacOS, out)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(replicator.called).To(BeTrue())
+		Expect(replicator.input).To(Equal(appstore.ReplicateSinfInput{
+			PackagePath: out.DestinationPath,
+			Sinfs:       out.Sinfs,
+		}))
+	})
+
 	It("replicates sinf for non-macOS packages", func() {
 		replicator := &fakeSinfReplicator{}
 		out := appstore.DownloadOutput{

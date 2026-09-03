@@ -182,7 +182,7 @@ type sinfReplicator interface {
 
 //nolint:wrapcheck
 func replicateDownloadSinf(store sinfReplicator, platform appstore.Platform, out appstore.DownloadOutput) error {
-	if platform == appstore.PlatformMacOS {
+	if platform == appstore.PlatformMacOS && len(out.Sinfs) == 0 {
 		return nil
 	}
 
