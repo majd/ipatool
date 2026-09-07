@@ -1,8 +1,10 @@
 package unicorn
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
+	"debug/elf"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -11,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 )
 
@@ -65,6 +68,48 @@ func cachedRuntimePaths(ctx context.Context) (runtimePaths, error) {
 }
 
 func linuxUsesMusl() bool {
+	if interpreter, ok := selfInterpreter(); ok {
+		return interpreterUsesMusl(interpreter)
+	}
+
+	return muslLoaderInstalled()
+}
+
+// selfInterpreter returns the dynamic loader this process was linked against, which is the only
+// reliable answer to which libc the process runs on. A statically linked build has no PT_INTERP, so
+// the caller has to fall back to inspecting the host.
+func selfInterpreter() (string, bool) {
+	file, err := elf.Open("/proc/self/exe")
+	if err != nil {
+		return "", false
+	}
+	defer file.Close()
+
+	for _, program := range file.Progs {
+		if program.Type != elf.PT_INTERP {
+			continue
+		}
+
+		interpreter, err := io.ReadAll(program.Open())
+		if err != nil {
+			return "", false
+		}
+
+		return string(bytes.TrimRight(interpreter, "\x00")), true
+	}
+
+	return "", false
+}
+
+func interpreterUsesMusl(interpreter string) bool {
+	return strings.HasPrefix(filepath.Base(interpreter), "ld-musl-")
+}
+
+// muslLoaderInstalled reports whether a musl loader exists on the host. That only says musl is
+// available, not that this process uses it, so it is a last resort for statically linked builds:
+// glibc distributions package musl for cross compilation, and selecting the musllinux artifact there
+// loads a second libc into the process.
+func muslLoaderInstalled() bool {
 	loaders, _ := filepath.Glob("/lib/ld-musl-*.so.1")
 	if len(loaders) != 0 {
 		return true
