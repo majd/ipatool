@@ -123,7 +123,12 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		return DownloadOutput{}, fmt.Errorf("failed to validate package platform: %w", err)
 	}
 
-	if err := t.applyPatches(item, input.Account, tmpPath, destination); err != nil {
+	artwork, err := t.downloadArtwork(input.Context, item.ArtworkURL)
+	if err != nil {
+		return DownloadOutput{}, fmt.Errorf("failed to download artwork: %w", err)
+	}
+
+	if err := t.applyPatches(item, input.Account, tmpPath, destination, artwork); err != nil {
 		return DownloadOutput{}, fmt.Errorf("failed to apply patches: %w", err)
 	}
 
@@ -206,10 +211,11 @@ func isTopLevelAppInfoPlist(path string) bool {
 }
 
 type downloadItemResult struct {
-	HashMD5  string                 `plist:"md5,omitempty"`
-	URL      string                 `plist:"URL,omitempty"`
-	Sinfs    []Sinf                 `plist:"sinfs,omitempty"`
-	Metadata map[string]interface{} `plist:"metadata,omitempty"`
+	ArtworkURL string                 `plist:"artworkURL,omitempty"`
+	HashMD5    string                 `plist:"md5,omitempty"`
+	URL        string                 `plist:"URL,omitempty"`
+	Sinfs      []Sinf                 `plist:"sinfs,omitempty"`
+	Metadata   map[string]interface{} `plist:"metadata,omitempty"`
 }
 
 type downloadResult struct {
@@ -343,7 +349,7 @@ func (t *appstore) isDirectory(path string) (bool, error) {
 	return info.IsDir(), nil
 }
 
-func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst string) error {
+func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst string, artwork []byte) error {
 	srcZip, err := zip.OpenReader(src)
 	if err != nil {
 		return fmt.Errorf("failed to open zip reader: %w", err)
@@ -362,6 +368,17 @@ func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst s
 	err = t.replicateZip(srcZip, dstZip)
 	if err != nil {
 		return fmt.Errorf("failed to replicate zip: %w", err)
+	}
+
+	if len(artwork) != 0 {
+		file, err := dstZip.Create("iTunesArtwork")
+		if err != nil {
+			return fmt.Errorf("failed to create artwork: %w", err)
+		}
+
+		if _, err := file.Write(artwork); err != nil {
+			return fmt.Errorf("failed to write artwork: %w", err)
+		}
 	}
 
 	err = t.writeMetadata(item.Metadata, acc, dstZip)
