@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	gohttp "net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -224,7 +225,8 @@ type downloadResult struct {
 	Items           []downloadItemResult `plist:"songList,omitempty"`
 }
 
-func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *progressbar.ProgressBar) error {
+//nolint:nonamedreturns // Deferred close errors must propagate to callers.
+func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *progressbar.ProgressBar) (err error) {
 	req, err := t.httpClient.NewRequest("GET", src, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -243,7 +245,11 @@ func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *
 		return fmt.Errorf("failed to open file: %w", err)
 	}
 
-	defer file.Close()
+	defer func() {
+		if closeErr := file.Close(); closeErr != nil {
+			err = joinCleanupError(err, "failed to close downloaded file", closeErr)
+		}
+	}()
 
 	stat, err := t.os.Stat(dst)
 	if err != nil {
@@ -260,33 +266,49 @@ func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *
 	}
 	defer res.Body.Close()
 
-	if progress != nil {
-		progress.ChangeMax64(res.ContentLength + stat.Size())
-		err = progress.Set64(stat.Size())
+	offset, remaining, total, complete, err := downloadResponseRange(res, stat.Size())
+	if err != nil {
+		return err
+	}
 
-		if err != nil {
+	if complete {
+		return nil
+	}
+
+	if res.StatusCode == gohttp.StatusOK {
+		if err := file.Truncate(0); err != nil {
+			return fmt.Errorf("failed to restart download: %w", err)
+		}
+	}
+
+	if _, err := file.Seek(offset, io.SeekStart); err != nil {
+		return fmt.Errorf("can not seek file: %w", err)
+	}
+
+	var writer io.Writer = file
+
+	if progress != nil {
+		progress.ChangeMax64(total)
+
+		if err := progress.Set64(offset); err != nil {
 			return fmt.Errorf("can not set bar progress: %w", err)
 		}
 
-		_, err = file.Seek(0, io.SeekEnd)
-		if err != nil {
-			return fmt.Errorf("can not seek file: %w", err)
-		}
-
-		_, err = io.Copy(io.MultiWriter(file, progress), res.Body)
-	} else {
-		if stat != nil && stat.Size() > 0 {
-			_, err = file.Seek(0, io.SeekEnd)
-			if err != nil {
-				return fmt.Errorf("can not seek file: %w", err)
-			}
-		}
-
-		_, err = io.Copy(file, res.Body)
+		writer = io.MultiWriter(file, progress)
 	}
 
+	var body io.Reader = res.Body
+	if remaining >= 0 {
+		body = io.LimitReader(body, remaining)
+	}
+
+	written, err := io.Copy(writer, body)
 	if err != nil {
 		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	if remaining >= 0 && written != remaining || total >= 0 && offset+written != total {
+		return fmt.Errorf("download is incomplete: %w", io.ErrUnexpectedEOF)
 	}
 
 	return nil
