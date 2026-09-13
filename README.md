@@ -90,7 +90,8 @@ Usage:
   ipatool purchase [flags]
 
 Flags:
-  -b, --bundle-identifier string   Bundle identifier of the target app (required)
+  -i, --app-id int                 ID of the target app
+  -b, --bundle-identifier string   The bundle identifier of the target app (overrides the app ID)
   -h, --help                       help for purchase
       --platform string            Platform to purchase for: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos
 
