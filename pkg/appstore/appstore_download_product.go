@@ -35,6 +35,24 @@ func (t *appstore) sendDownloadProduct(acc Account, app App, guid, externalVersi
 		return res, platform, nil
 	}
 
+	if externalVersionID == "" && platform == PlatformMacOS {
+		externalVersionID, err = t.lookupLatestMacOSExternalVersionID(acc, app)
+		if err != nil {
+			return res, platform, fmt.Errorf("failed to resolve latest macOS version for download: %w", err)
+		}
+
+		// Pin the Mac offer on volumeStore itself. The redownload endpoint
+		// can still return an empty HTTP 500 for the same pinned Mac version.
+		res, err = t.downloadClient.Send(t.downloadProductRequest(volumeStore, acc, app, guid, externalVersionID))
+		if err != nil {
+			return res, platform, fmt.Errorf("failed to send pinned macOS download request: %w", err)
+		}
+
+		if !isEmptyDownloadProductResponse(res) && !isUnavailableDownloadProductResponse(res) {
+			return res, platform, nil
+		}
+	}
+
 	// Try redownload when volumeStore returns no items, either silently or
 	// with the message-only "No Longer Available" response.
 	bag, err := t.fetchURLBag(guid)
