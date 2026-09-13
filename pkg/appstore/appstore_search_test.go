@@ -1,6 +1,7 @@
 package appstore
 
 import (
+	"encoding/json"
 	"errors"
 	"net/url"
 
@@ -31,6 +32,27 @@ var _ = Describe("AppStore (Search)", func() {
 	AfterEach(func() {
 		ctrl.Finish()
 	})
+
+	DescribeTable("decodes catalog platforms",
+		func(metadata string, expected []Platform) {
+			var result searchResult
+			Expect(json.Unmarshal([]byte(`{"resultCount":1,"results":[{"trackId":42,`+metadata+`}]}`), &result)).To(Succeed())
+			mockClient.EXPECT().Send(gomock.Any()).Return(http.Result[searchResult]{StatusCode: 200, Data: result}, nil)
+			out, err := as.Search(SearchInput{Account: Account{StoreFront: "143441"}})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out.Count).To(Equal(1))
+			Expect(out.Results).To(Equal([]App{{ID: 42, Platforms: expected}}))
+		},
+		Entry("universal app with duplicate devices", `"supportedDevices":["iPadAir-iPadAir","iPhone5s-iPhone5s","iPhone6-iPhone6","iPodTouchSixthGen-iPodTouchSixthGen"]`, []Platform{PlatformIPhone, PlatformIPad}),
+		Entry("iPad only", `"supportedDevices":["iPadAir-iPadAir"]`, []Platform{PlatformIPad}),
+		Entry("iPod", `"supportedDevices":["iPodTouchSixthGen-iPodTouchSixthGen"]`, []Platform{PlatformIPhone}),
+		Entry("TV", `"supportedDevices":["AppleTV4-AppleTV4"]`, []Platform{PlatformAppleTV}),
+		Entry("vision", `"supportedDevices":["RealityDevice-RealityDevice"]`, []Platform{PlatformVisionOS}),
+		Entry("Mac", `"kind":"mac-software"`, []Platform{PlatformMacOS}),
+		Entry("multiple families", `"supportedDevices":["MacDesktop-MacDesktop","RealityDevice-RealityDevice","iPadAir-iPadAir"]`, []Platform{PlatformIPad, PlatformVisionOS, PlatformMacOS}),
+		Entry("missing metadata", `"kind":"software"`, []Platform{PlatformUnknown}),
+		Entry("unrecognized devices", `"supportedDevices":["FutureDevice"]`, []Platform{PlatformUnknown}),
+	)
 
 	When("request is successful", func() {
 		const (
@@ -184,11 +206,27 @@ var _ = Describe("AppStore (Search)", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(out.Count).To(Equal(2))
 			Expect(out.Results).To(Equal([]App{
-				{ID: 200, BundleID: "hydrated.two", Name: "Hydrated Two", Version: "2.0"},
-				{ID: 100, BundleID: "hydrated.one", Name: "Hydrated One", Version: "1.0"},
+				{ID: 200, BundleID: "hydrated.two", Name: "Hydrated Two", Version: "2.0", Platforms: []Platform{PlatformVisionOS}},
+				{ID: 100, BundleID: "hydrated.one", Name: "Hydrated One", Version: "1.0", Platforms: []Platform{PlatformVisionOS}},
 			}))
 		})
 	})
+
+	DescribeTable("preserves confirmed visionOS support",
+		func(metadata []App, expected []Platform) {
+			page := `<script type="application/json" id="serialized-server-data">{"data":[{"data":{"shelves":[{"items":[{"$kind":"AppSearchResult","lockup":{"adamId":"42"},"purchaseConfiguration":{"metricsPlatformDisplayStyle":"vision","appPlatforms":["vision"],"buyParams":"salableAdamId=42&appExtVrsId=420"}}]}]}}]}</script>`
+			mockStorefrontClient.EXPECT().Send(gomock.Any()).Return(http.Result[[]byte]{StatusCode: 200, Data: []byte(page)}, nil)
+			mockClient.EXPECT().Send(gomock.Any()).Return(http.Result[searchResult]{StatusCode: 200, Data: searchResult{Results: metadata}}, nil)
+			out, err := as.Search(SearchInput{Account: Account{StoreFront: "143441"}, Platform: PlatformVisionOS, Limit: 1})
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out.Results).To(HaveLen(1))
+			Expect(out.Results[0].Platforms).To(Equal(expected))
+		},
+		Entry("missing lookup result", nil, []Platform{PlatformVisionOS}),
+		Entry("unknown lookup platforms", []App{{ID: 42, Platforms: []Platform{PlatformUnknown}}}, []Platform{PlatformVisionOS}),
+		Entry("additional lookup platforms", []App{{ID: 42, Platforms: []Platform{PlatformIPhone, PlatformIPad}}}, []Platform{PlatformIPhone, PlatformIPad, PlatformVisionOS}),
+		Entry("vision already present", []App{{ID: 42, Platforms: []Platform{PlatformVisionOS}}}, []Platform{PlatformVisionOS}),
+	)
 
 	When("store front is invalid", func() {
 		It("returns error", func() {
