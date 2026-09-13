@@ -108,6 +108,48 @@ jobs:
           name: ipatool-${{ needs.get_version.outputs.version }}-linux-${{ matrix.arch }}
           path: ipatool-${{ needs.get_version.outputs.version }}-linux-${{ matrix.arch }}
           if-no-files-found: error
+  build_ios:
+    name: Build for iOS
+    runs-on: macos-latest
+    needs: [get_version, test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.0"
+          cache: true
+      - run: brew install ldid cmake
+      - run: ./tools/build-ios.sh "ipatool-$VERSION-ios-arm64"
+        env:
+          VERSION: ${{ needs.get_version.outputs.version }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipatool-${{ needs.get_version.outputs.version }}-ios-arm64
+          path: ipatool-${{ needs.get_version.outputs.version }}-ios-arm64
+          if-no-files-found: error
+  release_ios:
+    name: Release for iOS
+    runs-on: ubuntu-latest
+    needs: [get_version, build_ios, release_windows]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ipatool-${{ needs.get_version.outputs.version }}-ios-arm64
+          path: bin
+      - run: chmod +x "bin/$FILE" && tar -czvf "$FILE.tar.gz" "bin/$FILE"
+        env:
+          FILE: ipatool-${{ needs.get_version.outputs.version }}-ios-arm64
+      - run: ./tools/sha256sum.sh "$TARBALL" > "$TARBALL.sha256sum"
+        env:
+          TARBALL: ipatool-${{ needs.get_version.outputs.version }}-ios-arm64.tar.gz
+      - uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ipatool-${{ needs.get_version.outputs.version }}-ios-arm64.*
+          tag: ${{ github.ref }}
+          overwrite: false
+          file_glob: true
   release_windows:
     name: Release for Windows
     runs-on: ubuntu-latest

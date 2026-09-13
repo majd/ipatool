@@ -1,4 +1,4 @@
-//go:build darwin || linux
+//go:build (darwin && !ios) || linux
 
 package unicorn
 

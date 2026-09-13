@@ -61,7 +61,7 @@ func newCookieJar(stateDirectory string) http.CookieJar {
 
 // newKeychain returns a new keychain instance.
 func newKeychain(stateDirectory string, logger log.Logger, interactive bool) keychain.Keychain {
-	ring := util.Must(keyring.Open(keyring.Config{
+	ring := util.Must(openKeyring(keyring.Config{
 		AllowedBackends: []keyring.BackendType{
 			keyring.KeychainBackend,
 			keyring.SecretServiceBackend,

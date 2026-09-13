@@ -14,7 +14,7 @@
 
 ## Requirements
 
-- A supported operating system (macOS, Linux or Windows).
+- A supported operating system (macOS, Linux, Windows or iOS).
 - An Apple Account already configured to use the App Store.
 
 ## Installation
