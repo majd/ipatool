@@ -570,7 +570,9 @@ var _ = Describe("AppStore (Download)", func() {
 				mockHTTPClient.EXPECT().
 					Do(gomock.Any()).
 					Return(&gohttp.Response{
-						Body: io.NopCloser(strings.NewReader("ping")),
+						StatusCode:    gohttp.StatusOK,
+						Body:          io.NopCloser(strings.NewReader("ping")),
+						ContentLength: 4,
 					}, nil)
 
 			})
@@ -630,7 +632,9 @@ var _ = Describe("AppStore (Download)", func() {
 			mockHTTPClient.EXPECT().
 				Do(gomock.Any()).
 				Return(&gohttp.Response{
-					Body: io.NopCloser(strings.NewReader("ping")),
+					StatusCode:    gohttp.StatusOK,
+					Body:          io.NopCloser(strings.NewReader("ping")),
+					ContentLength: 4,
 				}, nil)
 		})
 
@@ -672,7 +676,7 @@ var _ = Describe("AppStore (Download)", func() {
 
 				mockOS.EXPECT().
 					Stat(gomock.Any()).
-					Return(nil, nil)
+					Return(&dummyFileInfo{}, nil)
 
 				mockOS.EXPECT().
 					Remove(tmpFile.Name()).
@@ -776,6 +780,7 @@ var _ = Describe("AppStore (Download)", func() {
 			mockHTTPClient.EXPECT().NewRequest("GET", "https://example.test/app.ipa", nil).
 				Return(&gohttp.Request{Header: gohttp.Header{}}, nil)
 			mockHTTPClient.EXPECT().Do(gomock.Any()).Return(&gohttp.Response{
+				StatusCode:    gohttp.StatusOK,
 				Body:          io.NopCloser(bytes.NewReader(packageBuffer.Bytes())),
 				ContentLength: int64(packageBuffer.Len()),
 			}, nil)
@@ -865,6 +870,7 @@ var _ = Describe("AppStore (Download)", func() {
 			mockHTTPClient.EXPECT().
 				Do(gomock.Any()).
 				Return(&gohttp.Response{
+					StatusCode:    gohttp.StatusOK,
 					Body:          io.NopCloser(bytes.NewReader(packageData)),
 					ContentLength: int64(len(packageData)),
 				}, nil)
@@ -941,6 +947,7 @@ var _ = Describe("AppStore (Download)", func() {
 			mockHTTPClient.EXPECT().
 				Do(gomock.Any()).
 				Return(&gohttp.Response{
+					StatusCode:    gohttp.StatusOK,
 					Body:          io.NopCloser(bytes.NewReader(packageBuffer.Bytes())),
 					ContentLength: int64(packageBuffer.Len()),
 				}, nil)
@@ -1033,11 +1040,16 @@ var _ = Describe("AppStore (Download)", func() {
 				Stat(testFile.Name()).
 				Return(info, nil)
 			mockHTTPClient.EXPECT().
-				Do(request).
+				Do(request.WithContext(context.Background())).
 				DoAndReturn(func(request *gohttp.Request) (*gohttp.Response, error) {
 					Expect(request.Header.Get("range")).To(Equal("bytes=8-"))
 
-					return &gohttp.Response{Body: io.NopCloser(strings.NewReader("remainder"))}, nil
+					return &gohttp.Response{
+						StatusCode:    gohttp.StatusPartialContent,
+						Header:        gohttp.Header{"Content-Range": []string{"bytes 8-16/17"}},
+						ContentLength: 9,
+						Body:          io.NopCloser(strings.NewReader("remainder")),
+					}, nil
 				})
 
 			err = as.(*appstore).downloadFile(context.Background(), "https://example.com/app.ipa", testFile.Name(), nil)
