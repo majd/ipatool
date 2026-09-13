@@ -378,7 +378,8 @@ func (t *appstore) isDirectory(path string) (bool, error) {
 	return info.IsDir(), nil
 }
 
-func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst string, artwork []byte) error {
+//nolint:nonamedreturns // Deferred close errors must propagate to callers.
+func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst string, artwork []byte) (err error) {
 	srcZip, err := zip.OpenReader(src)
 	if err != nil {
 		return fmt.Errorf("failed to open zip reader: %w", err)
@@ -389,10 +390,19 @@ func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst s
 	if err != nil {
 		return fmt.Errorf("failed to open file: %w", err)
 	}
-	defer dstFile.Close()
+
+	defer func() {
+		if closeErr := dstFile.Close(); closeErr != nil {
+			err = joinCleanupError(err, "failed to close patched file", closeErr)
+		}
+	}()
 
 	dstZip := zip.NewWriter(dstFile)
-	defer dstZip.Close()
+	defer func() {
+		if closeErr := dstZip.Close(); closeErr != nil {
+			err = joinCleanupError(err, "failed to close zip writer", closeErr)
+		}
+	}()
 
 	err = t.replicateZip(srcZip, dstZip, src)
 	if err != nil {
