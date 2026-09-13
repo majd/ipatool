@@ -39,6 +39,42 @@ var _ = Describe("AppStore (ListVersions)", func() {
 		ctrl.Finish()
 	})
 
+	It("pins the Mac offer before requesting a universal app's version history", func() {
+		pages := http.NewMockClient[[]byte](ctrl)
+		as.(*appstore).storefrontClient = pages
+		mockMachine.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
+		gomock.InOrder(
+			pages.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+				Expect(req.URL).To(Equal("https://apps.apple.com/de/app/id6472431552?platform=mac"))
+			}).Return(http.Result[[]byte]{StatusCode: gohttp.StatusOK, Data: macVersionPage(karingMacConfiguration)}, nil),
+			mockDownloadClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+				Expect(req.URL).To(ContainSubstring("volumeStoreDownloadProduct"))
+				Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("externalVersionId", "876660716"))
+			}).Return(http.Result[downloadResult]{StatusCode: gohttp.StatusOK, Data: downloadResult{Items: []downloadItemResult{{Metadata: map[string]interface{}{
+				"softwareVersionExternalIdentifiers": []interface{}{uint64(876660700), uint64(876660716)},
+				"softwareVersionExternalIdentifier":  uint64(876660716),
+			}}}}}, nil),
+		)
+		out, err := as.ListVersions(ListVersionsInput{Account: Account{StoreFront: "143443-2,34"}, App: App{ID: 6472431552, BundleID: "com.nebula.karing"}, Platform: PlatformMacOS})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(out.ExternalVersionIdentifiers).To(Equal([]string{"876660700", "876660716"}))
+		Expect(out.LatestExternalVersionID).To(Equal("876660716"))
+	})
+
+	It("does not fall back to iOS when the Mac version cannot be resolved", func() {
+		pages := http.NewMockClient[[]byte](ctrl)
+		as.(*appstore).storefrontClient = pages
+		mockMachine.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
+		pages.EXPECT().Send(gomock.Any()).Return(http.Result[[]byte]{StatusCode: gohttp.StatusOK, Data: macVersionPage(`{}`)}, nil)
+		_, err := as.ListVersions(ListVersionsInput{Account: Account{StoreFront: "143443-2,34"}, App: App{ID: 42}, Platform: PlatformMacOS})
+		Expect(err).To(MatchError(ContainSubstring("failed to resolve platform version")))
+	})
+
+	It("rejects unsupported platforms before making requests", func() {
+		_, err := as.ListVersions(ListVersionsInput{Platform: PlatformUnknown})
+		Expect(err).To(MatchError(`invalid platform "unknown"`))
+	})
+
 	When("fails to get MAC address", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
