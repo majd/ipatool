@@ -8,6 +8,8 @@ import (
 type Platform string
 
 const (
+	// PlatformUnknown is an output value, not a selectable store platform.
+	PlatformUnknown  Platform = "unknown"
 	PlatformIPhone   Platform = "iphone"
 	PlatformIPad     Platform = "ipad"
 	PlatformAppleTV  Platform = "appletv"

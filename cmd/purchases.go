@@ -14,6 +14,10 @@ import (
 func listPurchasesCmd() *cobra.Command {
 	var page, maxResults int
 
+	var platformValue string
+
+	var platform appstore.Platform
+
 	cmd := &cobra.Command{
 		Use:   "list-purchases",
 		Short: "List apps owned by the authenticated App Store account",
@@ -29,7 +33,10 @@ func listPurchasesCmd() *cobra.Command {
 				return fmt.Errorf("max results must not exceed %d", appstore.MaxOwnedAppsLimit)
 			}
 
-			return nil
+			var err error
+			platform, err = appstore.ParsePlatform(platformValue)
+
+			return err
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var lastErr error
@@ -54,9 +61,10 @@ func listPurchasesCmd() *cobra.Command {
 				}
 
 				output, err := dependencies.AppStore.OwnedApps(appstore.OwnedAppsInput{
-					Account: acc,
-					Page:    page,
-					Limit:   maxResults,
+					Account:  acc,
+					Page:     page,
+					Limit:    maxResults,
+					Platform: platform,
 				})
 				if err != nil {
 					return err
@@ -86,6 +94,7 @@ func listPurchasesCmd() *cobra.Command {
 
 	cmd.Flags().IntVarP(&maxResults, "max-results", "l", appstore.DefaultOwnedAppsLimit, "maximum number of apps to return per page")
 	cmd.Flags().IntVarP(&page, "page", "p", 1, "page of owned apps to return")
+	cmd.Flags().StringVar(&platformValue, "platform", "", "Filter by platform: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos")
 
 	return cmd
 }
