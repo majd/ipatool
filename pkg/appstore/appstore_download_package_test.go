@@ -20,6 +20,18 @@ var _ = Describe("Download package platform", func() {
 		Expect(platform).To(Equal(PlatformMacOS))
 	})
 
+	It("recognizes universal Mac packages with an iOS product type", func() {
+		platform, err := downloadPackagePlatform(PlatformMacOS, downloadItemResult{
+			Metadata: map[string]interface{}{
+				"software-platform": "macos",
+				"product-type":      "ios-app",
+			},
+			Sinfs: []Sinf{{DPInfo: make([]byte, 88)}},
+		})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(platform).To(Equal(PlatformMacOS))
+	})
+
 	It("accepts native authorization data that also contains sinf data", func() {
 		item := downloadItemResult{
 			Metadata: map[string]interface{}{

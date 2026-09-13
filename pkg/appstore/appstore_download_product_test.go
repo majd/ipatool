@@ -197,7 +197,7 @@ var _ = Describe("AppStore (Download Product)", func() {
 			}
 			mockDownloadClient.EXPECT().Send(gomock.Any()).Return(expected, nil)
 
-			actual, resolvedPlatform, err := store.sendDownloadProduct(account, app, testGUID, "", platform)
+			actual, resolvedPlatform, err := store.sendDownloadProduct(account, app, testGUID, testVersionID, platform)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(actual).To(Equal(expected))
 			Expect(resolvedPlatform).To(Equal(platform))

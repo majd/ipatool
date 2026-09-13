@@ -12,13 +12,21 @@ func downloadPackagePlatform(platform Platform, item downloadItemResult) (Platfo
 
 	softwarePlatform := downloadMetadataString(item.Metadata, "software-platform")
 	productType := downloadMetadataString(item.Metadata, "product-type")
-	mobileMetadata := strings.EqualFold(softwarePlatform, "ios") || strings.EqualFold(productType, "ios-app")
-	macMetadata := strings.EqualFold(softwarePlatform, "macos") || strings.EqualFold(productType, "mac-os-app")
+	// Universal Mac apps can retain product-type=ios-app. Prefer the
+	// package's explicit software platform over that catalog classification.
+	mobileMetadata := strings.EqualFold(softwarePlatform, "ios")
+	macMetadata := strings.EqualFold(softwarePlatform, "macos")
+
+	if softwarePlatform == "" {
+		mobileMetadata = strings.EqualFold(productType, "ios-app")
+		macMetadata = strings.EqualFold(productType, "mac-os-app")
+	}
+
 	mobileSinf := hasMobileSinf(item.Sinfs)
 	mobileSinfEvidence := hasMobileSinfEvidence(item.Sinfs)
 	macDPInfo := hasMacDPInfo(item.Sinfs)
 
-	if (mobileMetadata && macMetadata) || (mobileMetadata && macDPInfo) || (macMetadata && mobileSinfEvidence) || (mobileSinfEvidence && macDPInfo) {
+	if (mobileMetadata && macDPInfo) || (macMetadata && mobileSinfEvidence) || (mobileSinfEvidence && macDPInfo) {
 		return "", errors.New("download response contains conflicting package metadata")
 	}
 
