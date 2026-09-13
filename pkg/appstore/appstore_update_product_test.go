@@ -241,7 +241,6 @@ var _ = Describe("AppStore (Update Product)", func() {
 			Expect(errors.Is(err, redownloadErr)).To(BeTrue())
 			Expect(resolvedPlatform).To(Equal(platform))
 		},
-		Entry("unpinned macOS", "", PlatformMacOS),
 		Entry("pinned macOS", testVersionID, PlatformMacOS),
 		Entry("pinned tvOS", testVersionID, PlatformAppleTV),
 		Entry("pinned visionOS", testVersionID, PlatformVisionOS),

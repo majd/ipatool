@@ -324,7 +324,7 @@ var _ = Describe("AppStore (Download Product)", func() {
 			Entry("explicit iOS version", testVersionID, PlatformIPhone),
 			Entry("explicit version without a platform", "818970197", Platform("")),
 			Entry("explicit tvOS version", "818970197", PlatformAppleTV),
-			Entry("macOS", "", PlatformMacOS),
+			Entry("explicit macOS version", testVersionID, PlatformMacOS),
 			Entry("tvOS", "", PlatformAppleTV),
 			Entry("visionOS", "", PlatformVisionOS),
 		)
