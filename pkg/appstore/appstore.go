@@ -75,7 +75,7 @@ func NewAppStore(args Args) AppStore {
 
 	return &appstore{
 		keychain:            args.Keychain,
-		loginClient:         http.NewClient[loginResult](clientArgs),
+		loginClient:         http.NewClient[loginResult](http.Args{CookieJar: args.CookieJar, Authentication: true}),
 		searchClient:        http.NewClient[searchResult](clientArgs),
 		purchaseClient:      http.NewClient[purchaseResult](clientArgs),
 		downloadClient:      http.NewClient[downloadResult](clientArgs),
