@@ -63,7 +63,7 @@ var _ = Describe("AppStore (ZIP streaming framing)", func() {
 
 			var output bytes.Buffer
 			dst := zip.NewWriter(&output)
-			Expect((&appstore{}).replicateZip(src, dst)).To(Succeed())
+			Expect((&appstore{}).replicateZip(src, dst, path)).To(Succeed())
 			Expect(dst.Close()).To(Succeed())
 			result, err := zip.NewReader(bytes.NewReader(output.Bytes()), int64(output.Len()))
 			Expect(err).ToNot(HaveOccurred())

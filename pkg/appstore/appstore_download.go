@@ -394,7 +394,7 @@ func (t *appstore) applyPatches(item downloadItemResult, acc Account, src, dst s
 	dstZip := zip.NewWriter(dstFile)
 	defer dstZip.Close()
 
-	err = t.replicateZip(srcZip, dstZip)
+	err = t.replicateZip(srcZip, dstZip, src)
 	if err != nil {
 		return fmt.Errorf("failed to replicate zip: %w", err)
 	}
