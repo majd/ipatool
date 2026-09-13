@@ -38,6 +38,7 @@ var _ = Describe("AppStore (Download)", func() {
 	var (
 		ctrl                 *gomock.Controller
 		mockKeychain         *keychain.MockKeychain
+		mockBagClient        *http.MockClient[bagResult]
 		mockDownloadClient   *http.MockClient[downloadResult]
 		mockPlatformClient   *http.MockClient[platformVersionLookupResult]
 		mockStorefrontClient *http.MockClient[[]byte]
@@ -52,6 +53,7 @@ var _ = Describe("AppStore (Download)", func() {
 	BeforeEach(func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockKeychain = keychain.NewMockKeychain(ctrl)
+		mockBagClient = http.NewMockClient[bagResult](ctrl)
 		mockDownloadClient = http.NewMockClient[downloadResult](ctrl)
 		mockPlatformClient = http.NewMockClient[platformVersionLookupResult](ctrl)
 		mockStorefrontClient = http.NewMockClient[[]byte](ctrl)
@@ -62,6 +64,7 @@ var _ = Describe("AppStore (Download)", func() {
 		mockMachine = machine.NewMockMachine(ctrl)
 		as = &appstore{
 			keychain:         mockKeychain,
+			bagClient:        mockBagClient,
 			loginClient:      mockLoginClient,
 			purchaseClient:   mockPurchaseClient,
 			downloadClient:   mockDownloadClient,
@@ -406,9 +409,17 @@ var _ = Describe("AppStore (Download)", func() {
 			mockDownloadClient.EXPECT().
 				Send(gomock.Any()).
 				Return(http.Result[downloadResult]{
+					StatusCode: gohttp.StatusOK,
 					Data: downloadResult{
 						Items: []downloadItemResult{},
 					},
+				}, nil)
+
+			mockBagClient.EXPECT().
+				Send(gomock.Any()).
+				Return(http.Result[bagResult]{
+					StatusCode: gohttp.StatusOK,
+					Data:       validBagResult(),
 				}, nil)
 		})
 
@@ -701,6 +712,119 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 	})
 
+	DescribeTable("validates explicit or catalog-resolved platforms before replacing the output",
+		func(platform Platform, versionID string, fallback string, supportedPlatform string, succeeds bool) {
+			tempDir := GinkgoT().TempDir()
+			outputPath := filepath.Join(tempDir, "app.ipa")
+			previousOutput := []byte("previous output")
+			Expect(os.WriteFile(outputPath, previousOutput, 0600)).To(Succeed())
+
+			packageBuffer := new(bytes.Buffer)
+			packageWriter := zip.NewWriter(packageBuffer)
+			infoWriter, err := packageWriter.Create("Payload/Test.app/Info.plist")
+			Expect(err).ToNot(HaveOccurred())
+			info, err := plist.Marshal(map[string]interface{}{
+				"CFBundleSupportedPlatforms": []string{supportedPlatform},
+			}, plist.BinaryFormat)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = infoWriter.Write(info)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(packageWriter.Close()).To(Succeed())
+
+			response := http.Result[downloadResult]{
+				StatusCode: gohttp.StatusOK,
+				Data: downloadResult{Items: []downloadItemResult{{
+					URL:      "https://example.test/app.ipa",
+					Metadata: map[string]interface{}{"bundleShortVersionString": "1.0"},
+				}}},
+			}
+			mockMachine.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
+			if fallback != "" {
+				bag := bagResult{URLBag: urlBag{RedownloadEndpoint: testRedownloadEndpoint, UpdateEndpoint: testUpdateEndpoint}}
+				first := mockDownloadClient.EXPECT().Send(gomock.Any()).
+					Return(http.Result[downloadResult]{StatusCode: gohttp.StatusOK}, nil)
+				previous := mockBagClient.EXPECT().Send(gomock.Any()).After(first).
+					Return(http.Result[bagResult]{StatusCode: gohttp.StatusOK, Data: bag}, nil)
+				resolvedVersion := versionID
+				if resolvedVersion == "" {
+					resolvedVersion = "890598805"
+					previous = mockPlatformClient.EXPECT().Send(gomock.Any()).After(previous).
+						Return(http.Result[platformVersionLookupResult]{
+							StatusCode: gohttp.StatusOK,
+							Data: platformVersionLookupResult{Results: map[string]platformVersionLookupItem{
+								"42": {Offers: []platformVersionLookupOffer{
+									{Version: platformVersionLookupVersion{ExternalID: platformVersionExternalID(resolvedVersion)}},
+								}},
+							}},
+						}, nil)
+				}
+				if fallback == "update" {
+					previous = mockDownloadClient.EXPECT().Send(gomock.Any()).After(previous).
+						Return(http.Result[downloadResult]{StatusCode: gohttp.StatusOK,
+							Data: downloadResult{CustomerMessage: "“Messenger” No Longer Available"}}, nil)
+					response.Data.Items[0].Metadata["itemId"] = uint64(42)
+					response.Data.Items[0].Metadata["softwareVersionExternalIdentifier"] = resolvedVersion
+					response.Data.Items[0].Metadata["softwareVersionBundleId"] = "com.example.app"
+				}
+				mockDownloadClient.EXPECT().Send(gomock.Any()).After(previous).
+					Do(func(req http.Request) {
+						Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("appExtVrsId", resolvedVersion))
+					}).Return(response, nil)
+			} else {
+				mockDownloadClient.EXPECT().Send(gomock.Any()).Return(response, nil)
+			}
+			mockHTTPClient.EXPECT().NewRequest("GET", "https://example.test/app.ipa", nil).
+				Return(&gohttp.Request{Header: gohttp.Header{}}, nil)
+			mockHTTPClient.EXPECT().Do(gomock.Any()).Return(&gohttp.Response{
+				Body:          io.NopCloser(bytes.NewReader(packageBuffer.Bytes())),
+				ContentLength: int64(packageBuffer.Len()),
+			}, nil)
+
+			store := &appstore{
+				downloadClient: mockDownloadClient,
+				bagClient:      mockBagClient,
+				platformClient: mockPlatformClient,
+				httpClient:     mockHTTPClient,
+				machine:        mockMachine,
+				os:             operatingsystem.New(),
+			}
+			out, err := store.Download(DownloadInput{
+				Account:           Account{StoreFront: "143441", Email: "test@example.com"},
+				App:               App{ID: 42},
+				OutputPath:        outputPath,
+				Platform:          platform,
+				ExternalVersionID: versionID,
+			})
+			if succeeds {
+				Expect(err).ToNot(HaveOccurred())
+				Expect(out.DestinationPath).To(Equal(outputPath))
+				actual, readErr := os.ReadFile(outputPath)
+				Expect(readErr).ToNot(HaveOccurred())
+				Expect(actual).ToNot(Equal(previousOutput))
+			} else {
+				Expect(err).To(MatchError(ContainSubstring("failed to validate package platform")))
+				Expect(out.DestinationPath).To(BeEmpty())
+				Expect(os.ReadFile(outputPath)).To(Equal(previousOutput))
+			}
+			Expect(outputPath + ".tmp").ToNot(BeAnExistingFile())
+		},
+		Entry("iPhone accepts iOS", PlatformIPhone, "", "", "iPhoneOS", true),
+		Entry("iPad accepts iOS", PlatformIPad, "", "", "iPhoneOS", true),
+		Entry("iPhone rejects tvOS", PlatformIPhone, "", "", "AppleTVOS", false),
+		Entry("iPad rejects tvOS", PlatformIPad, "", "", "AppleTVOS", false),
+		Entry("iPhone rejects visionOS", PlatformIPhone, "", "", "XROS", false),
+		Entry("a conflicting explicit version is rejected, not replaced", PlatformIPhone, "818970197", "", "AppleTVOS", false),
+		Entry("default iOS fallback accepts iOS", Platform(""), "", "redownload", "iPhoneOS", true),
+		Entry("default iOS fallback rejects tvOS", Platform(""), "", "redownload", "AppleTVOS", false),
+		Entry("latest update accepts iOS", Platform(""), "", "update", "iPhoneOS", true),
+		Entry("pinned update accepts iOS", Platform(""), "818970197", "update", "iPhoneOS", true),
+		Entry("pinned update rejects tvOS", Platform(""), "818970197", "update", "AppleTVOS", false),
+		Entry("pinned redownload preserves an unspecified platform", Platform(""), "818970197", "redownload", "AppleTVOS", true),
+		Entry("normal unspecified-platform behavior is preserved", Platform(""), "", "", "AppleTVOS", true),
+		Entry("an explicit tvOS version without a platform is preserved", Platform(""), "818970197", "", "AppleTVOS", true),
+		Entry("explicit tvOS downloads still work", PlatformAppleTV, "818970197", "", "AppleTVOS", true),
+	)
+
 	Describe("macOS packages", func() {
 		It("decrypts the downloaded package with in-memory machine identity and dpInfo", func() {
 			tempDir := GinkgoT().TempDir()
@@ -920,6 +1044,36 @@ var _ = Describe("AppStore (Download)", func() {
 
 			err := (&appstore{}).validatePackagePlatform(path, PlatformAppleTV)
 			Expect(err).ToNot(HaveOccurred())
+		})
+
+		DescribeTable("validates iOS packages",
+			func(platform Platform, supportedPlatforms []string, succeeds bool) {
+				path := writePackage(supportedPlatforms)
+				defer os.Remove(path)
+
+				err := (&appstore{}).validatePackagePlatform(path, platform)
+				if succeeds {
+					Expect(err).ToNot(HaveOccurred())
+				} else {
+					Expect(err).To(MatchError(ContainSubstring("iPhoneOS")))
+				}
+			},
+			Entry("iPhone accepts iPhoneOS", PlatformIPhone, []string{"iPhoneOS"}, true),
+			Entry("iPad accepts iPhoneOS", PlatformIPad, []string{"iPhoneOS"}, true),
+			Entry("iPhone rejects AppleTVOS", PlatformIPhone, []string{"AppleTVOS"}, false),
+			Entry("iPad rejects XROS", PlatformIPad, []string{"XROS"}, false),
+			Entry("missing platform declaration", PlatformIPhone, []string{}, false),
+		)
+
+		It("does not accept iOS support declared only by an embedded app", func() {
+			path := writePackageWithInfoPlists(map[string][]string{
+				"Payload/Test.app/Info.plist":                 {"AppleTVOS"},
+				"Payload/Test.app/PlugIns/iOS.app/Info.plist": {"iPhoneOS"},
+			})
+			defer os.Remove(path)
+
+			err := (&appstore{}).validatePackagePlatform(path, PlatformIPhone)
+			Expect(err).To(MatchError(ContainSubstring("iPhoneOS")))
 		})
 
 		It("returns an error for packages without AppleTVOS support", func() {

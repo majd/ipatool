@@ -33,26 +33,20 @@ func (t *appstore) Bag(input BagInput) (BagOutput, error) {
 }
 
 func (t *appstore) bag(guid string) (BagOutput, error) {
-	req := t.bagRequest(guid)
-
-	res, err := t.bagClient.Send(req)
+	bag, err := t.fetchURLBag(guid)
 	if err != nil {
-		return BagOutput{}, fmt.Errorf("failed to send http request: %w", err)
+		return BagOutput{}, err
 	}
 
-	if res.StatusCode != gohttp.StatusOK {
-		return BagOutput{}, fmt.Errorf("received unexpected status code: %d", res.StatusCode)
-	}
-
-	version, err := strconv.ParseUint(res.Data.URLBag.SAPVersion, 10, 32)
+	version, err := strconv.ParseUint(bag.SAPVersion, 10, 32)
 	if err != nil {
-		return BagOutput{}, fmt.Errorf("invalid SAP version %q in bag: %w", res.Data.URLBag.SAPVersion, err)
+		return BagOutput{}, fmt.Errorf("invalid SAP version %q in bag: %w", bag.SAPVersion, err)
 	}
 
 	config := SAPConfig{
-		AuthEndpoint:   res.Data.URLBag.AuthEndpoint,
-		SetupURL:       res.Data.URLBag.SAPSetupEndpoint,
-		CertificateURL: res.Data.URLBag.SAPSetupCertEndpoint,
+		AuthEndpoint:   bag.AuthEndpoint,
+		SetupURL:       bag.SAPSetupEndpoint,
+		CertificateURL: bag.SAPSetupCertEndpoint,
 		Version:        uint32(version),
 	}
 	if err := validateSAPConfig(config); err != nil {
@@ -62,12 +56,28 @@ func (t *appstore) bag(guid string) (BagOutput, error) {
 	return BagOutput{AuthEndpoint: config.AuthEndpoint, SAPConfig: config}, nil
 }
 
+// Download endpoints do not require the authentication-specific SAP configuration.
+func (t *appstore) fetchURLBag(guid string) (urlBag, error) {
+	res, err := t.bagClient.Send(t.bagRequest(guid))
+	if err != nil {
+		return urlBag{}, fmt.Errorf("failed to send http request: %w", err)
+	}
+
+	if res.StatusCode != gohttp.StatusOK {
+		return urlBag{}, fmt.Errorf("received unexpected status code: %d", res.StatusCode)
+	}
+
+	return res.Data.URLBag, nil
+}
+
 type bagResult struct {
 	URLBag urlBag `plist:"urlBag,omitempty"`
 }
 
 type urlBag struct {
 	AuthEndpoint         string `plist:"authenticateAccount,omitempty"`
+	RedownloadEndpoint   string `plist:"redownloadProduct,omitempty"`
+	UpdateEndpoint       string `plist:"updateProduct,omitempty"`
 	SAPSetupEndpoint     string `plist:"sign-sap-setup,omitempty"`
 	SAPSetupCertEndpoint string `plist:"sign-sap-setup-cert,omitempty"`
 	SAPVersion           string `plist:"sign-sap-version,omitempty"`

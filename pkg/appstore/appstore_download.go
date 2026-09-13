@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/schollz/progressbar/v3"
 	"howett.net/plist"
 )
@@ -59,11 +58,9 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		}
 	}
 
-	req := t.downloadRequest(input.Account, input.App, guid, externalVersionID)
-
-	res, err := t.downloadClient.Send(req)
+	res, resolvedPlatform, err := t.sendDownloadProduct(input.Account, input.App, guid, externalVersionID, input.Platform)
 	if err != nil {
-		return DownloadOutput{}, fmt.Errorf("failed to send http request: %w", err)
+		return DownloadOutput{}, err
 	}
 
 	if res.Data.FailureType == FailureTypePasswordTokenExpired ||
@@ -77,7 +74,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		return DownloadOutput{}, ErrLicenseRequired
 	}
 
-	if res.Data.FailureType != "" && res.Data.CustomerMessage != "" {
+	if res.Data.CustomerMessage != "" && (res.Data.FailureType != "" || len(res.Data.Items) == 0) {
 		return DownloadOutput{}, NewErrorWithMetadata(fmt.Errorf("received error: %s", res.Data.CustomerMessage), res)
 	}
 
@@ -118,12 +115,16 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		return DownloadOutput{}, fmt.Errorf("failed to download file: %w", err)
 	}
 
-	if err := t.applyPatches(item, input.Account, tmpPath, destination); err != nil {
-		return DownloadOutput{}, fmt.Errorf("failed to apply patches: %w", err)
+	if err := t.validatePackagePlatform(tmpPath, resolvedPlatform); err != nil {
+		if removeErr := t.os.Remove(tmpPath); removeErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to remove invalid package: %w", removeErr))
+		}
+
+		return DownloadOutput{}, fmt.Errorf("failed to validate package platform: %w", err)
 	}
 
-	if err := t.validatePackagePlatform(destination, input.Platform); err != nil {
-		return DownloadOutput{}, fmt.Errorf("failed to validate package platform: %w", err)
+	if err := t.applyPatches(item, input.Account, tmpPath, destination); err != nil {
+		return DownloadOutput{}, fmt.Errorf("failed to apply patches: %w", err)
 	}
 
 	if err := t.os.Remove(tmpPath); err != nil {
@@ -144,6 +145,8 @@ func (*appstore) validatePackagePlatform(path string, platform Platform) error {
 	var expectedPlatform string
 
 	switch platform {
+	case PlatformIPhone, PlatformIPad:
+		expectedPlatform = "iPhoneOS"
 	case PlatformAppleTV:
 		expectedPlatform = "AppleTVOS"
 	case PlatformVisionOS:
@@ -274,38 +277,6 @@ func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *
 	}
 
 	return nil
-}
-
-func (*appstore) downloadRequest(acc Account, app App, guid string, externalVersionID string) http.Request {
-	payload := map[string]interface{}{
-		"creditDisplay": "",
-		"guid":          guid,
-		"salableAdamId": app.ID,
-		"serialNumber":  "0",
-	}
-
-	if externalVersionID != "" {
-		payload["externalVersionId"] = externalVersionID
-	}
-
-	podPrefix := ""
-	if acc.Pod != "" {
-		podPrefix = "p" + acc.Pod + "-"
-	}
-
-	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s%s?guid=%s", podPrefix, PrivateAppStoreAPIDomain, PrivateAppStoreAPIPathDownload, guid),
-		Method:         http.MethodPOST,
-		ResponseFormat: http.ResponseFormatXML,
-		Headers: map[string]string{
-			"Content-Type": "application/x-apple-plist",
-			"iCloud-DSID":  acc.DirectoryServicesID,
-			"X-Dsid":       acc.DirectoryServicesID,
-		},
-		Payload: &http.XMLPayload{
-			Content: payload,
-		},
-	}
 }
 
 func fileName(app App, version string) string {
