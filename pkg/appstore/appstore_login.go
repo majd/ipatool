@@ -19,7 +19,8 @@ var (
 
 const (
 	maxAuthenticationRequestAttempts = 3
-	authenticationRetryDelay         = 250 * time.Millisecond
+	authenticationRetryDelay         = 10 * time.Second
+	maxAuthenticationRetryDelay      = 30 * time.Second
 )
 
 type LoginInput struct {
@@ -128,7 +129,16 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string, signe
 		res, err = t.sendAuthenticationRequest(request)
 
 		if err != nil {
-			return Account{}, fmt.Errorf("request failed: %w", err)
+			stage := "sign-in"
+			if authCode != "" {
+				stage = "2FA verification"
+			}
+
+			if redirect != "" {
+				stage += " at Store pod"
+			}
+
+			return Account{}, fmt.Errorf("%s request failed: %w", stage, err)
 		}
 
 		if retry, redirect, err = t.parseLoginResponse(&res, attempt, authCode); err != nil {
@@ -188,7 +198,7 @@ func (t *appstore) sendAuthenticationRequest(request http.Request) (http.Result[
 		status, retry := retryableAuthenticationError(err)
 		if !retry {
 			if err != nil {
-				return result, fmt.Errorf("%w", err)
+				return result, authenticationRequestError(err)
 			}
 
 			return result, nil
@@ -199,11 +209,25 @@ func (t *appstore) sendAuthenticationRequest(request http.Request) (http.Result[
 		if attempt == maxAuthenticationRequestAttempts {
 			return result, fmt.Errorf(
 				"authentication request failed after %d attempts (HTTP %s): %w",
-				maxAuthenticationRequestAttempts, strings.Join(statuses, ", "), err,
+				maxAuthenticationRequestAttempts, strings.Join(statuses, ", "), authenticationRequestError(err),
 			)
 		}
 
-		sleep(time.Duration(attempt) * authenticationRetryDelay)
+		delay := min(authenticationRetryDelay<<(attempt-1), maxAuthenticationRetryDelay)
+
+		var responseErr *http.UnexpectedResponseError
+		if errors.As(err, &responseErr) {
+			if requested, ok := authenticationRetryAfter(responseErr.RetryAfter, time.Now()); ok {
+				if requested > maxAuthenticationRetryDelay {
+					return result, fmt.Errorf("apple requested a wait longer than %s; try again later: %w", maxAuthenticationRetryDelay, err)
+				}
+
+				// Retry-After takes precedence over the fallback backoff.
+				delay = max(requested, time.Second)
+			}
+		}
+
+		sleep(delay)
 	}
 }
 
@@ -216,6 +240,7 @@ func retryableAuthenticationError(err error) (int, bool) {
 	status := responseErr.StatusCode
 	retry := status == gohttp.StatusNoContent ||
 		status == gohttp.StatusNotFound ||
+		status == gohttp.StatusTooManyRequests ||
 		status/100 == 5
 
 	return status, retry
@@ -249,7 +274,7 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 			err = NewErrorWithMetadata(errors.New("something went wrong"), res)
 		}
 	} else if res.StatusCode != gohttp.StatusOK || res.Data.PasswordToken == "" || res.Data.DirectoryServicesID == "" {
-		err = NewErrorWithMetadata(errors.New("something went wrong"), res)
+		err = fmt.Errorf("apple returned no usable authentication response (HTTP %d): missing account credentials or unexpected status; try again later or from another network", res.StatusCode)
 	}
 
 	return retry, redirect, err
@@ -275,4 +300,36 @@ func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string
 			},
 		},
 	}
+}
+
+func authenticationRequestError(err error) error {
+	var responseErr *http.UnexpectedResponseError
+	if !errors.As(err, &responseErr) {
+		return err
+	}
+
+	if responseErr.StatusCode == gohttp.StatusTooManyRequests {
+		return fmt.Errorf("apple rate limited authentication; try again later: %w", err)
+	}
+
+	return fmt.Errorf("apple returned no usable authentication response; try again later or from another network: %w", err)
+}
+
+func authenticationRetryAfter(value string, now time.Time) (time.Duration, bool) {
+	value = strings.TrimSpace(value)
+	if seconds, err := strconv.ParseUint(value, 10, 64); err == nil {
+		// Saturate before converting to Duration to avoid overflow. A wait over
+		// the budget ends this login rather than retrying before Apple's deadline.
+		if seconds > uint64(maxAuthenticationRetryDelay/time.Second) {
+			return maxAuthenticationRetryDelay + time.Second, true
+		}
+
+		return time.Duration(seconds) * time.Second, true
+	}
+
+	if date, err := gohttp.ParseTime(value); err == nil {
+		return max(time.Duration(0), date.Sub(now)), true
+	}
+
+	return 0, false
 }

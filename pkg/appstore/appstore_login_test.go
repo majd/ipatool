@@ -310,7 +310,7 @@ var _ = Describe("AppStore (Login)", func() {
 				_, err := as.Login(LoginInput{
 					Password: testPassword,
 				})
-				Expect(err).To(MatchError("request failed: test complete"))
+				Expect(err).To(MatchError("sign-in at Store pod request failed: test complete"))
 			})
 		})
 
