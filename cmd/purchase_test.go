@@ -17,6 +17,49 @@ var _ = Describe("Purchase command", func() {
 		Expect(cmd.Flag("platform").Usage).To(ContainSubstring("macos"))
 	})
 
+	DescribeTable("purchasing by app ID", func(flag string) {
+		store := &fakePurchaseAppStore{}
+		previousDependencies := dependencies
+		DeferCleanup(func() { dependencies = previousDependencies })
+		dependencies.Logger = log.NewLogger(log.Args{})
+
+		cmd := purchaseCmdWithAppStore(func() appstore.AppStore { return store })
+		cmd.SetArgs([]string{flag, "123456789", "--platform", "macos"})
+
+		Expect(cmd.Execute()).To(Succeed())
+		Expect(store.lookupCalls).To(BeZero())
+		Expect(store.purchaseInput.App).To(Equal(appstore.App{ID: 123456789}))
+		Expect(store.purchaseInput.Platform).To(Equal(appstore.PlatformMacOS))
+	},
+		Entry("accepts the long flag", "--app-id"),
+		Entry("accepts the short flag", "-i"),
+	)
+
+	It("requires an app ID or bundle identifier before accessing the account", func() {
+		cmd := purchaseCmdWithAppStore(func() appstore.AppStore {
+			Fail("must not access the app store without a target")
+
+			return nil
+		})
+		cmd.SetArgs([]string{})
+
+		Expect(cmd.Execute()).To(MatchError("either the app ID or the bundle identifier must be specified"))
+	})
+
+	It("lets the bundle identifier override the app ID", func() {
+		store := &fakePurchaseAppStore{}
+		previousDependencies := dependencies
+		DeferCleanup(func() { dependencies = previousDependencies })
+		dependencies.Logger = log.NewLogger(log.Args{})
+
+		cmd := purchaseCmdWithAppStore(func() appstore.AppStore { return store })
+		cmd.SetArgs([]string{"-i", "123456789", "-b", "com.example.app"})
+
+		Expect(cmd.Execute()).To(Succeed())
+		Expect(store.lookupCalls).To(Equal(1))
+		Expect(store.purchaseInput.App).To(Equal(appstore.App{ID: 42, BundleID: "com.example.app"}))
+	})
+
 	It("propagates macOS to lookup and purchase", func() {
 		store := &fakePurchaseAppStore{}
 		previousDependencies := dependencies
@@ -35,6 +78,7 @@ var _ = Describe("Purchase command", func() {
 })
 
 type fakePurchaseAppStore struct {
+	lookupCalls   int
 	lookupInput   appstore.LookupInput
 	purchaseInput appstore.PurchaseInput
 }
@@ -50,6 +94,7 @@ func (*fakePurchaseAppStore) AccountInfo() (appstore.AccountInfoOutput, error) {
 func (*fakePurchaseAppStore) Revoke() error { return nil }
 
 func (f *fakePurchaseAppStore) Lookup(input appstore.LookupInput) (appstore.LookupOutput, error) {
+	f.lookupCalls++
 	f.lookupInput = input
 
 	return appstore.LookupOutput{App: appstore.App{ID: 42, BundleID: input.BundleID}}, nil

@@ -17,6 +17,7 @@ func purchaseCmd() *cobra.Command {
 //nolint:wrapcheck
 func purchaseCmdWithAppStore(appStore func() appstore.AppStore) *cobra.Command {
 	var (
+		appID         int64
 		bundleID      string
 		platformValue string
 	)
@@ -25,6 +26,10 @@ func purchaseCmdWithAppStore(appStore func() appstore.AppStore) *cobra.Command {
 		Use:   "purchase",
 		Short: "Obtain a license for the app from the App Store",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if appID == 0 && bundleID == "" {
+				return errors.New("either the app ID or the bundle identifier must be specified")
+			}
+
 			platform, err := appstore.ParsePlatform(platformValue)
 			if err != nil {
 				return err
@@ -54,18 +59,23 @@ func purchaseCmdWithAppStore(appStore func() appstore.AppStore) *cobra.Command {
 					acc = loginResult.Account
 				}
 
-				lookupResult, err := store.Lookup(appstore.LookupInput{
-					Account:  acc,
-					BundleID: bundleID,
-					Platform: platform,
-				})
-				if err != nil {
-					return err
+				app := appstore.App{ID: appID}
+				if bundleID != "" {
+					lookupResult, err := store.Lookup(appstore.LookupInput{
+						Account:  acc,
+						BundleID: bundleID,
+						Platform: platform,
+					})
+					if err != nil {
+						return err
+					}
+
+					app = lookupResult.App
 				}
 
 				err = store.Purchase(appstore.PurchaseInput{
 					Account:  acc,
-					App:      lookupResult.App,
+					App:      app,
 					Platform: platform,
 				})
 				if err != nil && !errors.Is(err, appstore.ErrLicenseAlreadyExists) {
@@ -92,9 +102,9 @@ func purchaseCmdWithAppStore(appStore func() appstore.AppStore) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "Bundle identifier of the target app (required)")
+	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target app")
+	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target app (overrides the app ID)")
 	cmd.Flags().StringVar(&platformValue, "platform", "", "Platform to purchase for: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos")
-	_ = cmd.MarkFlagRequired("bundle-identifier")
 
 	return cmd
 }
