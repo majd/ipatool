@@ -19,7 +19,6 @@ import (
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 	"github.com/rs/zerolog"
 	"github.com/spf13/cobra"
-	"golang.org/x/term"
 )
 
 var dependencies = Dependencies{}
@@ -60,7 +59,7 @@ func newCookieJar(stateDirectory string) http.CookieJar {
 }
 
 // newKeychain returns a new keychain instance.
-func newKeychain(stateDirectory string, logger log.Logger, interactive bool) keychain.Keychain {
+func newKeychain(stateDirectory string, interactive bool) keychain.Keychain {
 	ring := util.Must(openKeyring(keyring.Config{
 		AllowedBackends: []keyring.BackendType{
 			keyring.KeychainBackend,
@@ -80,15 +79,10 @@ func newKeychain(stateDirectory string, logger log.Logger, interactive bool) key
 			}
 
 			path := strings.Split(s, " unlock ")[1]
-			logger.Log().Msgf("enter passphrase to unlock %s (this is separate from your Apple ID password): ", path)
-			bytes, err := term.ReadPassword(int(os.Stdin.Fd()))
+			password, err := readPrompt(fmt.Sprintf("enter passphrase to unlock %s (this is separate from your Apple ID password): ", path), true)
 			if err != nil {
 				return "", fmt.Errorf("failed to read password: %w", err)
 			}
-
-			password := string(bytes)
-			password = strings.Trim(password, "\n")
-			password = strings.Trim(password, "\r")
 
 			return password, nil
 		},
@@ -111,7 +105,7 @@ func initWithCommand(cmd *cobra.Command) {
 	dependencies.Machine = machine.New(machine.Args{OS: dependencies.OS})
 	stateDirectory := util.Must(prepareStateDirectory(dependencies.OS, dependencies.Machine.HomeDirectory()))
 	dependencies.CookieJar = newCookieJar(stateDirectory)
-	dependencies.Keychain = newKeychain(stateDirectory, dependencies.Logger, interactive)
+	dependencies.Keychain = newKeychain(stateDirectory, interactive)
 	dependencies.AppStore = appstore.NewAppStore(appstore.Args{
 		CookieJar:       dependencies.CookieJar,
 		OperatingSystem: dependencies.OS,
