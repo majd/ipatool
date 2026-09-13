@@ -171,6 +171,15 @@ func (t *appstore) replicateZip(src *zip.ReadCloser, dst *zip.Writer) error {
 			}
 
 			header := file.FileHeader
+			// Frame deflated files with a trailing descriptor for streaming
+			// installers, without changing their compressed data or timestamps.
+			// Stored files need inline sizes because they have no stream terminator.
+			if strings.HasSuffix(header.Name, "/") || header.Method == zip.Store {
+				header.Flags &^= 0x8
+			} else if header.Method == zip.Deflate {
+				header.Flags |= 0x8
+			}
+
 			dstFile, err := dst.CreateRaw(&header)
 
 			if err != nil {
