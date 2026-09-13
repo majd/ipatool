@@ -2,6 +2,7 @@
 
 [![Release](https://img.shields.io/github/release/majd/ipatool.svg?label=Release)](https://GitHub.com/majd/ipatool/releases/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/majd/ipatool/blob/main/LICENSE)
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink.svg)](https://github.com/sponsors/majd)
 
 `ipatool` is a command line tool that allows you to search for iOS, iPadOS, tvOS, visionOS, and macOS apps on the [App Store](https://apps.apple.com), and download `.ipa` or macOS `.pkg` app packages.
 
