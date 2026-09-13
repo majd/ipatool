@@ -6,6 +6,7 @@ require (
 	github.com/avast/retry-go v3.0.0+incompatible
 	github.com/blacktop/go-macho v1.1.282
 	github.com/bodgit/sevenzip v1.6.3
+	github.com/byteness/go-keychain v0.0.0-20191008050251-8e49817e8af4
 	github.com/byteness/keyring v1.9.0
 	github.com/ebitengine/purego v0.10.2
 	github.com/juju/persistent-cookiejar v1.0.0
@@ -29,7 +30,6 @@ require (
 	github.com/blacktop/go-dwarf v1.0.14 // indirect
 	github.com/bodgit/plumbing v1.3.0 // indirect
 	github.com/bodgit/windows v1.0.1 // indirect
-	github.com/byteness/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/byteness/go-libsecret v0.0.0-20260108215642-107379d3dee0 // indirect
 	github.com/byteness/percent v0.2.2 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect

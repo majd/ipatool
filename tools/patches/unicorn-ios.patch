@@ -1,0 +1,76 @@
+--- a/qemu/configure
++++ b/qemu/configure
+@@ -2152,7 +2152,7 @@
+ if [ "$darwin" = "yes" ] ; then
+   cat > $TMPC << EOF
+ #include <pthread.h>
+-int main() { pthread_jit_write_protect_supported_np(); return 0;}
++int main() { pthread_jit_write_protect_supported_np(); pthread_jit_write_protect_np(0); return 0;}
+ EOF
+   if ! compile_prog ""; then
+     have_pthread_jit_protect='no'
+--- a/qemu/include/tcg/tcg-apple-jit.h
++++ b/qemu/include/tcg/tcg-apple-jit.h
+@@ -104,13 +104,11 @@
+ #endif
+ 
+ 
+-#if defined(__APPLE__) && defined(HAVE_PTHREAD_JIT_PROTECT) && (defined(__arm__) || defined(__aarch64__))
++#if defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+ 
+-/* write protect enable = write disable */
+-static inline void jit_write_protect(int enabled)
+-{
+-    return pthread_jit_write_protect_np(enabled);
+-}
++struct uc_struct;
++void ipatool_jit_write_protect(struct uc_struct *uc, int enabled);
++#define jit_write_protect(enabled) ipatool_jit_write_protect(uc, enabled)
+ 
+ #define JIT_CALLBACK_GUARD(x)                       \
+ {                                                   \
+--- a/qemu/accel/tcg/translate-all.c
++++ b/qemu/accel/tcg/translate-all.c
+@@ -1019,7 +1019,7 @@
+ static inline void *alloc_code_gen_buffer(struct uc_struct *uc)
+ {
+     TCGContext *tcg_ctx = uc->tcg_ctx;
+-    int prot = PROT_WRITE | PROT_READ | PROT_EXEC;
++    int prot = PROT_WRITE | PROT_READ;
+     int flags = MAP_PRIVATE | MAP_ANONYMOUS;
+     size_t size = tcg_ctx->code_gen_buffer_size;
+     void *buf;
+@@ -2172,7 +2172,20 @@
+ }
+ 
+ 
+-#if defined(__APPLE__) && defined(HAVE_PTHREAD_JIT_PROTECT) && (defined(__arm__) || defined(__aarch64__))
++/* iOS CLI processes cannot use MAP_JIT outside an app sandbox. Toggle the
++ * translation buffer between writable and executable instead of using RWX. */
++void ipatool_jit_write_protect(struct uc_struct *uc, int enabled)
++{
++    TCGContext *ctx = uc->tcg_ctx;
++    if (ctx && ctx->initial_buffer &&
++        mprotect(ctx->initial_buffer, ctx->initial_buffer_size,
++                 PROT_READ | (enabled ? PROT_EXEC : PROT_WRITE)) != 0) {
++        perror("protect Unicorn translation buffer");
++        abort();
++    }
++}
++
++#if defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+ static bool tb_exec_is_locked(struct uc_struct *uc)
+ {
+     return uc->current_executable;
+--- a/uc.c
++++ b/uc.c
+@@ -35,8 +35,7 @@
+ static uc_err uc_snapshot(uc_engine *uc);
+ static uc_err uc_restore_latest_snapshot(uc_engine *uc);
+ 
+-#if defined(__APPLE__) && defined(HAVE_PTHREAD_JIT_PROTECT) &&                 \
+-    (defined(__arm__) || defined(__aarch64__))
++#if defined(__ENVIRONMENT_IPHONE_OS_VERSION_MIN_REQUIRED__)
+ static void save_jit_state(uc_engine *uc)
+ {
+     if (!uc->nested) {

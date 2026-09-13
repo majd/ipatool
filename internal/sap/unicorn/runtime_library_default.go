@@ -1,4 +1,4 @@
-//go:build !windows || !arm64
+//go:build !ios && (!windows || !arm64)
 
 package unicorn
 
