@@ -858,7 +858,7 @@ var _ = Describe("AppStore (Download)", func() {
 							Metadata: map[string]interface{}{
 								"bundleShortVersionString": "1.2.3",
 								"software-platform":        "macos",
-								"product-type":             "mac-os-app",
+								"product-type":             "ios-app",
 							},
 						}},
 					},
@@ -889,10 +889,11 @@ var _ = Describe("AppStore (Download)", func() {
 				},
 			}
 			out, err := store.Download(DownloadInput{
-				Context:    context.Background(),
-				App:        App{ID: 42, BundleID: "com.example.mac"},
-				OutputPath: requestedPath,
-				Platform:   PlatformMacOS,
+				Context:           context.Background(),
+				App:               App{ID: 42, BundleID: "com.example.mac"},
+				OutputPath:        requestedPath,
+				Platform:          PlatformMacOS,
+				ExternalVersionID: "123456789",
 			})
 
 			Expect(err).ToNot(HaveOccurred())
@@ -965,11 +966,12 @@ var _ = Describe("AppStore (Download)", func() {
 			}
 
 			out, err := store.Download(DownloadInput{
-				Context:    context.Background(),
-				Account:    Account{Email: "test@example.com"},
-				App:        App{ID: 640199958, BundleID: "developer.apple.wwdc-Release"},
-				OutputPath: tempDir,
-				Platform:   PlatformMacOS,
+				Context:           context.Background(),
+				Account:           Account{Email: "test@example.com"},
+				App:               App{ID: 640199958, BundleID: "developer.apple.wwdc-Release"},
+				OutputPath:        tempDir,
+				Platform:          PlatformMacOS,
+				ExternalVersionID: "123456789",
 			})
 
 			Expect(err).ToNot(HaveOccurred())
