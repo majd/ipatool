@@ -1,35 +1,29 @@
-# IPATool
+<p align="center">
+  <a href="https://GitHub.com/majd/ipatool/releases/"><img src="https://img.shields.io/github/release/majd/ipatool.svg?label=Release" alt="Release"></a>
+  <a href="https://github.com/majd/ipatool/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License"></a>
+  <a href="https://github.com/sponsors/majd"><img src="https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink.svg" alt="Sponsor"></a>
+</p>
 
-[![Release](https://img.shields.io/github/release/majd/ipatool.svg?label=Release)](https://GitHub.com/majd/ipatool/releases/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/majd/ipatool/blob/main/LICENSE)
-[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink.svg)](https://github.com/sponsors/majd)
+<p align="center">
+  <code>ipatool</code> is a command line tool that allows you to search for iOS, iPadOS, tvOS, visionOS, and macOS apps on the <a href="https://apps.apple.com">App Store</a>, and download <code>.ipa</code> or macOS <code>.pkg</code> app packages.
+</p>
 
-`ipatool` is a command line tool that allows you to search for iOS, iPadOS, tvOS, visionOS, and macOS apps on the [App Store](https://apps.apple.com), and download `.ipa` or macOS `.pkg` app packages.
-
-![Demo](./resources/demo.gif)
-
-- [Requirements](#requirements)
-- [Installation](#installation)
-  - [Manual](#manual)
-  - [Package Manager (macOS)](#package-manager-macos)
-- [Usage](#usage)
-- [Compiling](#compiling)
-- [License](#license)
-- [Releases](https://github.com/majd/ipatool/releases)
-- [FAQ](https://github.com/majd/ipatool/wiki/FAQ)
+<p align="center">
+  <img src="./resources/demo.gif" alt="Demo">
+</p>
 
 ## Requirements
 
-- Supported operating system (Windows, Linux or macOS).
-- Apple ID set up to use the App Store.
+- A supported operating system (macOS, Linux or Windows).
+- An Apple Account already configured to use the App Store.
 
 ## Installation
 
-### Manual
+### Linux and Windows
 
 You can grab the latest version of `ipatool` from [GitHub releases](https://github.com/majd/ipatool/releases).
 
-### Package Manager (macOS)
+### macOS
 
 You can install `ipatool` using [Homebrew](https://brew.sh).
 
@@ -39,152 +33,35 @@ $ brew install ipatool
 
 ## Usage
 
-To authenticate with the App Store, use the `auth` command.
+To get started, run the following command.
 
-```
-Authenticate with the App Store
+```text
+$ ipatool --help
+A cli tool for interacting with Apple's ipa files
 
 Usage:
-  ipatool auth [command]
+  ipatool [command]
 
 Available Commands:
-  info        Show current account info
-  login       Login to the App Store
-  revoke      Revoke your App Store credentials
+  auth                 Authenticate with the App Store
+  completion           Generate the autocompletion script for the specified shell
+  download             Download iOS, iPadOS, tvOS, visionOS, and macOS app packages from the App Store
+  get-version-metadata Retrieves the metadata for a specific version of an app
+  help                 Help about any command
+  list-purchases       List apps owned by the authenticated App Store account
+  list-versions        List the available versions of an App Store app
+  purchase             Obtain a license for the app from the App Store
+  search               Search for iOS, iPadOS, tvOS, visionOS, and macOS apps available on the App Store
 
 Flags:
-  -h, --help   help for auth
-
-Global Flags:
-      --format format     sets output format for command; can be 'text', 'json' (default text)
-      --non-interactive   run in non-interactive session
-      --verbose           enables verbose logs
-
-Use "ipatool auth [command] --help" for more information about a command.
-```
-
-To search for apps on the App Store, use the `search` command.
-
-```
-Search for iOS, iPadOS, tvOS, visionOS, and macOS apps available on the App Store
-
-Usage:
-  ipatool search <term> [flags]
-
-Flags:
-  -h, --help              help for search
-  -l, --limit int         maximum amount of search results to retrieve; visionOS supports up to 12 (default 5)
-      --platform string   Platform to search: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos
-
-Global Flags:
-      --format format     sets output format for command; can be 'text', 'json' (default text)
-      --non-interactive   run in non-interactive session
-      --verbose           enables verbose logs
-```
-
-To obtain a license for an app, use the `purchase` command.
-
-```
-Obtain a license for the app from the App Store
-
-Usage:
-  ipatool purchase [flags]
-
-Flags:
-  -i, --app-id int                 ID of the target app
-  -b, --bundle-identifier string   The bundle identifier of the target app (overrides the app ID)
-  -h, --help                       help for purchase
-      --platform string            Platform to purchase for: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos
-
-Global Flags:
-      --format format     sets output format for command; can be 'text', 'json' (default text)
-      --non-interactive   run in non-interactive session
-      --verbose           enables verbose logs
-```
-
-To list apps owned by the authenticated account, use the `list-purchases` command. Results are ordered by purchase date, newest first.
-
-```
-List apps owned by the authenticated App Store account
-
-Usage:
-  ipatool list-purchases [flags]
-
-Flags:
-  -h, --help              help for list-purchases
-  -l, --max-results int   maximum number of apps to return per page (default 10)
-  -p, --page int          page of owned apps to return (default 1)
-
-Global Flags:
       --format format                sets output format for command; can be 'text', 'json' (default text)
+  -h, --help                         help for ipatool
       --keychain-passphrase string   passphrase for unlocking keychain
       --non-interactive              run in non-interactive session
       --verbose                      enables verbose logs
-```
+  -v, --version                      version for ipatool
 
-To obtain a list of availble app versions to download, use the `list-versions` command.
-
-```
-List the available versions of an iOS app
-
-Usage:
-  ipatool list-versions [flags]
-
-Flags:
-  -i, --app-id int                 ID of the target iOS app (required)
-  -b, --bundle-identifier string   The bundle identifier of the target iOS app (overrides the app ID)
-  -h, --help                       help for list-versions
-
-Global Flags:
-      --format format                sets output format for command; can be 'text', 'json' (default text)
-      --keychain-passphrase string   passphrase for unlocking keychain
-      --non-interactive              run in non-interactive session
-      --verbose                      enables verbose logs
-```
-
-To download an app package, use the `download` command.
-
-```
-Download iOS, iPadOS, tvOS, visionOS, and macOS app packages from the App Store
-
-Usage:
-  ipatool download [flags]
-
-Flags:
-  -i, --app-id int                   ID of the target app (required)
-  -b, --bundle-identifier string     The bundle identifier of the target app (overrides the app ID)
-      --external-version-id string   External version identifier of the target app (defaults to latest version when not specified)
-  -h, --help                         help for download
-  -o, --output string                The destination path of the downloaded app package
-      --platform string              Platform to download for: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos
-      --purchase                     Obtain a license for the app if needed
-
-Global Flags:
-      --format format                sets output format for command; can be 'text', 'json' (default text)
-      --keychain-passphrase string   passphrase for unlocking keychain
-      --non-interactive              run in non-interactive session
-      --verbose                      enables verbose logs
-```
-
-To resolve an external version identifier, returned by the `list-versions` command, use the `get-version-metadata` command.
-
-```
-Retrieves the metadata for a specific version of an app
-
-Usage:
-  ipatool get-version-metadata [flags]
-
-Flags:
-  -i, --app-id int                   ID of the target iOS app (required)
-  -b, --bundle-identifier string     The bundle identifier of the target iOS app (overrides the app ID)
-      --external-version-id string   External version identifier of the target iOS app (required)
-  -h, --help                         help for get-version-metadata
-
-Global Flags:
-      --format format                sets output format for command; can be 'text', 'json' (default text)
-      --keychain-passphrase string   passphrase for unlocking keychain
-      --non-interactive              run in non-interactive session
-      --verbose                      enables verbose logs
+Use "ipatool [command] --help" for more information about a command.
 ```
 
 **Note:** the tool runs in interactive mode by default. Use the `--non-interactive` flag
@@ -207,4 +84,4 @@ $ go test -v ./...
 
 ## License
 
-IPATool is released under the [MIT license](https://github.com/majd/ipatool/blob/main/LICENSE).
+ipatool is released under the [MIT license](https://github.com/majd/ipatool/blob/main/LICENSE).
