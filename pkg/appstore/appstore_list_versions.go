@@ -7,8 +7,9 @@ import (
 )
 
 type ListVersionsInput struct {
-	Account Account
-	App     App
+	Account  Account
+	App      App
+	Platform Platform
 }
 
 type ListVersionsOutput struct {
@@ -17,6 +18,17 @@ type ListVersionsOutput struct {
 }
 
 func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, error) {
+	platform := input.Platform
+	if platform == "" {
+		platform = PlatformIPhone
+	}
+
+	switch platform {
+	case PlatformIPhone, PlatformIPad, PlatformAppleTV, PlatformVisionOS, PlatformMacOS:
+	default:
+		return ListVersionsOutput{}, fmt.Errorf("invalid platform %q", platform)
+	}
+
 	macAddr, err := t.machine.MacAddress()
 	if err != nil {
 		return ListVersionsOutput{}, fmt.Errorf("failed to get mac address: %w", err)
@@ -24,7 +36,20 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 
 	guid := strings.ReplaceAll(strings.ToUpper(macAddr), ":", "")
 
-	res, _, err := t.sendDownloadProduct(input.Account, input.App, guid, "", PlatformIPhone)
+	var externalVersionID string
+
+	switch platform {
+	case PlatformMacOS:
+		externalVersionID, err = t.lookupLatestMacOSExternalVersionID(input.Account, input.App)
+	case PlatformAppleTV, PlatformVisionOS:
+		externalVersionID, err = t.lookupLatestExternalVersionID(input.Account, input.App, platform)
+	}
+
+	if err != nil {
+		return ListVersionsOutput{}, fmt.Errorf("failed to resolve platform version: %w", err)
+	}
+
+	res, _, err := t.sendDownloadProduct(input.Account, input.App, guid, externalVersionID, platform)
 	if err != nil {
 		return ListVersionsOutput{}, err
 	}
