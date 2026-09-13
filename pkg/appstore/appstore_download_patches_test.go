@@ -2,12 +2,15 @@ package appstore
 
 import (
 	"archive/zip"
+	"bytes"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"testing"
 
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 )
 
 type readOnlyDestinationOS struct {
@@ -38,34 +41,26 @@ func (o readOnlyDestinationOS) OpenFile(name string, flag int, perm os.FileMode)
 	return file, nil
 }
 
-func TestApplyPatchesReportsZipWriteFailure(t *testing.T) {
-	dir := t.TempDir()
-	src, dst := filepath.Join(dir, "source.zip"), filepath.Join(dir, "patched.ipa")
+var _ = Describe("AppStore (patch finalization)", func() {
+	It("reports buffered writes that fail when closing the ZIP writer", func() {
+		dir := GinkgoT().TempDir()
+		src, dst := filepath.Join(dir, "source.zip"), filepath.Join(dir, "patched.ipa")
 
-	file, err := os.Create(src)
-	if err != nil {
-		t.Fatal(err)
-	}
+		var source bytes.Buffer
+		writer := zip.NewWriter(&source)
+		_, err := writer.Create("Payload/App.app/")
+		Expect(err).ToNot(HaveOccurred())
+		Expect(writer.Close()).To(Succeed())
+		Expect(os.WriteFile(src, source.Bytes(), 0600)).To(Succeed())
 
-	writer := zip.NewWriter(file)
-	if _, err := writer.Create("Payload/App.app/"); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := file.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	// The patched archive is small enough to stay buffered until the zip writer
-	// is closed, so the write failure only surfaces when the archive is finalized.
-	store := &appstore{os: readOnlyDestinationOS{OperatingSystem: operatingsystem.New(), destination: dst}}
-
-	err = store.applyPatches(downloadItemResult{Metadata: map[string]interface{}{}}, Account{}, src, dst, nil)
-	if err == nil {
-		t.Fatal("expected applyPatches to report that the patched archive could not be written")
-	}
-}
+		// The patched archive stays buffered until Close, where the read-only
+		// destination descriptor rejects the write.
+		store := &appstore{os: readOnlyDestinationOS{OperatingSystem: operatingsystem.New(), destination: dst}}
+		err = store.applyPatches(downloadItemResult{Metadata: map[string]interface{}{}}, Account{}, src, dst, nil)
+		Expect(err).To(MatchError(ContainSubstring("failed to close zip writer")))
+		var pathErr *os.PathError
+		Expect(errors.As(err, &pathErr)).To(BeTrue())
+		Expect(pathErr.Op).To(Equal("write"))
+		Expect(pathErr.Path).To(Equal(dst))
+	})
+})
