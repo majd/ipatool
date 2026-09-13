@@ -84,6 +84,22 @@ var _ = Describe("App", func() {
 		Expect(out).ToNot(HaveKey("purchaseDate"))
 	})
 
+	DescribeTable("serializes purchase platforms as an array",
+		func(platforms []Platform, expected string) {
+			app := App{ID: 42, Platforms: platforms}
+			data, err := json.Marshal(app)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(string(data)).To(ContainSubstring(`"platforms":` + expected))
+
+			buffer := bytes.NewBuffer(nil)
+			logger := zerolog.New(buffer)
+			logger.Log().Object("app", app).Send()
+			Expect(buffer.String()).To(ContainSubstring(`"platforms":` + expected))
+		},
+		Entry("multiple platforms", []Platform{PlatformIPhone, PlatformIPad, PlatformMacOS}, `["iphone","ipad","macos"]`),
+		Entry("unknown platforms", []Platform{PlatformUnknown}, `["unknown"]`),
+	)
+
 	It("formats ipa name correctly", func() {
 		app := App{
 			ID:       42,
