@@ -4,7 +4,9 @@ import (
 	"archive/zip"
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
@@ -198,4 +200,57 @@ var _ = Describe("AppStore (ReplicateSinf)", func() {
 			Expect(err).To(HaveOccurred())
 		})
 	})
+})
+
+var _ = Describe("SINF replication with optional license data", func() {
+	DescribeTable("preserves package contents when Apple supplies no sinfs", func(withManifest bool, sinfs []Sinf) {
+		packagePath := filepath.Join(GinkgoT().TempDir(), "app.ipa")
+		file, err := os.Create(packagePath)
+		Expect(err).ToNot(HaveOccurred())
+		writer := zip.NewWriter(file)
+		info, err := plist.Marshal(packageInfo{BundleExecutable: "Test"}, plist.BinaryFormat)
+		Expect(err).ToNot(HaveOccurred())
+		contents := map[string][]byte{
+			"Payload/Test.app/Info.plist":        info,
+			"Payload/Test.app/Test":              []byte("executable"),
+			"Payload/Test.app/SC_Info/Test.supf": []byte("existing protection data"),
+		}
+		if withManifest {
+			manifest, err := plist.Marshal(packageManifest{SinfPaths: []string{"SC_Info/Test.sinf"}}, plist.BinaryFormat)
+			Expect(err).ToNot(HaveOccurred())
+			contents["Payload/Test.app/SC_Info/Manifest.plist"] = manifest
+		}
+		for name, data := range contents {
+			entry, err := writer.Create(name)
+			Expect(err).ToNot(HaveOccurred())
+			_, err = entry.Write(data)
+			Expect(err).ToNot(HaveOccurred())
+		}
+		Expect(writer.Close()).To(Succeed())
+		Expect(file.Close()).To(Succeed())
+
+		store := &appstore{os: operatingsystem.New()}
+		Expect(store.ReplicateSinf(ReplicateSinfInput{PackagePath: packagePath, Sinfs: sinfs})).To(Succeed())
+
+		reader, err := zip.OpenReader(packagePath)
+		Expect(err).ToNot(HaveOccurred())
+		DeferCleanup(reader.Close)
+		Expect(reader.File).To(HaveLen(len(contents)))
+		for _, entry := range reader.File {
+			Expect(contents).To(HaveKey(entry.Name))
+			src, err := entry.Open()
+			Expect(err).ToNot(HaveOccurred())
+			data, err := io.ReadAll(src)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(src.Close()).To(Succeed())
+			Expect(data).To(Equal(contents[entry.Name]))
+		}
+		_, err = os.Stat(packagePath + ".tmp")
+		Expect(os.IsNotExist(err)).To(BeTrue())
+	},
+		Entry("with a manifest and omitted sinfs", true, []Sinf(nil)),
+		Entry("with a manifest and empty sinfs", true, []Sinf{}),
+		Entry("without a manifest and omitted sinfs", false, []Sinf(nil)),
+		Entry("without a manifest and empty sinfs", false, []Sinf{}),
+	)
 })

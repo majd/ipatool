@@ -78,6 +78,12 @@ func (t *appstore) writeReplicatedZip(input ReplicateSinfInput, tmpPath string) 
 		return fmt.Errorf("failed to replicate zip: %w", err)
 	}
 
+	// Device-based downloads can omit sinfs even when the package has a
+	// manifest. Preserve the archive rewrite, but only inject supplied data.
+	if len(input.Sinfs) == 0 {
+		return nil
+	}
+
 	bundleName, err := t.readBundleName(zipReader)
 	if err != nil {
 		return fmt.Errorf("failed to read bundle name: %w", err)
