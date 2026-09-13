@@ -68,18 +68,21 @@ func cachedRuntimePaths(ctx context.Context) (runtimePaths, error) {
 }
 
 func linuxUsesMusl() bool {
-	if interpreter, ok := selfInterpreter(); ok {
+	return linuxUsesMuslFor("/proc/self/exe", muslLoaderInstalled)
+}
+
+func linuxUsesMuslFor(executable string, loaderInstalled func() bool) bool {
+	if interpreter, ok := executableInterpreter(executable); ok {
 		return interpreterUsesMusl(interpreter)
 	}
 
-	return muslLoaderInstalled()
+	return loaderInstalled()
 }
 
-// selfInterpreter returns the dynamic loader this process was linked against, which is the only
-// reliable answer to which libc the process runs on. A statically linked build has no PT_INTERP, so
-// the caller has to fall back to inspecting the host.
-func selfInterpreter() (string, bool) {
-	file, err := elf.Open("/proc/self/exe")
+// executableInterpreter reads the loader recorded in the executable. Missing PT_INTERP or
+// an unreadable executable leaves the caller to fall back to the host filesystem heuristic.
+func executableInterpreter(path string) (string, bool) {
+	file, err := elf.Open(path)
 	if err != nil {
 		return "", false
 	}
@@ -91,7 +94,7 @@ func selfInterpreter() (string, bool) {
 		}
 
 		interpreter, err := io.ReadAll(program.Open())
-		if err != nil {
+		if err != nil || uint64(len(interpreter)) != program.Filesz {
 			return "", false
 		}
 
@@ -106,9 +109,9 @@ func interpreterUsesMusl(interpreter string) bool {
 }
 
 // muslLoaderInstalled reports whether a musl loader exists on the host. That only says musl is
-// available, not that this process uses it, so it is a last resort for statically linked builds:
-// glibc distributions package musl for cross compilation, and selecting the musllinux artifact there
-// loads a second libc into the process.
+// available, not that this process uses it, so it is a last resort when the interpreter is
+// unavailable. glibc distributions package musl for cross compilation, and selecting the
+// musllinux artifact there loads a second libc into the process.
 func muslLoaderInstalled() bool {
 	loaders, _ := filepath.Glob("/lib/ld-musl-*.so.1")
 	if len(loaders) != 0 {
