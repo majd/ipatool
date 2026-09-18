@@ -70,44 +70,63 @@ func (t *appstore) lookupLatestExternalVersionID(acc Account, app App, platform 
 		return t.lookupLatestVisionOSExternalVersionID(app.ID, countryCode)
 	}
 
-	request, err := t.platformVersionLookupRequest(app.ID, countryCode, platform)
+	metadataPlatform, err := platform.metadataPlatform()
 	if err != nil {
 		return "", fmt.Errorf("failed to create platform version lookup request: %w", err)
 	}
 
-	res, err := t.platformClient.Send(request)
-	if err != nil {
-		return "", fmt.Errorf("platform version lookup request failed: %w", err)
+	catalogs := []string{metadataPlatform}
+	if platform == PlatformIPhone || platform == PlatformIPad {
+		// Some storefronts have no enterprise listing even when the consumer
+		// catalogs contain the app. Keep the account's country for each lookup.
+		catalogs = append(catalogs, "iphone", "ipad")
 	}
 
-	if res.StatusCode != gohttp.StatusOK {
-		return "", NewErrorWithMetadata(errors.New("platform version lookup request failed"), res)
-	}
+	var lastErr error
 
-	item, ok := res.Data.Results[strconv.FormatInt(app.ID, 10)]
-	if !ok {
-		return "", NewErrorWithMetadata(errors.New("platform version lookup returned no app"), res)
-	}
+	for _, catalog := range catalogs {
+		request := t.platformVersionLookupRequest(app.ID, countryCode, catalog)
 
-	if len(item.Offers) == 0 {
-		return "", NewErrorWithMetadata(errors.New("platform version lookup returned no offers"), res)
-	}
-
-	offer := item.Offers[0]
-	externalVersionID := string(offer.Version.ExternalID)
-
-	if externalVersionID == "" {
-		externalVersionID, err = externalVersionIDFromBuyParams(offer.BuyParams)
+		res, err := t.platformClient.Send(request)
 		if err != nil {
-			return "", fmt.Errorf("failed to parse buy params: %w", err)
+			return "", fmt.Errorf("platform version lookup request failed: %w", err)
 		}
+
+		if res.StatusCode != gohttp.StatusOK {
+			return "", NewErrorWithMetadata(errors.New("platform version lookup request failed"), res)
+		}
+
+		item, ok := res.Data.Results[strconv.FormatInt(app.ID, 10)]
+		if !ok {
+			lastErr = NewErrorWithMetadata(errors.New("platform version lookup returned no app"), res)
+
+			continue
+		}
+
+		if len(item.Offers) == 0 {
+			lastErr = NewErrorWithMetadata(errors.New("platform version lookup returned no offers"), res)
+
+			continue
+		}
+
+		offer := item.Offers[0]
+		externalVersionID := string(offer.Version.ExternalID)
+
+		if externalVersionID == "" {
+			externalVersionID, err = externalVersionIDFromBuyParams(offer.BuyParams)
+			if err != nil {
+				return "", fmt.Errorf("failed to parse buy params: %w", err)
+			}
+		}
+
+		if externalVersionID == "" {
+			return "", NewErrorWithMetadata(errors.New("platform version lookup returned no external version id"), res)
+		}
+
+		return externalVersionID, nil
 	}
 
-	if externalVersionID == "" {
-		return "", NewErrorWithMetadata(errors.New("platform version lookup returned no external version id"), res)
-	}
-
-	return externalVersionID, nil
+	return "", fmt.Errorf("app %d in storefront %s (catalogs: %s): %w", app.ID, countryCode, strings.Join(catalogs, ", "), lastErr)
 }
 
 func (t *appstore) lookupLatestVisionOSExternalVersionID(appID int64, countryCode string) (string, error) {
@@ -134,12 +153,7 @@ func (t *appstore) lookupLatestVisionOSExternalVersionID(appID int64, countryCod
 	return externalVersionID, nil
 }
 
-func (*appstore) platformVersionLookupRequest(appID int64, countryCode string, platform Platform) (http.Request, error) {
-	metadataPlatform, err := platform.metadataPlatform()
-	if err != nil {
-		return http.Request{}, err
-	}
-
+func (*appstore) platformVersionLookupRequest(appID int64, countryCode, metadataPlatform string) http.Request {
 	params := url.Values{}
 	params.Add("version", "2")
 	params.Add("id", strconv.FormatInt(appID, 10))
@@ -153,7 +167,7 @@ func (*appstore) platformVersionLookupRequest(appID int64, countryCode string, p
 		URL:            fmt.Sprintf("https://uclient-api.itunes.apple.com/WebObjects/MZStorePlatform.woa/wa/lookup?%s", params.Encode()),
 		Method:         http.MethodGET,
 		ResponseFormat: http.ResponseFormatJSON,
-	}, nil
+	}
 }
 
 func externalVersionIDFromBuyParams(buyParams string) (string, error) {
