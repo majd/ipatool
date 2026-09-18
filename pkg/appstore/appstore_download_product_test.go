@@ -280,6 +280,18 @@ var _ = Describe("AppStore (Download Product)", func() {
 			Entry("account storefront", PlatformIPhone, "143444-2,29", "gb"),
 		)
 
+		It("pins the consumer catalog version on redownload", func() {
+			gomock.InOrder(
+				mockPlatformClient.EXPECT().Send(gomock.Any()).Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK}, nil),
+				mockPlatformClient.EXPECT().Send(gomock.Any()).Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK, Data: latestVersion}, nil),
+				mockDownloadClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+					Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("appExtVrsId", testVersionID))
+				}).Return(http.Result[downloadResult]{StatusCode: gohttp.StatusOK}, nil),
+			)
+			_, _, err := store.sendDownloadProduct(account, app, testGUID, "", PlatformIPhone)
+			Expect(err).ToNot(HaveOccurred())
+		})
+
 		DescribeTable("does not retry or remove the version pin after a redownload error",
 			func(original error) {
 				gomock.InOrder(
@@ -354,7 +366,7 @@ var _ = Describe("AppStore (Download Product)", func() {
 
 		It("does not send an unpinned request when the app is absent from the catalog", func() {
 			mockPlatformClient.EXPECT().Send(gomock.Any()).
-				Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK}, nil)
+				Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK}, nil).Times(3)
 
 			_, _, err := store.sendDownloadProduct(account, app, testGUID, "", PlatformIPhone)
 			Expect(err).To(MatchError(ContainSubstring("platform version lookup returned no app")))
