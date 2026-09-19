@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/util"
@@ -37,6 +38,11 @@ type LoginOutput struct {
 }
 
 func (t *appstore) Login(input LoginInput) (LoginOutput, error) {
+	authCode, err := normalizeAuthCode(input.AuthCode)
+	if err != nil {
+		return LoginOutput{}, err
+	}
+
 	macAddr, err := t.machine.MacAddress()
 	if err != nil {
 		return LoginOutput{}, fmt.Errorf("failed to get mac address: %w", err)
@@ -65,7 +71,7 @@ func (t *appstore) Login(input LoginInput) (LoginOutput, error) {
 		return LoginOutput{}, errors.New("SAP action signer factory returned nil")
 	}
 
-	acc, loginErr := t.login(input.Email, input.Password, input.AuthCode, guid, bag.SAPConfig.AuthEndpoint, signer)
+	acc, loginErr := t.login(input.Email, input.Password, authCode, guid, bag.SAPConfig.AuthEndpoint, signer)
 	closeErr := signer.Close()
 
 	if closeErr != nil {
@@ -86,6 +92,32 @@ func (t *appstore) Login(input LoginInput) (LoginOutput, error) {
 	}
 
 	return output, nil
+}
+
+func normalizeAuthCode(code string) (string, error) {
+	if code == "" {
+		return "", nil
+	}
+
+	// Terminals may wrap pasted input in bracketed-paste markers. Strip only
+	// a matched outer pair; other escape sequences are invalid input.
+	code = strings.TrimSpace(code)
+	if strings.HasPrefix(code, "\x1b[200~") && strings.HasSuffix(code, "\x1b[201~") {
+		code = strings.TrimSuffix(strings.TrimPrefix(code, "\x1b[200~"), "\x1b[201~")
+	}
+
+	code = strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) {
+			return -1
+		}
+
+		return r
+	}, code)
+	if len(code) != 6 || strings.IndexFunc(code, func(r rune) bool { return r < '0' || r > '9' }) != -1 {
+		return "", errors.New("2FA code must contain exactly six digits")
+	}
+
+	return code, nil
 }
 
 type loginAddressResult struct {
@@ -263,8 +295,12 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 		}
 	} else if attempt == 1 && res.Data.FailureType == FailureTypeInvalidCredentials {
 		retry = true
-	} else if res.Data.FailureType == "" && authCode == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
-		err = ErrAuthCodeRequired
+	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
+		if authCode == "" {
+			err = ErrAuthCodeRequired
+		} else {
+			err = errors.New("apple did not complete verification; try a fresh 2FA code")
+		}
 	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageAccountDisabled {
 		err = NewErrorWithMetadata(errors.New("account is disabled"), res)
 	} else if res.Data.FailureType != "" {
