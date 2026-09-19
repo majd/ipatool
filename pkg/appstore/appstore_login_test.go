@@ -60,6 +60,22 @@ var _ = Describe("AppStore (Login)", func() {
 		ctrl.Finish()
 	})
 
+	DescribeTable("rejects malformed 2FA codes before preparing authentication", func(code string) {
+		_, err := as.Login(LoginInput{AuthCode: code})
+
+		Expect(err).To(MatchError("2FA code must contain exactly six digits"))
+	},
+		Entry("whitespace only", " \t\r\n"),
+		Entry("too short", "12345"),
+		Entry("too long", "1234567"),
+		Entry("letters", "12345a"),
+		Entry("non-ASCII digits", "１２３４５６"),
+		Entry("other escape sequences", "\x1b[31m123456"),
+		Entry("unmatched paste marker", "\x1b[200~123456"),
+		Entry("empty paste", "\x1b[200~\x1b[201~"),
+		Entry("embedded paste markers", "123\x1b[200~456\x1b[201~"),
+	)
+
 	Describe("transient authentication responses", func() {
 		It("retries the same request until it succeeds", func() {
 			request := as.loginRequest(testEmail, testPassword, "", "guid", testAuthEndpoint, 1, signer)
@@ -143,6 +159,26 @@ var _ = Describe("AppStore (Login)", func() {
 					Data:       validBagResult(),
 				}, nil)
 		})
+
+		DescribeTable("normalizes 2FA codes without changing the password", func(code, suffix string) {
+			const password = " \tpäss word\n"
+			mockClient.EXPECT().Send(gomock.Any()).DoAndReturn(func(req http.Request) (http.Result[loginResult], error) {
+				Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("password", password+suffix))
+
+				return http.Result[loginResult]{}, errors.New("test complete")
+			})
+
+			_, err := as.Login(LoginInput{Password: password, AuthCode: code})
+
+			Expect(err).To(MatchError(ContainSubstring("test complete")))
+		},
+			Entry("no code on initial login", "", ""),
+			Entry("plain code with leading zero", "012345", "012345"),
+			Entry("spaces", "123 456", "123456"),
+			Entry("Unicode whitespace", "\t123\u00a0456\r\n", "123456"),
+			Entry("bracketed paste", "\x1b[200~123456\x1b[201~", "123456"),
+			Entry("bracketed paste with whitespace", " \x1b[200~123 456\n\x1b[201~\r\n", "123456"),
+		)
 
 		When("client returns error", func() {
 			var clientErr error
@@ -259,6 +295,7 @@ var _ = Describe("AppStore (Login)", func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
 					Return(http.Result[loginResult]{
+						StatusCode: 200,
 						Data: loginResult{
 							FailureType:     "",
 							CustomerMessage: CustomerMessageBadLogin,
@@ -271,6 +308,13 @@ var _ = Describe("AppStore (Login)", func() {
 					Password: testPassword,
 				})
 				Expect(err).To(Equal(ErrAuthCodeRequired))
+			})
+
+			It("reports an incomplete verification when a code was already supplied", func() {
+				_, err := as.Login(LoginInput{Password: testPassword, AuthCode: "123456"})
+
+				Expect(err).To(MatchError("apple did not complete verification; try a fresh 2FA code"))
+				Expect(errors.Is(err, ErrAuthCodeRequired)).To(BeFalse())
 			})
 		})
 
