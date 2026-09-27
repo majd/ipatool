@@ -116,11 +116,12 @@ var _ = Describe("AppStore (Update Product)", func() {
 		Entry("latest iPad", "", PlatformIPad),
 		Entry("explicit historical version", testVersionID, PlatformIPhone),
 		Entry("explicit macOS version", testVersionID, PlatformMacOS),
+		Entry("explicit tvOS version", testVersionID, PlatformAppleTV),
 		Entry("explicit version without a platform", testVersionID, Platform("")),
 	)
 
 	DescribeTable("tries update once for a message-only availability response",
-		func(primaryUnavailable, updateUnavailable bool) {
+		func(platform Platform, primaryUnavailable, updateUnavailable bool) {
 			unavailable := http.Result[downloadResult]{StatusCode: gohttp.StatusOK,
 				Data: downloadResult{CustomerMessage: "“Messenger” No Longer Available"}}
 			primary := http.Result[downloadResult]{StatusCode: gohttp.StatusOK}
@@ -132,20 +133,25 @@ var _ = Describe("AppStore (Update Product)", func() {
 				update = unavailable
 			}
 
+			var redownloadRequest http.Request
 			gomock.InOrder(
 				mockDownloadClient.EXPECT().Send(gomock.Any()).Return(primary, nil),
 				mockBagClient.EXPECT().Send(gomock.Any()).Return(http.Result[bagResult]{StatusCode: gohttp.StatusOK, Data: bag}, nil),
 				mockDownloadClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
 					Expect(req.URL).To(Equal(testRedownloadEndpoint + "?guid=" + testGUID))
 					Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("appExtVrsId", testVersionID))
+					redownloadRequest = req
 				}).Return(unavailable, nil),
 				mockDownloadClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
 					Expect(req.URL).To(Equal(testUpdateEndpoint + "?guid=" + testGUID))
+					Expect(req.Headers).To(Equal(redownloadRequest.Headers))
+					Expect(req.Payload).To(Equal(redownloadRequest.Payload))
 					Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("appExtVrsId", testVersionID))
 				}).Return(update, nil),
 			)
 
-			actual, _, err := store.sendDownloadProduct(account, app, testGUID, testVersionID, PlatformIPhone)
+			actual, resolvedPlatform, err := store.sendDownloadProduct(account, app, testGUID, testVersionID, platform)
+			Expect(resolvedPlatform).To(Equal(platform))
 			Expect(actual).To(Equal(update))
 			if updateUnavailable {
 				Expect(err).To(MatchError(ContainSubstring(unavailable.Data.CustomerMessage)))
@@ -153,9 +159,12 @@ var _ = Describe("AppStore (Update Product)", func() {
 				Expect(err).ToNot(HaveOccurred())
 			}
 		},
-		Entry("redownload unavailable", false, false),
-		Entry("both initial endpoints unavailable", true, false),
-		Entry("update also unavailable", false, true),
+		Entry("redownload unavailable", PlatformIPhone, false, false),
+		Entry("both initial endpoints unavailable", PlatformIPhone, true, false),
+		Entry("update also unavailable", PlatformIPhone, false, true),
+		Entry("tvOS redownload unavailable", PlatformAppleTV, false, false),
+		Entry("tvOS both initial endpoints unavailable", PlatformAppleTV, true, false),
+		Entry("tvOS update also unavailable", PlatformAppleTV, false, true),
 	)
 
 	DescribeTable("keeps TestFlight's Mac offer pinned through update fallback",
@@ -231,7 +240,6 @@ var _ = Describe("AppStore (Update Product)", func() {
 			Expect(actual).To(Equal(response))
 		},
 		Entry("missing endpoint", PlatformIPhone, "", "", "“Messenger” No Longer Available", 200),
-		Entry("tvOS", PlatformAppleTV, testUpdateEndpoint, "", "“Messenger” No Longer Available", 200),
 		Entry("visionOS", PlatformVisionOS, testUpdateEndpoint, "", "“Messenger” No Longer Available", 200),
 		Entry("license failure", PlatformIPhone, testUpdateEndpoint, FailureTypeLicenseNotFound, "“Messenger” No Longer Available", 200),
 		Entry("other message", PlatformIPhone, testUpdateEndpoint, "", "Sign in required", 200),
@@ -291,7 +299,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 		Expect(err).To(MatchError("invalid download endpoint in bag"))
 	})
 
-	DescribeTable("does not extend the fallback to unverified platforms",
+	DescribeTable("does not update unpinned tvOS or unverified platforms",
 		func(versionID string, platform Platform) {
 			previous := expectPrimary()
 			mockDownloadClient.EXPECT().Send(gomock.Any()).After(previous).
@@ -301,7 +309,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 			Expect(errors.Is(err, redownloadErr)).To(BeTrue())
 			Expect(resolvedPlatform).To(Equal(platform))
 		},
-		Entry("pinned tvOS", testVersionID, PlatformAppleTV),
+		Entry("unpinned tvOS", "", PlatformAppleTV),
 		Entry("pinned visionOS", testVersionID, PlatformVisionOS),
 	)
 
