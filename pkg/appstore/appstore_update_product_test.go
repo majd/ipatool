@@ -313,6 +313,18 @@ var _ = Describe("AppStore (Update Product)", func() {
 		Entry("pinned visionOS", testVersionID, PlatformVisionOS),
 	)
 
+	It("preserves an unpinned tvOS availability response without updating", func() {
+		previous := expectPrimary()
+		response := http.Result[downloadResult]{StatusCode: gohttp.StatusOK,
+			Data: downloadResult{CustomerMessage: "No Longer Available"}}
+		mockDownloadClient.EXPECT().Send(gomock.Any()).After(previous).Return(response, nil)
+
+		actual, platform, err := store.sendDownloadProduct(account, app, testGUID, "", PlatformAppleTV)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(actual).To(Equal(response))
+		Expect(platform).To(Equal(PlatformAppleTV))
+	})
+
 	It("propagates an update error without retrying again", func() {
 		previous := expectPrimary()
 		gomock.InOrder(
