@@ -12,6 +12,11 @@ import (
 	"github.com/majd/ipatool/v2/pkg/http"
 )
 
+var (
+	errPlatformAppNotFound    = errors.New("platform version lookup returned no app")
+	errPlatformOffersNotFound = errors.New("platform version lookup returned no offers")
+)
+
 type platformVersionLookupResult struct {
 	Results map[string]platformVersionLookupItem `json:"results,omitempty"`
 }
@@ -98,13 +103,13 @@ func (t *appstore) lookupLatestExternalVersionID(acc Account, app App, platform 
 
 		item, ok := res.Data.Results[strconv.FormatInt(app.ID, 10)]
 		if !ok {
-			lastErr = NewErrorWithMetadata(errors.New("platform version lookup returned no app"), res)
+			lastErr = NewErrorWithMetadata(errPlatformAppNotFound, res)
 
 			continue
 		}
 
 		if len(item.Offers) == 0 {
-			lastErr = NewErrorWithMetadata(errors.New("platform version lookup returned no offers"), res)
+			lastErr = NewErrorWithMetadata(errPlatformOffersNotFound, res)
 
 			continue
 		}

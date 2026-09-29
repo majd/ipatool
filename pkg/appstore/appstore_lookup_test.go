@@ -49,7 +49,7 @@ var _ = Describe("AppStore (Lookup)", func() {
 						StoreFront: "143441",
 					},
 				})
-				Expect(err).To(HaveOccurred())
+				Expect(errors.Is(err, ErrAppNotFound)).To(BeTrue())
 			})
 		})
 

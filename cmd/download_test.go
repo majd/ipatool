@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/majd/ipatool/v2/pkg/appstore"
 	"github.com/majd/ipatool/v2/pkg/log"
@@ -11,6 +12,69 @@ import (
 )
 
 var _ = Describe("Download command", func() {
+	Describe("app resolution", func() {
+		var store *fakeDownloadAppStore
+
+		BeforeEach(func() {
+			store = &fakeDownloadAppStore{account: appstore.Account{StoreFront: "143441"}}
+			previousDependencies := dependencies
+			DeferCleanup(func() { dependencies = previousDependencies })
+			dependencies.Logger = log.NewLogger(log.Args{})
+		})
+
+		execute := func(args ...string) error {
+			cmd := downloadCmdWithAppStore(func() appstore.AppStore { return store })
+			cmd.SetArgs(args)
+			cmd.SetContext(context.WithValue(context.Background(), interactiveKey, false))
+
+			return cmd.Execute()
+		}
+
+		It("uses the app ID when the bundle is absent from the catalog", func() {
+			store.lookupError = fmt.Errorf("lookup: %w", appstore.ErrAppNotFound)
+			Expect(execute("-i", "42", "-b", "com.example.delisted", "--platform", "appletv")).To(Succeed())
+			Expect(store.lookupInputs).To(Equal([]appstore.LookupInput{{
+				Account:  appstore.Account{StoreFront: "143441"},
+				BundleID: "com.example.delisted",
+				Platform: appstore.PlatformAppleTV,
+			}}))
+			Expect(store.downloadInputs).To(HaveLen(1))
+			Expect(store.downloadInputs[0].App).To(Equal(appstore.App{ID: 42, BundleID: "com.example.delisted"}))
+			Expect(store.downloadInputs[0].Platform).To(Equal(appstore.PlatformAppleTV))
+		})
+
+		It("preserves bundle identifier precedence when lookup succeeds", func() {
+			store.lookupOutput.App = appstore.App{ID: 43, BundleID: "com.example.listed"}
+			Expect(execute("-i", "42", "-b", "com.example.listed")).To(Succeed())
+			Expect(store.downloadInputs).To(HaveLen(1))
+			Expect(store.downloadInputs[0].App).To(Equal(store.lookupOutput.App))
+		})
+
+		It("resolves a bundle identifier without an app ID", func() {
+			store.lookupOutput.App = appstore.App{ID: 43, BundleID: "com.example.listed"}
+			Expect(execute("-b", "com.example.listed")).To(Succeed())
+			Expect(store.downloadInputs).To(HaveLen(1))
+			Expect(store.downloadInputs[0].App).To(Equal(store.lookupOutput.App))
+		})
+
+		It("does not look up the bundle for an explicit app ID and version", func() {
+			Expect(execute("-i", "42", "--platform", "appletv", "--external-version-id", "123456")).To(Succeed())
+			Expect(store.lookupInputs).To(BeEmpty())
+			Expect(store.downloadInputs).To(HaveLen(1))
+			Expect(store.downloadInputs[0].App).To(Equal(appstore.App{ID: 42}))
+			Expect(store.downloadInputs[0].ExternalVersionID).To(Equal("123456"))
+		})
+
+		DescribeTable("preserves lookup errors", func(args []string, lookupError error) {
+			store.lookupError = lookupError
+			Expect(execute(args...)).To(MatchError(lookupError))
+			Expect(store.downloadInputs).To(BeEmpty())
+		},
+			Entry("missing bundle without an app ID", []string{"-b", "com.example.delisted"}, appstore.ErrAppNotFound),
+			Entry("request failure with an app ID", []string{"-i", "42", "-b", "com.example.app"}, errors.New("request failed")),
+		)
+	})
+
 	It("exposes macOS in platform help", func() {
 		cmd := downloadCmd()
 		Expect(cmd.Flag("platform").Usage).To(ContainSubstring("macos"))
@@ -192,6 +256,8 @@ type fakeDownloadAppStore struct {
 	loginAccount     appstore.Account
 	loginInputs      []appstore.LoginInput
 	lookupInputs     []appstore.LookupInput
+	lookupOutput     appstore.LookupOutput
+	lookupError      error
 	purchaseErrors   []error
 	purchaseInputs   []appstore.PurchaseInput
 }
@@ -213,7 +279,7 @@ func (*fakeDownloadAppStore) Revoke() error { return nil }
 func (f *fakeDownloadAppStore) Lookup(input appstore.LookupInput) (appstore.LookupOutput, error) {
 	f.lookupInputs = append(f.lookupInputs, input)
 
-	return appstore.LookupOutput{}, nil
+	return f.lookupOutput, f.lookupError
 }
 
 func (*fakeDownloadAppStore) Search(input appstore.SearchInput) (appstore.SearchOutput, error) {
