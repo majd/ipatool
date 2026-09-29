@@ -54,7 +54,11 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	externalVersionID := input.ExternalVersionID
 	if externalVersionID == "" && (input.Platform == PlatformAppleTV || input.Platform == PlatformVisionOS) {
 		externalVersionID, err = t.lookupLatestExternalVersionID(input.Account, input.App, input.Platform)
-		if err != nil {
+		// Delisted tvOS apps may have no catalog offer but still be available
+		// for redownload. Validate the returned package's platform below.
+		missingTVOffer := input.Platform == PlatformAppleTV &&
+			(errors.Is(err, errPlatformAppNotFound) || errors.Is(err, errPlatformOffersNotFound))
+		if err != nil && !missingTVOffer {
 			return DownloadOutput{}, fmt.Errorf("failed to resolve platform version: %w", err)
 		}
 	}

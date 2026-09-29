@@ -9,6 +9,8 @@ import (
 	"github.com/majd/ipatool/v2/pkg/http"
 )
 
+var ErrAppNotFound = errors.New("app not found")
+
 type LookupInput struct {
 	Account  Account
 	BundleID string
@@ -40,7 +42,7 @@ func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
 	}
 
 	if len(res.Data.Results) == 0 {
-		return LookupOutput{}, errors.New("app not found")
+		return LookupOutput{}, ErrAppNotFound
 	}
 
 	return LookupOutput{
