@@ -44,7 +44,7 @@ func (*machine) MacAddress() (string, error) {
 	for _, netInterface := range interfaces {
 		addr := netInterface.HardwareAddr.String()
 		if addr != "" {
-			return addr, nil
+			return interfaceMacAddress(netInterface)
 		}
 	}
 
