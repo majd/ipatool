@@ -828,6 +828,9 @@ var _ = Describe("AppStore (Download)", func() {
 		Entry("normal unspecified-platform behavior is preserved", Platform(""), "", "", "AppleTVOS", true),
 		Entry("an explicit tvOS version without a platform is preserved", Platform(""), "818970197", "", "AppleTVOS", true),
 		Entry("explicit tvOS downloads still work", PlatformAppleTV, "818970197", "", "AppleTVOS", true),
+		Entry("tvOS update accepts tvOS", PlatformAppleTV, "818970197", "update", "AppleTVOS", true),
+		Entry("tvOS update rejects iOS", PlatformAppleTV, "818970197", "update", "iPhoneOS", false),
+		Entry("tvOS update rejects visionOS", PlatformAppleTV, "818970197", "update", "XROS", false),
 	)
 
 	Describe("macOS packages", func() {
