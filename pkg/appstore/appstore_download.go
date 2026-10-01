@@ -63,7 +63,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 		}
 	}
 
-	res, resolvedPlatform, err := t.sendDownloadProduct(input.Account, input.App, guid, externalVersionID, input.Platform)
+	res, resolvedPlatform, err := t.sendDownloadProduct(input.Context, input.Account, input.App, guid, externalVersionID, input.Platform)
 	if err != nil {
 		return DownloadOutput{}, err
 	}

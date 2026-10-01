@@ -63,7 +63,7 @@ func ListVersionsCmd() *cobra.Command {
 					app = lookupResult.App
 				}
 
-				out, err := dependencies.AppStore.ListVersions(appstore.ListVersionsInput{Account: acc, App: app, Platform: platform})
+				out, err := dependencies.AppStore.ListVersions(appstore.ListVersionsInput{Context: cmd.Context(), Account: acc, App: app, Platform: platform})
 				if err != nil {
 					return err
 				}

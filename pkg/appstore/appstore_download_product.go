@@ -1,6 +1,7 @@
 package appstore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	gohttp "net/http"
@@ -23,7 +24,15 @@ type downloadProductEndpoint struct {
 	versionKey string
 }
 
-func (t *appstore) sendDownloadProduct(acc Account, app App, guid, externalVersionID string, platform Platform) (http.Result[downloadResult], Platform, error) {
+func (t *appstore) sendDownloadProduct(ctx context.Context, acc Account, app App, guid, externalVersionID string, platform Platform) (http.Result[downloadResult], Platform, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	if err := ctx.Err(); err != nil {
+		return http.Result[downloadResult]{}, platform, fmt.Errorf("download request canceled: %w", err)
+	}
+
 	// An unpinned request can return the iOS build of a universal app.
 	// Select the Mac offer before accepting any download response.
 	if externalVersionID == "" && platform == PlatformMacOS {
@@ -33,6 +42,28 @@ func (t *appstore) sendDownloadProduct(acc Account, app App, guid, externalVersi
 		if err != nil {
 			return http.Result[downloadResult]{}, platform, fmt.Errorf("failed to resolve latest macOS version for download: %w", err)
 		}
+	}
+
+	// Prefer ent/download when its generator and bag endpoint are available.
+	// Keep the fetched bag for the legacy chain if this attempt cannot serve
+	// the requested app; asset, network, and response failures can fall back.
+	var bag *urlBag
+
+	if t.kbsyncGenerator != nil {
+		fetched, err := t.fetchURLBag(guid)
+		if err == nil {
+			bag = &fetched
+			if bag.EntDownloadEndpoint != "" {
+				res, resolvedPlatform, err := t.sendPreferredDownload(ctx, bag.EntDownloadEndpoint, acc, app, guid, externalVersionID, platform)
+				if err == nil {
+					return res, resolvedPlatform, nil
+				}
+			}
+		}
+	}
+
+	if err := ctx.Err(); err != nil {
+		return http.Result[downloadResult]{}, platform, fmt.Errorf("download request canceled: %w", err)
 	}
 
 	volumeStore := t.volumeStoreEndpoint(acc)
@@ -48,9 +79,13 @@ func (t *appstore) sendDownloadProduct(acc Account, app App, guid, externalVersi
 
 	// Try redownload when volumeStore returns no items, either silently or
 	// with the message-only "No Longer Available" response.
-	bag, err := t.fetchURLBag(guid)
-	if err != nil {
-		return res, platform, fmt.Errorf("failed to get bag for redownload fallback: %w", err)
+	if bag == nil {
+		fetched, err := t.fetchURLBag(guid)
+		if err != nil {
+			return res, platform, fmt.Errorf("failed to get bag for redownload fallback: %w", err)
+		}
+
+		bag = &fetched
 	}
 
 	if bag.RedownloadEndpoint == "" {
@@ -116,34 +151,38 @@ func (t *appstore) sendUpdateProduct(endpoint string, acc Account, app App, guid
 		return res, fmt.Errorf("failed to send update request: %w", err)
 	}
 
+	return res, validateVersionedDownloadResponse(res, app, externalVersionID, "update")
+}
+
+func validateVersionedDownloadResponse(res http.Result[downloadResult], app App, externalVersionID, source string) error {
 	if res.Data.FailureType != "" {
-		return res, nil
+		return nil
 	}
 
 	if res.Data.CustomerMessage != "" {
-		return res, NewErrorWithMetadata(fmt.Errorf("received update error: %s", res.Data.CustomerMessage), res)
+		return NewErrorWithMetadata(fmt.Errorf("received %s error: %s", source, res.Data.CustomerMessage), res)
 	}
 
 	if res.StatusCode != gohttp.StatusOK {
-		return res, fmt.Errorf("received unexpected update status code: %d", res.StatusCode)
+		return fmt.Errorf("received unexpected %s status code: %d", source, res.StatusCode)
 	}
 
 	if len(res.Data.Items) != 1 {
-		return res, errors.New("update response must contain exactly one item")
+		return fmt.Errorf("%s response must contain exactly one item", source)
 	}
 
 	metadata := res.Data.Items[0].Metadata
 	if fmt.Sprint(metadata["itemId"]) != fmt.Sprint(app.ID) ||
 		fmt.Sprint(metadata["softwareVersionExternalIdentifier"]) != externalVersionID {
-		return res, errors.New("update response does not match the requested app or version")
+		return fmt.Errorf("%s response does not match the requested app or version", source)
 	}
 
 	bundleID, ok := metadata["softwareVersionBundleId"].(string)
 	if !ok || bundleID == "" || (app.BundleID != "" && bundleID != app.BundleID) {
-		return res, errors.New("update response does not match the requested bundle identifier")
+		return fmt.Errorf("%s response does not match the requested bundle identifier", source)
 	}
 
-	return res, nil
+	return nil
 }
 
 func newDownloadEndpoint(endpoint, path string) (downloadProductEndpoint, error) {
