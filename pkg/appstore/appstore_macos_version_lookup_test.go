@@ -1,6 +1,7 @@
 package appstore
 
 import (
+	"context"
 	"errors"
 	gohttp "net/http"
 
@@ -54,7 +55,7 @@ var _ = Describe("Mac purchase version selection", func() {
 				Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("externalVersionId", "876660716"))
 			}).Return(expected, downloadErr),
 		)
-		output, platform, err := store.sendDownloadProduct(Account{StoreFront: "143443-2,34"}, app, "001122334455", "", PlatformMacOS)
+		output, platform, err := store.sendDownloadProduct(context.Background(), Account{StoreFront: "143443-2,34"}, app, "001122334455", "", PlatformMacOS)
 		Expect(output).To(Equal(expected))
 		Expect(platform).To(Equal(PlatformMacOS))
 		if downloadErr == nil {
@@ -88,7 +89,7 @@ var _ = Describe("Mac purchase version selection", func() {
 				Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("appExtVrsId", "876660716"))
 			}).Return(expected, nil),
 		)
-		output, platform, err := store.sendDownloadProduct(Account{StoreFront: "143443-2,34"}, app, "001122334455", "", PlatformMacOS)
+		output, platform, err := store.sendDownloadProduct(context.Background(), Account{StoreFront: "143443-2,34"}, app, "001122334455", "", PlatformMacOS)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(output).To(Equal(expected))
 		Expect(platform).To(Equal(PlatformMacOS))
@@ -103,7 +104,7 @@ var _ = Describe("Mac purchase version selection", func() {
 		pages := http.NewMockClient[[]byte](ctrl)
 		store := &appstore{storefrontClient: pages, downloadClient: http.NewMockClient[downloadResult](ctrl)}
 		pages.EXPECT().Send(gomock.Any()).Return(http.Result[[]byte]{StatusCode: status, Data: body}, requestErr)
-		_, _, err := store.sendDownloadProduct(Account{StoreFront: "143443-2,34"}, app, "001122334455", "", PlatformMacOS)
+		_, _, err := store.sendDownloadProduct(context.Background(), Account{StoreFront: "143443-2,34"}, app, "001122334455", "", PlatformMacOS)
 		Expect(err).To(HaveOccurred())
 	},
 		Entry("HTTP failure", 500, nil, nil),

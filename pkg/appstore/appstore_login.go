@@ -318,7 +318,10 @@ func retryableAuthenticationError(err error) (int, bool) {
 	}
 
 	status := responseErr.StatusCode
+	// A Store pod can transiently return an HTML 403 page. Populated Apple
+	// credential errors are decoded normally and never reach this branch.
 	retry := status == gohttp.StatusNoContent ||
+		status == gohttp.StatusForbidden ||
 		status == gohttp.StatusNotFound ||
 		status == gohttp.StatusTooManyRequests ||
 		status/100 == 5

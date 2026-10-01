@@ -125,7 +125,8 @@ var _ = Describe("AppStore (Login)", func() {
 			},
 			Entry("retries and then stops for HTTP 204", 204, maxAuthenticationRequestAttempts),
 			Entry("retries and then stops for HTTP 503", 503, maxAuthenticationRequestAttempts),
-			Entry("does not retry HTTP 403", 403, 1),
+			Entry("retries and then stops for non-plist HTTP 403", 403, maxAuthenticationRequestAttempts),
+			Entry("does not retry HTTP 401", 401, 1),
 		)
 	})
 

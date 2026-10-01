@@ -13,6 +13,7 @@ import (
 const (
 	storeAgentBase         = uint64(0x00001000c0000000)
 	storeAgentGlobalInit   = storeAgentBase + 0x0c5fc0
+	storeAgentKBSyncEntry  = storeAgentBase + 0x0c93c0
 	storeAgentSessionInit  = storeAgentBase + 0x0debd0
 	storeAgentDecryptEntry = storeAgentBase + 0x0ee700
 	storeAgentSessionClose = storeAgentBase + 0x1212d0
@@ -55,63 +56,69 @@ func OpenStoreAgent(ctx context.Context, bundle assets.Bundle, hardwareID, dpInf
 }
 
 func openStoreAgent(ctx context.Context, bundle assets.Bundle, image, hardwareID, dpInfo []byte) (*StoreAgent, error) {
-	if ctx == nil {
-		return nil, errors.New("StoreAgent context is nil")
-	}
-
-	if err := ctx.Err(); err != nil {
-		return nil, fmt.Errorf("open StoreAgent runtime: %w", err)
-	}
-
 	if len(dpInfo) == 0 {
 		return nil, errors.New("StoreAgent dpInfo is empty")
 	}
 
-	if err := assets.VerifyStoreAgent(image); err != nil {
-		return nil, fmt.Errorf("verify Apple StoreAgent profile: %w", err)
-	}
-
-	hardware, err := hardwareBlock(hardwareID)
-	if err != nil {
-		return nil, err
-	}
-
-	guest, _, err := openRuntime(ctx, bundle, runtimeOptions{
-		extraImages: []imageSpec{{name: "storeagent", data: image, base: storeAgentBase}},
-		shims: shimOptions{
-			zeroReturnAliases: storeAgentZeroReturnAliases,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("start StoreAgent runtime: %w", err)
-	}
-
-	agent := &StoreAgent{
-		guest:        guest,
-		decryptEntry: storeAgentDecryptEntry,
-		closeEntry:   storeAgentSessionClose,
-	}
-	complete := false
-
-	defer func() {
-		if !complete {
-			_ = agent.Close()
-		}
-	}()
-
-	globalContext, err := agent.initializeGlobal(hardware)
+	agent, globalContext, err := openStoreAgentGlobal(ctx, bundle, image, hardwareID)
 	if err != nil {
 		return nil, err
 	}
 
 	agent.session, err = agent.initializeSession(globalContext, dpInfo)
 	if err != nil {
+		_ = agent.Close()
+
 		return nil, err
 	}
 
-	complete = true
-
 	return agent, nil
+}
+
+func openStoreAgentGlobal(ctx context.Context, bundle assets.Bundle, image, hardwareID []byte) (*StoreAgent, uint32, error) {
+	if ctx == nil {
+		return nil, 0, errors.New("StoreAgent context is nil")
+	}
+
+	if err := ctx.Err(); err != nil {
+		return nil, 0, fmt.Errorf("open StoreAgent runtime: %w", err)
+	}
+
+	if err := assets.VerifyStoreAgent(image); err != nil {
+		return nil, 0, fmt.Errorf("verify Apple StoreAgent profile: %w", err)
+	}
+
+	hardware, err := hardwareBlock(hardwareID)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	guest, exports, err := openRuntime(ctx, bundle, runtimeOptions{
+		extraImages: []imageSpec{{name: "storeagent", data: image, base: storeAgentBase}},
+		shims: shimOptions{
+			zeroReturnAliases: storeAgentZeroReturnAliases,
+		},
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("start StoreAgent runtime: %w", err)
+	}
+
+	guest.entry.dispose = exports["_jEHf8Xzsv8K"]
+
+	agent := &StoreAgent{
+		guest:        guest,
+		decryptEntry: storeAgentDecryptEntry,
+		closeEntry:   storeAgentSessionClose,
+	}
+
+	globalContext, err := agent.initializeGlobal(hardware)
+	if err != nil {
+		_ = agent.Close()
+
+		return nil, 0, err
+	}
+
+	return agent, globalContext, nil
 }
 
 func (s *StoreAgent) initializeGlobal(hardware []byte) (uint32, error) {

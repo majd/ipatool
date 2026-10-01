@@ -77,6 +77,7 @@ type bagResult struct {
 
 type urlBag struct {
 	AuthEndpoint         string `plist:"authenticateAccount,omitempty"`
+	EntDownloadEndpoint  string `plist:"volumeStoreDownloadProduct,omitempty"`
 	RedownloadEndpoint   string `plist:"redownloadProduct,omitempty"`
 	UpdateEndpoint       string `plist:"updateProduct,omitempty"`
 	SAPSetupEndpoint     string `plist:"sign-sap-setup,omitempty"`

@@ -63,13 +63,13 @@ var _ = Describe("Authentication recovery", func() {
 		Entry("other transport failure", errors.New("unrecoverable transport error"), true, 1),
 	)
 
-	It("shares the attempt budget with HTTP failures and still honors Retry-After", func() {
+	DescribeTable("shares the attempt budget with HTTP failures and still honors Retry-After", func(status int) {
 		ctrl := gomock.NewController(GinkgoT())
 		client := apphttp.NewMockClient[loginResult](ctrl)
 		last := &apphttp.TransportError{Err: context.DeadlineExceeded}
 		gomock.InOrder(
 			client.EXPECT().Send(gomock.Any()).Return(apphttp.Result[loginResult]{}, &apphttp.TransportError{Err: io.EOF}),
-			client.EXPECT().Send(gomock.Any()).Return(apphttp.Result[loginResult]{}, &apphttp.UnexpectedResponseError{StatusCode: 503, RetryAfter: "2"}),
+			client.EXPECT().Send(gomock.Any()).Return(apphttp.Result[loginResult]{}, &apphttp.UnexpectedResponseError{StatusCode: status, RetryAfter: "2"}),
 			client.EXPECT().Send(gomock.Any()).Return(apphttp.Result[loginResult]{}, last),
 		)
 		var waits []time.Duration
@@ -77,8 +77,11 @@ var _ = Describe("Authentication recovery", func() {
 		_, err := sut.sendAuthenticationRequest(apphttp.Request{})
 		Expect(errors.Is(err, last)).To(BeTrue())
 		Expect(waits).To(Equal([]time.Duration{10 * time.Second, 2 * time.Second}))
-		Expect(err.Error()).To(ContainSubstring("after 3 attempts (transport error, HTTP 503, transport error)"))
-	})
+		Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("after 3 attempts (transport error, HTTP %d, transport error)", status)))
+	},
+		Entry("non-plist 403", http.StatusForbidden),
+		Entry("503", http.StatusServiceUnavailable),
+	)
 
 	It("stops when an incomplete response requests a wait beyond the budget", func() {
 		ctrl := gomock.NewController(GinkgoT())
@@ -116,7 +119,9 @@ var _ = Describe("Authentication recovery", func() {
 		Entry("404 without a deadline", 404, "", 3, []time.Duration{10 * time.Second, 20 * time.Second}),
 		Entry("Retry-After zero avoids a tight retry loop", 429, "0", 3, []time.Duration{time.Second, time.Second}),
 		Entry("503 with a long deadline", 503, "3600", 1, []time.Duration(nil)),
-		Entry("403 is not retried", 403, "1", 1, []time.Duration(nil)),
+		Entry("403 without a deadline", 403, "", 3, []time.Duration{10 * time.Second, 20 * time.Second}),
+		Entry("403 with a requested delay", 403, "1", 3, []time.Duration{time.Second, time.Second}),
+		Entry("403 with a long deadline", 403, "3600", 1, []time.Duration(nil)),
 		Entry("malformed redirect is not retried", 302, "", 1, []time.Duration(nil)),
 	)
 
@@ -138,7 +143,7 @@ var _ = Describe("Authentication recovery", func() {
 		}
 	})
 
-	It("does not retry populated Apple credential errors or 2FA challenges", func() {
+	DescribeTable("does not retry populated Apple credential errors or 2FA challenges", func(status int) {
 		ctrl := gomock.NewController(GinkgoT())
 		client := apphttp.NewMockClient[loginResult](ctrl)
 		sut := &appstore{loginClient: client, authRetrySleep: func(time.Duration) { Fail("must not sleep") }}
@@ -146,14 +151,17 @@ var _ = Describe("Authentication recovery", func() {
 			{FailureType: FailureTypeInvalidCredentials, CustomerMessage: "invalid credentials"},
 			{CustomerMessage: CustomerMessageBadLogin},
 		} {
-			client.EXPECT().Send(gomock.Any()).Return(apphttp.Result[loginResult]{StatusCode: 200, Data: data}, nil).Times(1)
+			client.EXPECT().Send(gomock.Any()).Return(apphttp.Result[loginResult]{StatusCode: status, Data: data}, nil).Times(1)
 			result, err := sut.sendAuthenticationRequest(apphttp.Request{})
 			Expect(err).NotTo(HaveOccurred())
 			_, _, err = sut.parseLoginResponse(&result, 2, "", testAuthEndpoint)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).NotTo(ContainSubstring("another network"))
 		}
-	})
+	},
+		Entry("HTTP 200", http.StatusOK),
+		Entry("HTTP 403", http.StatusForbidden),
+	)
 })
 
 // The adapter only redirects network traffic to the local server; login still
@@ -212,7 +220,7 @@ var _ = Describe("Login session continuity", func() {
 		Expect(<-bodies).To(Equal(<-bodies))
 	})
 
-	It("retains cookies and the signed payload through retries, a pod redirect and 2FA", func() {
+	It("retains cookies and the signed payload through retries, a pod HTML 403 and 2FA", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		jar, err := cookiejar.New(nil)
 		Expect(err).NotTo(HaveOccurred())
@@ -220,9 +228,11 @@ var _ = Describe("Login session continuity", func() {
 		adapter := apphttp.NewMockClient[loginResult](ctrl)
 		keychain := keychain.NewMockKeychain(ctrl)
 		keychain.EXPECT().Set("account", gomock.Any()).Return(nil).Times(1)
-		sut := &appstore{loginClient: adapter, keychain: keychain, authRetrySleep: func(time.Duration) {}}
-		connections := make(chan string, 4)
+		var waits []time.Duration
+		sut := &appstore{loginClient: adapter, keychain: keychain, authRetrySleep: func(delay time.Duration) { waits = append(waits, delay) }}
+		connections := make(chan string, 5)
 		calls := 0
+		var originalBody []byte
 		podURL := "https://p7-buy.itunes.apple.com" + PrivateAppStoreAPIPathAuth
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer GinkgoRecover()
@@ -231,6 +241,11 @@ var _ = Describe("Login session continuity", func() {
 			Expect(r.Method).To(Equal(http.MethodPost))
 			body, err := io.ReadAll(r.Body)
 			Expect(err).NotTo(HaveOccurred())
+			if calls == 1 {
+				originalBody = body
+			} else if calls <= 4 {
+				Expect(body).To(Equal(originalBody))
+			}
 			signature, err := base64.StdEncoding.DecodeString(r.Header.Get(apphttp.HeaderAppleActionSignature))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(signature).To(Equal(body))
@@ -251,12 +266,17 @@ var _ = Describe("Login session continuity", func() {
 				w.Header().Set("Location", podURL)
 				w.WriteHeader(http.StatusFound)
 			case 3:
+				w.Header().Set("Content-Type", "text/html")
+				w.WriteHeader(http.StatusForbidden)
+				_, err = w.Write([]byte("<html><body>Access Denied</body></html>"))
+				Expect(err).NotTo(HaveOccurred())
+			case 4:
 				Expect(payload["password"]).To(Equal("password"))
 				data, err := plist.Marshal(map[string]string{"customerMessage": CustomerMessageBadLogin}, plist.XMLFormat)
 				Expect(err).NotTo(HaveOccurred())
 				_, err = w.Write(data)
 				Expect(err).NotTo(HaveOccurred())
-			case 4:
+			case 5:
 				Expect(payload["password"]).To(Equal("password123456"))
 				w.Header().Set(HTTPHeaderStoreFront, "143441-1,29")
 				_, err = w.Write([]byte("<dict><key>passwordToken</key><string>token</string><key>dsPersonId</key><string>123</string></dict>"))
@@ -269,23 +289,25 @@ var _ = Describe("Login session continuity", func() {
 		adapted := 0
 		adapter.EXPECT().Send(gomock.Any()).DoAndReturn(func(request apphttp.Request) (apphttp.Result[loginResult], error) {
 			adapted++
-			if adapted == 3 {
+			if adapted == 3 || adapted == 4 {
 				Expect(request.URL).To(Equal(podURL))
 			}
 			request.URL = srv.URL + PrivateAppStoreAPIPathAuth
 
 			return client.Send(request)
-		}).Times(4)
+		}).Times(5)
 		signer := &stubActionSigner{}
 		_, err = sut.login("email", "password", "", "guid", testAuthEndpoint, signer)
 		Expect(errors.Is(err, ErrAuthCodeRequired)).To(BeTrue())
 		account, err := sut.login("email", "password", "123456", "guid", testAuthEndpoint, signer)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(account.PasswordToken).To(Equal("token"))
+		Expect(waits).To(Equal([]time.Duration{10 * time.Second, 10 * time.Second}))
+		Expect(signer.signCalls).To(Equal(5))
 		seen := map[string]bool{}
-		for range 4 {
+		for range 5 {
 			seen[<-connections] = true
 		}
-		Expect(seen).To(HaveLen(4))
+		Expect(seen).To(HaveLen(5))
 	})
 })

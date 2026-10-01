@@ -157,6 +157,10 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 		return Result[R]{}, fmt.Errorf("failed to create request: %w", err)
 	}
 
+	if req.Context != nil {
+		request = request.WithContext(req.Context)
+	}
+
 	for key, val := range req.Headers {
 		request.Header.Set(key, val)
 	}
@@ -170,7 +174,12 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 		request.Header.Set(HeaderAppleActionSignature, base64.StdEncoding.EncodeToString(signature))
 	}
 
-	res, err := c.internalClient.Do(request)
+	client := c.internalClient
+	if req.NoRedirects {
+		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	}
+
+	res, err := client.Do(request)
 	if err != nil {
 		return Result[R]{}, fmt.Errorf("request failed: %w", &TransportError{Err: err})
 	}

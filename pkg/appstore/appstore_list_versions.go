@@ -1,12 +1,14 @@
 package appstore
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strings"
 )
 
 type ListVersionsInput struct {
+	Context  context.Context
 	Account  Account
 	App      App
 	Platform Platform
@@ -49,7 +51,7 @@ func (t *appstore) ListVersions(input ListVersionsInput) (ListVersionsOutput, er
 		return ListVersionsOutput{}, fmt.Errorf("failed to resolve platform version: %w", err)
 	}
 
-	res, _, err := t.sendDownloadProduct(input.Account, input.App, guid, externalVersionID, platform)
+	res, _, err := t.sendDownloadProduct(input.Context, input.Account, input.App, guid, externalVersionID, platform)
 	if err != nil {
 		return ListVersionsOutput{}, err
 	}
