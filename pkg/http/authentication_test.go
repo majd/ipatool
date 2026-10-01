@@ -16,6 +16,49 @@ type sessionCookieJar struct{ *cookiejar.Jar }
 func (sessionCookieJar) Save() error { return nil }
 
 var _ = Describe("Authentication transport", func() {
+	DescribeTable("returns redirects for explicit validation without contacting their destination",
+		func(http2 bool, status int, suffix string) {
+			jar, err := cookiejar.New(nil)
+			Expect(err).NotTo(HaveOccurred())
+			calls := 0
+			srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				defer GinkgoRecover()
+				calls++
+				Expect(r.Method).To(Equal(http.MethodPost))
+				Expect(r.URL.Path).To(Equal(appStoreAuthPath + suffix))
+				Expect(r.ProtoMajor).To(Equal(map[bool]int{false: 1, true: 2}[http2]))
+				if calls == 1 {
+					w.Header().Set("Location", "/must-not-follow?token=secret")
+					w.WriteHeader(status)
+				}
+			}))
+			srv.EnableHTTP2 = http2
+			srv.StartTLS()
+			DeferCleanup(srv.Close)
+			sut := NewClient[struct{}](Args{CookieJar: sessionCookieJar{jar}, Authentication: true}).(*client[struct{}])
+			transport := sut.internalClient.Transport.(*AddHeaderTransport).T.(*http.Transport)
+			transport.TLSClientConfig = srv.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
+			DeferCleanup(transport.CloseIdleConnections)
+			result, err := sut.Send(Request{
+				URL: srv.URL + appStoreAuthPath + suffix, Method: MethodPOST, ResponseFormat: ResponseFormatXML,
+				Payload: &XMLPayload{Content: map[string]interface{}{"password": "secret"}},
+			})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(result.StatusCode).To(Equal(status))
+			Expect(result.Headers).To(HaveKeyWithValue("Location", "/must-not-follow?token=secret"))
+			Expect(calls).To(Equal(1))
+		},
+		Entry("301, bare path, HTTP/1.1", false, 301, ""),
+		Entry("301, trailing slash, HTTP/2", true, 301, "/"),
+		Entry("302, trailing slash, HTTP/1.1", false, 302, "/"),
+		Entry("302, bare path, HTTP/2", true, 302, ""),
+		Entry("307, trailing slash, HTTP/1.1", false, 307, "/"),
+		Entry("307, bare path, HTTP/2", true, 307, ""),
+		Entry("308, bare path, HTTP/1.1", false, 308, ""),
+		Entry("308, trailing slash, HTTP/2", true, 308, "/"),
+		Entry("303 must also reach the caller for rejection", false, 303, "/"),
+	)
+
 	DescribeTable("preserves cookies and signed POSTs across fresh connections",
 		func(http2 bool) {
 			jar, err := cookiejar.New(nil)
@@ -146,6 +189,9 @@ var _ = Describe("Authentication transport", func() {
 		Entry("empty forbidden response", 403, "", "empty or non-plist authentication response"),
 		Entry("HTML failure", 500, "<html>secret-password</html>", "empty or non-plist authentication response"),
 		Entry("redirect without Location", 302, "secret-token", "authentication redirect is missing Location"),
+		Entry("permanent redirect without Location", 301, "secret-token", "authentication redirect is missing Location"),
+		Entry("temporary redirect without Location", 307, "secret-token", "authentication redirect is missing Location"),
+		Entry("permanent POST redirect without Location", 308, "secret-token", "authentication redirect is missing Location"),
 		Entry("rate limit", 429, "secret-token", "rate limited by Apple"),
 		Entry("malformed plist", 200, "<plist><dict>secret-token", "malformed authentication plist"),
 	)
