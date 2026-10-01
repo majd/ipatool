@@ -81,7 +81,7 @@ func NewAppStore(args Args) AppStore {
 		downloadClient:      http.NewClient[downloadResult](clientArgs),
 		platformClient:      http.NewClient[platformVersionLookupResult](clientArgs),
 		storefrontClient:    http.NewClient[[]byte](clientArgs),
-		bagClient:           http.NewClient[bagResult](clientArgs),
+		bagClient:           http.NewClient[bagResult](http.Args{CookieJar: args.CookieJar, Timeout: http.DefaultAuthenticationTimeout}),
 		ownedAppsClient:     http.NewClient[[]byte](clientArgs),
 		httpClient:          http.NewClient[interface{}](clientArgs),
 		macDecrypterFactory: defaultMacPackageDecrypterFactory,
