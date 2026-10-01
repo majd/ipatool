@@ -1,13 +1,17 @@
 package appstore
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
 	gohttp "net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode"
 
@@ -226,6 +230,7 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string, signe
 
 func (t *appstore) sendAuthenticationRequest(request http.Request) (http.Result[loginResult], error) {
 	statuses := make([]string, 0, maxAuthenticationRequestAttempts)
+	onlyHTTP := true
 
 	sleep := t.authRetrySleep
 	if sleep == nil {
@@ -244,27 +249,48 @@ func (t *appstore) sendAuthenticationRequest(request http.Request) (http.Result[
 			return result, nil
 		}
 
-		statuses = append(statuses, strconv.Itoa(status))
+		outcome := fmt.Sprintf("HTTP %d", status)
+		if status == 0 {
+			outcome = "transport error"
+			onlyHTTP = false
+		}
+
+		statuses = append(statuses, outcome)
 
 		if attempt == maxAuthenticationRequestAttempts {
+			summary := strings.Join(statuses, ", ")
+			if onlyHTTP {
+				// Preserve the existing diagnostic format for HTTP-only failures.
+				summary = strings.ReplaceAll(summary, ", HTTP ", ", ")
+			}
+
 			return result, fmt.Errorf(
-				"authentication request failed after %d attempts (HTTP %s): %w",
-				maxAuthenticationRequestAttempts, strings.Join(statuses, ", "), authenticationRequestError(err),
+				"authentication request failed after %d attempts (%s): %w",
+				maxAuthenticationRequestAttempts, summary, authenticationRequestError(err),
 			)
 		}
 
 		delay := min(authenticationRetryDelay<<(attempt-1), maxAuthenticationRetryDelay)
 
-		var responseErr *http.UnexpectedResponseError
-		if errors.As(err, &responseErr) {
-			if requested, ok := authenticationRetryAfter(responseErr.RetryAfter, time.Now()); ok {
-				if requested > maxAuthenticationRetryDelay {
-					return result, fmt.Errorf("apple requested a wait longer than %s; try again later: %w", maxAuthenticationRetryDelay, err)
-				}
+		var (
+			responseErr  *http.UnexpectedResponseError
+			transportErr *http.TransportError
+			retryAfter   string
+		)
 
-				// Retry-After takes precedence over the fallback backoff.
-				delay = max(requested, time.Second)
+		if errors.As(err, &responseErr) {
+			retryAfter = responseErr.RetryAfter
+		} else if errors.As(err, &transportErr) {
+			retryAfter = transportErr.RetryAfter
+		}
+
+		if requested, ok := authenticationRetryAfter(retryAfter, time.Now()); ok {
+			if requested > maxAuthenticationRetryDelay {
+				return result, fmt.Errorf("apple requested a wait longer than %s; try again later: %w", maxAuthenticationRetryDelay, err)
 			}
+
+			// Retry-After takes precedence over the fallback backoff.
+			delay = max(requested, time.Second)
 		}
 
 		sleep(delay)
@@ -274,7 +300,21 @@ func (t *appstore) sendAuthenticationRequest(request http.Request) (http.Result[
 func retryableAuthenticationError(err error) (int, bool) {
 	var responseErr *http.UnexpectedResponseError
 	if !errors.As(err, &responseErr) {
-		return 0, false
+		var transportErr *http.TransportError
+		if !errors.As(err, &transportErr) || errors.Is(err, context.Canceled) {
+			return 0, false
+		}
+
+		// A url.Error can report Timeout false when its cause is wrapped by
+		// AddHeaderTransport, so inspect each underlying error as well.
+		for cause := transportErr.Err; cause != nil; cause = errors.Unwrap(cause) {
+			if networkErr, ok := cause.(net.Error); ok && networkErr.Timeout() {
+				return 0, true
+			}
+		}
+
+		return 0, errors.Is(transportErr, io.EOF) || errors.Is(transportErr, io.ErrUnexpectedEOF) ||
+			errors.Is(transportErr, syscall.ECONNRESET) || errors.Is(transportErr, syscall.EPIPE)
 	}
 
 	status := responseErr.StatusCode

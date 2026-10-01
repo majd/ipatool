@@ -7,14 +7,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
+	"time"
 
 	"howett.net/plist"
 )
 
 const appStoreAuthPath = "/WebObjects/MZFinance.woa/wa/authenticate"
+
+const DefaultAuthenticationTimeout = 30 * time.Second
 
 // IsAuthenticationRedirect reports which Store redirects can replay a signed POST.
 // A 303 explicitly requests a GET and is not part of this authentication flow.
@@ -51,6 +55,9 @@ type Args struct {
 	CookieJar CookieJar
 	// Authentication isolates login connections and reports only allowlisted response diagnostics.
 	Authentication bool
+	// Timeout covers the request and response body. Zero uses the authentication
+	// default for login clients and leaves other clients without an overall limit.
+	Timeout time.Duration
 }
 
 // UnexpectedResponseError preserves the HTTP status when Apple returns an
@@ -96,19 +103,25 @@ func (t *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error
 
 func NewClient[R interface{}](args Args) Client[R] {
 	transport := http.DefaultTransport
+	timeout := args.Timeout
 
 	if args.Authentication {
+		if timeout == 0 {
+			timeout = DefaultAuthenticationTimeout
+		}
+
 		// Keep the cookie jar, but do not share pooled connections with other
 		// Store operations or reuse a connection for the next login attempt.
 		isolated := http.DefaultTransport.(*http.Transport).Clone()
 		isolated.DisableKeepAlives = true
+		isolated.DialContext = (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext
 		transport = isolated
 	}
 
 	return &client[R]{
 		authentication: args.Authentication,
 		internalClient: http.Client{
-			Timeout: 0,
+			Timeout: timeout,
 			Jar:     args.CookieJar,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
 				// Login validates destinations and replays the signed POST itself.
@@ -159,7 +172,7 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 
 	res, err := c.internalClient.Do(request)
 	if err != nil {
-		return Result[R]{}, fmt.Errorf("request failed: %w", err)
+		return Result[R]{}, fmt.Errorf("request failed: %w", &TransportError{Err: err})
 	}
 	defer res.Body.Close()
 
@@ -186,7 +199,7 @@ func (c *client[R]) Send(req Request) (Result[R], error) {
 func (c *client[R]) handleRawResponse(res *http.Response) (Result[R], error) {
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Result[R]{}, fmt.Errorf("failed to read response body: %w", err)
+		return Result[R]{}, fmt.Errorf("failed to read response body: %w", &TransportError{Err: err, RetryAfter: res.Header.Get("Retry-After")})
 	}
 
 	data, ok := any(body).(R)
@@ -222,7 +235,7 @@ func (*client[R]) NewRequest(method, url string, body io.Reader) (*http.Request,
 func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Result[R]{}, fmt.Errorf("failed to read response body: %w", err)
+		return Result[R]{}, fmt.Errorf("failed to read response body: %w", &TransportError{Err: err, RetryAfter: res.Header.Get("Retry-After")})
 	}
 
 	var data R
@@ -241,7 +254,7 @@ func (c *client[R]) handleJSONResponse(res *http.Response) (Result[R], error) {
 func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return Result[R]{}, fmt.Errorf("failed to read response body: %w", err)
+		return Result[R]{}, fmt.Errorf("failed to read response body: %w", &TransportError{Err: err, RetryAfter: res.Header.Get("Retry-After")})
 	}
 
 	if c.authentication && IsAuthenticationRedirect(res.StatusCode) && strings.TrimSpace(res.Header.Get("Location")) == "" {
