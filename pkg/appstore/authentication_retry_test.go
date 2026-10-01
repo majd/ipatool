@@ -77,7 +77,7 @@ var _ = Describe("Authentication recovery", func() {
 			client.EXPECT().Send(gomock.Any()).Return(apphttp.Result[loginResult]{StatusCode: 200, Data: data}, nil).Times(1)
 			result, err := sut.sendAuthenticationRequest(apphttp.Request{})
 			Expect(err).NotTo(HaveOccurred())
-			_, _, err = sut.parseLoginResponse(&result, 2, "")
+			_, _, err = sut.parseLoginResponse(&result, 2, "", testAuthEndpoint)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).NotTo(ContainSubstring("another network"))
 		}

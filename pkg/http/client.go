@@ -16,6 +16,17 @@ import (
 
 const appStoreAuthPath = "/WebObjects/MZFinance.woa/wa/authenticate"
 
+// IsAuthenticationRedirect reports which Store redirects can replay a signed POST.
+// A 303 explicitly requests a GET and is not part of this authentication flow.
+func IsAuthenticationRedirect(status int) bool {
+	switch status {
+	case http.StatusMovedPermanently, http.StatusFound, http.StatusTemporaryRedirect, http.StatusPermanentRedirect:
+		return true
+	default:
+		return false
+	}
+}
+
 var (
 	documentXMLPattern = regexp.MustCompile(`(?is)<Document\b[^>]*>(.*)</Document>`)
 	plistXMLPattern    = regexp.MustCompile(`(?is)<plist\b[^>]*>.*?</plist>`)
@@ -100,7 +111,10 @@ func NewClient[R interface{}](args Args) Client[R] {
 			Timeout: 0,
 			Jar:     args.CookieJar,
 			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				if len(via) > 0 && via[len(via)-1].URL.Path == appStoreAuthPath {
+				// Login validates destinations and replays the signed POST itself.
+				// Never let net/http turn an authentication redirect into a GET.
+				if args.Authentication || (len(via) > 0 &&
+					(via[len(via)-1].URL.Path == appStoreAuthPath || via[len(via)-1].URL.Path == appStoreAuthPath+"/")) {
 					return http.ErrUseLastResponse
 				}
 
@@ -230,7 +244,7 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 		return Result[R]{}, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	if c.authentication && res.StatusCode == http.StatusFound && strings.TrimSpace(res.Header.Get("Location")) == "" {
+	if c.authentication && IsAuthenticationRedirect(res.StatusCode) && strings.TrimSpace(res.Header.Get("Location")) == "" {
 		return Result[R]{}, authenticationResponseError(res, body, "authentication redirect is missing Location")
 	}
 

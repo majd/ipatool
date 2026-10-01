@@ -5,13 +5,13 @@ import (
 	"errors"
 	"fmt"
 	gohttp "net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/majd/ipatool/v2/pkg/http"
-	"github.com/majd/ipatool/v2/pkg/util"
 )
 
 var (
@@ -20,6 +20,7 @@ var (
 
 const (
 	maxAuthenticationRequestAttempts = 3
+	maxAuthenticationRedirects       = 4
 	authenticationRetryDelay         = 10 * time.Second
 	maxAuthenticationRetryDelay      = 30 * time.Second
 )
@@ -139,25 +140,15 @@ type loginResult struct {
 }
 
 func (t *appstore) login(email, password, authCode, guid, endpoint string, signer ActionSigner) (Account, error) {
-	redirect := ""
+	request := t.loginRequest(email, password, authCode, guid, endpoint, 1, signer)
+	redirects := 0
 
 	var (
 		err error
 		res http.Result[loginResult]
 	)
 
-	retry := true
-
-	for attempt := 1; retry && attempt <= 4; attempt++ {
-		requestAttempt := attempt
-		if redirect != "" {
-			// The pod redirect is part of the same authentication attempt. Apple
-			// expects the original XML plist body, including its attempt value.
-			requestAttempt = 1
-		}
-
-		request := t.loginRequest(email, password, authCode, guid, endpoint, requestAttempt, signer)
-		request.URL, _ = util.IfEmpty(redirect, request.URL), ""
+	for attempt := 1; ; {
 		res, err = t.sendAuthenticationRequest(request)
 
 		if err != nil {
@@ -166,20 +157,37 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string, signe
 				stage = "2FA verification"
 			}
 
-			if redirect != "" {
+			if redirects > 0 {
 				stage += " at Store pod"
 			}
 
 			return Account{}, fmt.Errorf("%s request failed: %w", stage, err)
 		}
 
-		if retry, redirect, err = t.parseLoginResponse(&res, attempt, authCode); err != nil {
+		retry, redirect, err := t.parseLoginResponse(&res, attempt, authCode, request.URL)
+		if err != nil {
 			return Account{}, err
 		}
-	}
 
-	if retry {
-		return Account{}, NewErrorWithMetadata(errors.New("too many attempts"), res)
+		if !retry {
+			break
+		}
+
+		if redirect != "" {
+			if redirects == maxAuthenticationRedirects {
+				return Account{}, authenticationRedirectError(errors.New("too many authentication redirects"), res.StatusCode, redirect)
+			}
+
+			redirects++
+			// Only the destination changes: redirects belong to the same login
+			// attempt and must retain its payload, including the attempt value.
+			request.URL = redirect
+
+			continue
+		}
+
+		attempt++
+		request = t.loginRequest(email, password, authCode, guid, request.URL, attempt, signer)
 	}
 
 	sf, err := res.GetHeader(HTTPHeaderStoreFront)
@@ -278,21 +286,29 @@ func retryableAuthenticationError(err error) (int, bool) {
 	return status, retry
 }
 
-func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int, authCode string) (bool, string, error) {
+func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int, authCode, endpoint string) (bool, string, error) {
 	var (
 		retry    bool
 		redirect string
 		err      error
 	)
 
-	if res.StatusCode == gohttp.StatusFound {
+	if res.StatusCode >= gohttp.StatusMultipleChoices && res.StatusCode < gohttp.StatusBadRequest {
 		if redirect, err = res.GetHeader("location"); err != nil {
 			err = fmt.Errorf("failed to retrieve redirect location: %w", err)
-		} else if err = validateAuthenticationEndpoint(redirect); err != nil {
-			err = fmt.Errorf("invalid authentication redirect: %w", err)
+		} else if !http.IsAuthenticationRedirect(res.StatusCode) {
+			err = errors.New("unsupported authentication redirect status")
 		} else {
-			retry = true
+			redirect, err = resolveAuthenticationRedirect(endpoint, redirect)
 		}
+
+		if err != nil {
+			location, _ := res.GetHeader("location")
+
+			return false, "", authenticationRedirectError(err, res.StatusCode, location)
+		}
+
+		retry = true
 	} else if attempt == 1 && res.Data.FailureType == FailureTypeInvalidCredentials {
 		retry = true
 	} else if res.Data.FailureType == "" && res.Data.CustomerMessage == CustomerMessageBadLogin {
@@ -314,6 +330,39 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 	}
 
 	return retry, redirect, err
+}
+
+func resolveAuthenticationRedirect(endpoint, location string) (string, error) {
+	base, err := url.Parse(endpoint)
+	if err != nil {
+		return "", errors.New("invalid authentication redirect base URL")
+	}
+
+	reference, err := url.Parse(strings.TrimSpace(location))
+	if err != nil || strings.TrimSpace(location) == "" {
+		return "", errors.New("invalid authentication redirect location")
+	}
+
+	destination := base.ResolveReference(reference).String()
+	if err := validateAuthenticationEndpoint(destination); err != nil {
+		return "", fmt.Errorf("invalid authentication redirect: %w", err)
+	}
+
+	return destination, nil
+}
+
+func authenticationRedirectError(err error, status int, location string) error {
+	// Keep useful routing diagnostics without retaining URL credentials, query
+	// parameters, fragments, response bodies or arbitrary response headers.
+	destination := "invalid URL"
+	if parsed, parseErr := url.Parse(location); parseErr == nil {
+		destination = (&url.URL{Scheme: parsed.Scheme, Host: parsed.Host, Path: parsed.Path}).String()
+	}
+
+	return NewErrorWithMetadata(fmt.Errorf("%w (HTTP %d)", err, status), map[string]interface{}{
+		"statusCode":  status,
+		"destination": destination,
+	})
 }
 
 func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string, attempt int, signer ActionSigner) http.Request {

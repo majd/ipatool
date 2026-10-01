@@ -33,6 +33,21 @@ var _ = Describe("AppStore (Bag)", func() {
 		ctrl.Finish()
 	})
 
+	DescribeTable("preserves supported authentication URLs from the bag", func(endpoint string) {
+		mockMachine.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
+		result := validBagResult()
+		result.URLBag.AuthEndpoint = endpoint
+		mockBagClient.EXPECT().Send(gomock.Any()).Return(http.Result[bagResult]{StatusCode: gohttp.StatusOK, Data: result}, nil)
+		out, err := as.Bag(BagInput{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(out.AuthEndpoint).To(Equal(endpoint))
+		Expect(out.SAPConfig.AuthEndpoint).To(Equal(endpoint))
+	},
+		Entry("bare path", testAuthEndpoint),
+		Entry("trailing slash", testAuthEndpoint+"/"),
+		Entry("pod URL with routing query", "https://p7-buy.itunes.apple.com"+PrivateAppStoreAPIPathAuth+"/?routing=opaque"),
+	)
+
 	When("fails to read machine MAC address", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
