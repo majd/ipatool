@@ -5,6 +5,7 @@ import (
 	"net"
 	"path/filepath"
 	"runtime"
+	"sync"
 
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 	"golang.org/x/term"
@@ -18,7 +19,11 @@ type Machine interface {
 }
 
 type machine struct {
-	os operatingsystem.OperatingSystem
+	os             operatingsystem.OperatingSystem
+	interfaces     func() ([]net.Interface, error)
+	macAddressOnce sync.Once
+	macAddress     string
+	macAddressErr  error
 }
 
 type Args struct {
@@ -27,28 +32,26 @@ type Args struct {
 
 func New(args Args) Machine {
 	return &machine{
-		os: args.OS,
+		os:         args.OS,
+		interfaces: net.Interfaces,
 	}
 }
 
-func (*machine) MacAddress() (string, error) {
-	interfaces, err := net.Interfaces()
-	if err != nil {
-		return "", fmt.Errorf("failed to get network interfaces: %w", err)
-	}
+// Resolve once so bag requests, authentication and downloads use the same
+// identity even if an adapter is added or removed during this invocation.
+func (m *machine) MacAddress() (string, error) {
+	m.macAddressOnce.Do(func() {
+		interfaces, err := m.interfaces()
+		if err != nil {
+			m.macAddressErr = fmt.Errorf("failed to get network interfaces: %w", err)
 
-	if len(interfaces) == 0 {
-		return "", fmt.Errorf("could not find network interfaces: %w", err)
-	}
-
-	for _, netInterface := range interfaces {
-		addr := netInterface.HardwareAddr.String()
-		if addr != "" {
-			return interfaceMacAddress(netInterface)
+			return
 		}
-	}
 
-	return "", fmt.Errorf("could not find network interfaces with a valid mac address: %w", err)
+		m.macAddress, m.macAddressErr = selectMacAddress(interfaces, interfaceMacAddress)
+	})
+
+	return m.macAddress, m.macAddressErr
 }
 
 func (m *machine) HomeDirectory() string {

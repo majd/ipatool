@@ -3,7 +3,6 @@
 package machine
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -12,29 +11,32 @@ import (
 	"github.com/ebitengine/purego"
 )
 
-func interfaceMacAddress(networkInterface net.Interface) (string, error) {
+func interfaceMacAddress(networkInterface net.Interface) (macAddressCandidate, error) {
 	return macAddressWithHardwareLookup(networkInterface, hardwareMacAddress)
 }
 
-func macAddressWithHardwareLookup(networkInterface net.Interface, lookup func(string) (net.HardwareAddr, error)) (string, error) {
-	// macOS 27 can redact network interface addresses with a shared placeholder.
-	// Resolve the same interface through IOKit to preserve its existing identity.
-	if !bytes.Equal(networkInterface.HardwareAddr, []byte{0x02, 0, 0, 0, 0, 0}) {
-		return networkInterface.HardwareAddr.String(), nil
-	}
-
+func macAddressWithHardwareLookup(networkInterface net.Interface, lookup func(string) (net.HardwareAddr, error)) (macAddressCandidate, error) {
+	// IOKit supplies the hardware address even when the current network address
+	// is randomized or redacted. Prefer en0, then other hardware interfaces.
 	address, err := lookup(networkInterface.Name)
+	if err == nil && usableMacAddress(address) {
+		priority := macPriorityPhysical
+		if networkInterface.Name == "en0" {
+			priority = macPriorityPrimary
+		}
+
+		return macAddressCandidate{address: address, priority: priority}, nil
+	}
+
+	if usableMacAddress(networkInterface.HardwareAddr) {
+		return macAddressCandidate{address: networkInterface.HardwareAddr, priority: macPriorityFallback}, nil
+	}
+
 	if err != nil {
-		return "", fmt.Errorf("macOS redacted the mac address for %q; failed to read its hardware address: %w", networkInterface.Name, err)
+		return macAddressCandidate{}, fmt.Errorf("failed to read hardware address for %q: %w", networkInterface.Name, err)
 	}
 
-	if len(address) != 6 || address[0]&1 != 0 ||
-		bytes.Equal(address, []byte{0, 0, 0, 0, 0, 0}) ||
-		bytes.Equal(address, []byte{0x02, 0, 0, 0, 0, 0}) {
-		return "", fmt.Errorf("macOS redacted the mac address for %q; IOKit returned no usable hardware address", networkInterface.Name)
-	}
-
-	return address.String(), nil
+	return macAddressCandidate{}, fmt.Errorf("IOKit returned no usable hardware address for %q", networkInterface.Name)
 }
 
 type macAddressAPI struct {

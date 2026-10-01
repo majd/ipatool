@@ -21,17 +21,16 @@ var _ = Describe("macOS hardware address", func() {
 		}
 	})
 
-	It("preserves an existing unredacted identity without consulting IOKit", func() {
+	It("falls back to an unredacted address when IOKit is unavailable", func() {
 		networkInterface.HardwareAddr = net.HardwareAddr{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff}
 
 		address, err := macAddressWithHardwareLookup(networkInterface, func(string) (net.HardwareAddr, error) {
-			Fail("unexpected IOKit lookup")
-
-			return nil, nil
+			return nil, errors.New("IOKit unavailable")
 		})
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(address).To(Equal("aa:bb:cc:dd:ee:ff"))
+		Expect(address.address.String()).To(Equal("aa:bb:cc:dd:ee:ff"))
+		Expect(address.priority).To(Equal(macPriorityFallback))
 	})
 
 	It("recovers the hardware address of the selected interface when redacted", func() {
@@ -42,7 +41,22 @@ var _ = Describe("macOS hardware address", func() {
 		})
 
 		Expect(err).ToNot(HaveOccurred())
-		Expect(address).To(Equal("aa:bb:cc:dd:ee:ff"))
+		Expect(address.address.String()).To(Equal("aa:bb:cc:dd:ee:ff"))
+		Expect(address.priority).To(Equal(macPriorityPhysical))
+	})
+
+	It("prefers en0's hardware address over its randomized network address", func() {
+		networkInterface.Name = "en0"
+		networkInterface.HardwareAddr = net.HardwareAddr{0x02, 1, 2, 3, 4, 5}
+		address, err := macAddressWithHardwareLookup(networkInterface, func(name string) (net.HardwareAddr, error) {
+			Expect(name).To(Equal("en0"))
+
+			return net.HardwareAddr{0x00, 1, 2, 3, 4, 5}, nil
+		})
+
+		Expect(err).NotTo(HaveOccurred())
+		Expect(address.address.String()).To(Equal("00:01:02:03:04:05"))
+		Expect(address.priority).To(Equal(macPriorityPrimary))
 	})
 
 	It("reports unavailable hardware information without returning the placeholder", func() {
@@ -51,9 +65,9 @@ var _ = Describe("macOS hardware address", func() {
 			return nil, lookupErr
 		})
 
-		Expect(address).To(BeEmpty())
+		Expect(address.address).To(BeEmpty())
 		Expect(errors.Is(err, lookupErr)).To(BeTrue())
-		Expect(err.Error()).To(ContainSubstring("macOS redacted the mac address for \"en4\""))
+		Expect(err.Error()).To(ContainSubstring("failed to read hardware address for \"en4\""))
 	})
 
 	DescribeTable("rejects an unusable IOKit address", func(hardware net.HardwareAddr) {
@@ -61,7 +75,7 @@ var _ = Describe("macOS hardware address", func() {
 			return hardware, nil
 		})
 
-		Expect(address).To(BeEmpty())
+		Expect(address.address).To(BeEmpty())
 		Expect(err).To(MatchError(ContainSubstring("IOKit returned no usable hardware address")))
 	},
 		Entry("missing", nil),

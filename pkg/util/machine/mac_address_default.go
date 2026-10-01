@@ -1,9 +1,9 @@
-//go:build !darwin || ios
+//go:build (!darwin && !linux && !windows) || ios
 
 package machine
 
 import "net"
 
-func interfaceMacAddress(networkInterface net.Interface) (string, error) {
-	return networkInterface.HardwareAddr.String(), nil
+func interfaceMacAddress(networkInterface net.Interface) (macAddressCandidate, error) {
+	return macAddressCandidate{address: networkInterface.HardwareAddr, priority: macPriorityFallback}, nil
 }
