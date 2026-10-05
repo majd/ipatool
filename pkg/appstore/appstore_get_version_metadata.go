@@ -66,6 +66,16 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 	}
 
 	item := res.Data.Items[0]
+	// A pinned Mac version can be returned even when no platform was supplied.
+	// Use the response's package type instead of passing it to the IPA reader.
+	if input.Platform == "" {
+		softwarePlatform := downloadMetadataString(item.Metadata, "software-platform")
+		if strings.EqualFold(softwarePlatform, "macos") ||
+			(softwarePlatform == "" && strings.EqualFold(downloadMetadataString(item.Metadata, "product-type"), "mac-os-app")) {
+			platform = PlatformMacOS
+		}
+	}
+
 	if platform == PlatformMacOS {
 		packagePlatform, err := downloadPackagePlatform(platform, item)
 		if err != nil {

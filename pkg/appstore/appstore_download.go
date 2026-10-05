@@ -216,11 +216,12 @@ func isTopLevelAppInfoPlist(path string) bool {
 }
 
 type downloadItemResult struct {
-	ArtworkURL string                 `plist:"artworkURL,omitempty"`
-	HashMD5    string                 `plist:"md5,omitempty"`
-	URL        string                 `plist:"URL,omitempty"`
-	Sinfs      []Sinf                 `plist:"sinfs,omitempty"`
-	Metadata   map[string]interface{} `plist:"metadata,omitempty"`
+	PreflightPackageURL string                 `plist:"preflightPackageURL,omitempty"`
+	ArtworkURL          string                 `plist:"artworkURL,omitempty"`
+	HashMD5             string                 `plist:"md5,omitempty"`
+	URL                 string                 `plist:"URL,omitempty"`
+	Sinfs               []Sinf                 `plist:"sinfs,omitempty"`
+	Metadata            map[string]interface{} `plist:"metadata,omitempty"`
 }
 
 type downloadResult struct {

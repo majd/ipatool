@@ -24,7 +24,14 @@ func (t *appstore) readVersionMetadataFromMacPackage(ctx context.Context, item d
 	defer os.RemoveAll(directory)
 
 	destination := filepath.Join(directory, "app.pkg")
-	if _, err := t.downloadMacPackage(ctx, item, destination, hardwareID, nil); err != nil {
+	// Older device-based downloads omit dpInfo but include a small, readable
+	// preflight archive containing the selected build's installer metadata.
+	preflight := !hasMacDPInfo(item.Sinfs) && item.PreflightPackageURL != ""
+	if preflight {
+		if err := t.downloadFile(ctx, item.PreflightPackageURL, destination, nil); err != nil {
+			return versionMetadata{}, fmt.Errorf("failed to download Mac preflight package: %w", err)
+		}
+	} else if _, err := t.downloadMacPackage(ctx, item, destination, hardwareID, nil); err != nil {
 		return versionMetadata{}, err
 	}
 
@@ -38,6 +45,10 @@ func (t *appstore) readVersionMetadataFromMacPackage(ctx context.Context, item d
 	}
 
 	defer archive.Close()
+
+	if preflight {
+		return macPreflightVersionMetadata(&archive.Reader, bundleID)
+	}
 
 	return macPackageVersionMetadata(&archive.Reader, bundleID)
 }
