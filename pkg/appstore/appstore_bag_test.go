@@ -33,19 +33,42 @@ var _ = Describe("AppStore (Bag)", func() {
 		ctrl.Finish()
 	})
 
-	DescribeTable("preserves supported authentication URLs from the bag", func(endpoint string) {
+	DescribeTable("normalizes the authentication path while preserving the bag host and query", func(endpoint, expected string) {
 		mockMachine.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
 		result := validBagResult()
 		result.URLBag.AuthEndpoint = endpoint
 		mockBagClient.EXPECT().Send(gomock.Any()).Return(http.Result[bagResult]{StatusCode: gohttp.StatusOK, Data: result}, nil)
 		out, err := as.Bag(BagInput{})
 		Expect(err).NotTo(HaveOccurred())
-		Expect(out.AuthEndpoint).To(Equal(endpoint))
-		Expect(out.SAPConfig.AuthEndpoint).To(Equal(endpoint))
+		Expect(out.AuthEndpoint).To(Equal(expected))
+		Expect(out.SAPConfig.AuthEndpoint).To(Equal(expected))
 	},
-		Entry("bare path", testAuthEndpoint),
-		Entry("trailing slash", testAuthEndpoint+"/"),
-		Entry("pod URL with routing query", "https://p7-buy.itunes.apple.com"+PrivateAppStoreAPIPathAuth+"/?routing=opaque"),
+		Entry("bare path", testAuthEndpoint, testAuthEndpoint+"/"),
+		Entry("trailing slash", testAuthEndpoint+"/", testAuthEndpoint+"/"),
+		Entry("bare path with routing query", testAuthEndpoint+"?Pod=7&routing=a%2Fb+c", testAuthEndpoint+"/?Pod=7&routing=a%2Fb+c"),
+		Entry("bare pod URL with routing query", "https://p7-buy.itunes.apple.com"+PrivateAppStoreAPIPathAuth+"?Pod=7&PRH=7", "https://p7-buy.itunes.apple.com"+PrivateAppStoreAPIPathAuth+"/?Pod=7&PRH=7"),
+		Entry("slashed pod URL with routing query", "https://p7-buy.itunes.apple.com"+PrivateAppStoreAPIPathAuth+"/?routing=opaque", "https://p7-buy.itunes.apple.com"+PrivateAppStoreAPIPathAuth+"/?routing=opaque"),
+		Entry("explicit HTTPS port", "https://buy.itunes.apple.com:443"+PrivateAppStoreAPIPathAuth, "https://buy.itunes.apple.com:443"+PrivateAppStoreAPIPathAuth+"/"),
+	)
+
+	DescribeTable("rejects invalid authentication URLs before normalizing the path", func(endpoint string) {
+		mockMachine.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
+		result := validBagResult()
+		result.URLBag.AuthEndpoint = endpoint
+		mockBagClient.EXPECT().Send(gomock.Any()).Return(http.Result[bagResult]{StatusCode: gohttp.StatusOK, Data: result}, nil)
+		_, err := as.Bag(BagInput{})
+		Expect(err).To(HaveOccurred())
+	},
+		Entry("double slash", testAuthEndpoint+"//"),
+		Entry("extra path", testAuthEndpoint+"/extra"),
+		Entry("encoded slash", testAuthEndpoint+"%2f"),
+		Entry("different path", "https://buy.itunes.apple.com/other"),
+		Entry("foreign host", "https://example.com"+PrivateAppStoreAPIPathAuth),
+		Entry("HTTP", "http://buy.itunes.apple.com"+PrivateAppStoreAPIPathAuth),
+		Entry("userinfo", "https://user@buy.itunes.apple.com"+PrivateAppStoreAPIPathAuth),
+		Entry("unsupported port", "https://buy.itunes.apple.com:8443"+PrivateAppStoreAPIPathAuth),
+		Entry("fragment", testAuthEndpoint+"#fragment"),
+		Entry("malformed URL", testAuthEndpoint+"%zz"),
 	)
 
 	When("fails to read machine MAC address", func() {
@@ -192,7 +215,7 @@ func validBagResult() bagResult {
 
 func validSAPConfig() SAPConfig {
 	return SAPConfig{
-		AuthEndpoint:   testAuthEndpoint,
+		AuthEndpoint:   testAuthEndpoint + "/",
 		SetupURL:       testSAPSetupEndpoint,
 		CertificateURL: testSAPSetupCertEndpoint,
 		Version:        200,
