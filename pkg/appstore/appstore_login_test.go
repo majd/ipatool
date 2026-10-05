@@ -164,6 +164,7 @@ var _ = Describe("AppStore (Login)", func() {
 		DescribeTable("normalizes 2FA codes without changing the password", func(code, suffix string) {
 			const password = " \tpäss word\n"
 			mockClient.EXPECT().Send(gomock.Any()).DoAndReturn(func(req http.Request) (http.Result[loginResult], error) {
+				Expect(req.URL).To(Equal(testAuthEndpoint + "/"))
 				Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("password", password+suffix))
 
 				return http.Result[loginResult]{}, errors.New("test complete")
@@ -189,7 +190,7 @@ var _ = Describe("AppStore (Login)", func() {
 				mockClient.EXPECT().
 					Send(gomock.Any()).
 					Do(func(req http.Request) {
-						Expect(req.URL).To(Equal(testAuthEndpoint))
+						Expect(req.URL).To(Equal(testAuthEndpoint + "/"))
 						Expect(req.ActionSigner).To(BeIdenticalTo(signer))
 					}).
 					Return(http.Result[loginResult]{}, clientErr)
@@ -328,7 +329,7 @@ var _ = Describe("AppStore (Login)", func() {
 				firstCall := mockClient.EXPECT().
 					Send(gomock.Any()).
 					Do(func(req http.Request) {
-						Expect(req.URL).To(Equal(testAuthEndpoint))
+						Expect(req.URL).To(Equal(testAuthEndpoint + "/"))
 						Expect(req.ActionSigner).To(BeIdenticalTo(signer))
 						Expect(req.Payload).To(BeAssignableToTypeOf(&http.XMLPayload{}))
 						x := req.Payload.(*http.XMLPayload)

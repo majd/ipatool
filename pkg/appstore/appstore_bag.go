@@ -54,6 +54,16 @@ func (t *appstore) bag(guid string) (BagOutput, error) {
 		return BagOutput{}, err
 	}
 
+	authURL, err := url.Parse(config.AuthEndpoint)
+	if err != nil {
+		return BagOutput{}, fmt.Errorf("failed to parse authentication endpoint: %w", err)
+	}
+
+	// The bare path can return unusable responses, including a 301 without
+	// Location. Normalize only the validated bag URL, retaining its host and query.
+	authURL.Path = PrivateAppStoreAPIPathAuth + "/"
+	config.AuthEndpoint = authURL.String()
+
 	return BagOutput{AuthEndpoint: config.AuthEndpoint, SAPConfig: config}, nil
 }
 
