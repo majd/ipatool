@@ -16,7 +16,7 @@ type AppStore interface {
 	AccountInfo() (AccountInfoOutput, error)
 	// Revoke revokes the active credentials.
 	Revoke() error
-	// Lookup looks apps up based on the specified bundle identifier.
+	// Lookup looks apps up by bundle identifier or numeric app ID.
 	Lookup(input LookupInput) (LookupOutput, error)
 	// Search searches the App Store for apps matching the specified term.
 	Search(input SearchInput) (SearchOutput, error)

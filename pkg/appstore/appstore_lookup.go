@@ -5,6 +5,7 @@ import (
 	"fmt"
 	gohttp "net/http"
 	"net/url"
+	"strconv"
 
 	"github.com/majd/ipatool/v2/pkg/http"
 )
@@ -13,6 +14,7 @@ var ErrAppNotFound = errors.New("app not found")
 
 type LookupInput struct {
 	Account  Account
+	AppID    int64
 	BundleID string
 	Platform Platform
 }
@@ -27,7 +29,13 @@ func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
 		return LookupOutput{}, fmt.Errorf("failed to resolve the country code: %w", err)
 	}
 
-	request, err := t.lookupRequest(input.BundleID, countryCode, input.Platform)
+	var request http.Request
+	if input.BundleID == "" && input.AppID > 0 {
+		request, err = t.lookupIDsRequest([]string{strconv.FormatInt(input.AppID, 10)}, countryCode, input.Platform)
+	} else {
+		request, err = t.lookupRequest(input.BundleID, countryCode, input.Platform)
+	}
+
 	if err != nil {
 		return LookupOutput{}, fmt.Errorf("failed to create lookup request: %w", err)
 	}

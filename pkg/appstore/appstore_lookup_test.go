@@ -29,6 +29,33 @@ var _ = Describe("AppStore (Lookup)", func() {
 		ctrl.Finish()
 	})
 
+	DescribeTable("looks up an app by ID or bundle identifier", func(appID int64, bundleID, key, value string) {
+		mockClient.EXPECT().Send(gomock.Any()).DoAndReturn(func(req http.Request) (http.Result[searchResult], error) {
+			parsed, err := url.Parse(req.URL)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(parsed.Query().Get(key)).To(Equal(value))
+			Expect(parsed.Query().Get("entity")).To(Equal("macSoftware"))
+			Expect(parsed.Query().Get("country")).To(Equal("US"))
+			if key == "bundleId" {
+				Expect(parsed.Query().Has("id")).To(BeFalse())
+			} else {
+				Expect(parsed.Query().Has("bundleId")).To(BeFalse())
+			}
+
+			return http.Result[searchResult]{
+				StatusCode: 200, Data: searchResult{Results: []App{{ID: 123, BundleID: "com.example.app"}}},
+			}, nil
+		})
+		output, err := as.Lookup(LookupInput{
+			Account: Account{StoreFront: "143441"}, AppID: appID, BundleID: bundleID, Platform: PlatformMacOS,
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(output.App.BundleID).To(Equal("com.example.app"))
+	},
+		Entry("numeric ID", int64(123), "", "id", "123"),
+		Entry("bundle identifier overrides ID", int64(999), "com.example.app", "bundleId", "com.example.app"),
+	)
+
 	When("request is successful", func() {
 		When("does not find app", func() {
 			BeforeEach(func() {

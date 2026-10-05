@@ -101,6 +101,10 @@ func initWithCommand(cmd *cobra.Command) {
 	format := util.Must(OutputFormatFromString(cmd.Flag("format").Value.String()))
 
 	dependencies.Logger = newLogger(format, verbose)
+	if cmd.Name() == "mcp" {
+		dependencies.Logger = log.NewLogger(log.Args{Verbose: verbose, Writer: zerolog.SyncWriter(os.Stderr)})
+	}
+
 	dependencies.OS = operatingsystem.New()
 	dependencies.Machine = machine.New(machine.Args{OS: dependencies.OS})
 	stateDirectory := util.Must(prepareStateDirectory(dependencies.OS, dependencies.Machine.HomeDirectory()))
