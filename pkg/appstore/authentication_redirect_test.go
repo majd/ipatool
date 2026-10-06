@@ -20,8 +20,8 @@ import (
 )
 
 var _ = Describe("Authentication redirects", func() {
-	DescribeTable("preserves a signed POST, cookies and 2FA after a credential retry",
-		func(status int, suffix string) {
+	DescribeTable("preserves a signed POST, cookies, credentials and storefront after a credential retry",
+		func(status int, suffix, appleID, storefront, authCode string) {
 			ctrl := gomock.NewController(GinkgoT())
 			jar, err := cookiejar.New(nil)
 			Expect(err).NotTo(HaveOccurred())
@@ -37,6 +37,7 @@ var _ = Describe("Authentication redirects", func() {
 				defer GinkgoRecover()
 				calls++
 				Expect(r.Method).To(Equal(http.MethodPost))
+				Expect(r.Header.Get("X-Apple-Store-Front")).To(Equal(storefront))
 				body, err := io.ReadAll(r.Body)
 				Expect(err).NotTo(HaveOccurred())
 				signature, err := base64.StdEncoding.DecodeString(r.Header.Get(apphttp.HeaderAppleActionSignature))
@@ -45,7 +46,8 @@ var _ = Describe("Authentication redirects", func() {
 				var payload map[string]string
 				_, err = plist.Unmarshal(body, &payload)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(payload["password"]).To(Equal("password123456"))
+				Expect(payload["appleId"]).To(Equal(appleID))
+				Expect(payload["password"]).To(Equal("password" + authCode))
 				if calls > 1 {
 					cookie, err := r.Cookie("session")
 					Expect(err).NotTo(HaveOccurred())
@@ -84,20 +86,23 @@ var _ = Describe("Authentication redirects", func() {
 				return client.Send(request)
 			}).Times(3)
 			signer := &stubActionSigner{}
-			account, err := sut.login("email", "password", "123456", "guid", testAuthEndpoint+suffix, signer)
+			account, err := sut.login(appleID, "password", authCode, "guid", testAuthEndpoint+suffix, signer)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(account.PasswordToken).To(Equal("token"))
+			Expect(account.StoreFront).To(Equal("143441-1,29"))
 			Expect(destinations).To(Equal([]string{testAuthEndpoint + suffix, testAuthEndpoint + suffix, podURL}))
 			Expect(signer.signCalls).To(Equal(3))
 		},
-		Entry("301, bare path", 301, ""),
-		Entry("301, trailing slash", 301, "/"),
-		Entry("302, bare path", 302, ""),
-		Entry("302, trailing slash", 302, "/"),
-		Entry("307, bare path", 307, ""),
-		Entry("307, trailing slash", 307, "/"),
-		Entry("308, bare path", 308, ""),
-		Entry("308, trailing slash", 308, "/"),
+		Entry("301, bare path", 301, "", "user@example.test", "", "123456"),
+		Entry("301, trailing slash", 301, "/", "user@example.test", "", "123456"),
+		Entry("302, bare path", 302, "", "user@example.test", "", "123456"),
+		Entry("302, trailing slash", 302, "/", "user@example.test", "", "123456"),
+		Entry("307, bare path", 307, "", "user@example.test", "", "123456"),
+		Entry("307, trailing slash", 307, "/", "user@example.test", "", "123456"),
+		Entry("308, bare path", 308, "", "user@example.test", "", "123456"),
+		Entry("308, trailing slash", 308, "/", "user@example.test", "", "123456"),
+		Entry("Chinese phone number before 2FA", 302, "/", "+86 139-1234-5678", "143465", ""),
+		Entry("Indian phone number with 2FA", 307, "/", "9123456789", "143467", "012345"),
 	)
 
 	It("follows relative and pod redirects within the redirect budget", func() {

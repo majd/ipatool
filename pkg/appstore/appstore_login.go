@@ -409,7 +409,7 @@ func authenticationRedirectError(err error, status int, location string) error {
 }
 
 func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string, attempt int, signer ActionSigner) http.Request {
-	return http.Request{
+	request := http.Request{
 		Method:         http.MethodPOST,
 		URL:            endpoint,
 		ResponseFormat: http.ResponseFormatXML,
@@ -428,6 +428,11 @@ func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string
 			},
 		},
 	}
+	if storefront := phoneNumberStorefront(email); storefront != "" {
+		request.Headers["X-Apple-Store-Front"] = storefront
+	}
+
+	return request
 }
 
 func authenticationRequestError(err error) error {

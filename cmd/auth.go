@@ -33,13 +33,13 @@ func loginCmd() *cobra.Command {
 			interactive := cmd.Context().Value(interactiveKey).(bool)
 
 			if email == "" && !interactive {
-				return errors.New("email is required when not running in interactive mode; use the \"--email\" flag")
+				return errors.New("an Apple ID is required when not running in interactive mode; use the \"--email\" flag")
 			}
 
 			if email == "" && interactive {
-				value, err := readPrompt("enter email: ", false)
+				value, err := readPrompt("enter Apple ID (email address or phone number): ", false)
 				if err != nil {
-					return fmt.Errorf("failed to read email: %w", err)
+					return fmt.Errorf("failed to read Apple ID: %w", err)
 				}
 				email = value
 			}
@@ -111,7 +111,7 @@ func loginCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&email, "email", "e", "", "email address for the Apple ID (required)")
+	cmd.Flags().StringVarP(&email, "email", "e", "", "Apple ID email address or phone number (required)")
 	cmd.Flags().StringVarP(&password, "password", "p", "", "password for the Apple ID (required)")
 	cmd.Flags().StringVar(&authCode, "auth-code", "", "2FA code for the Apple ID")
 
