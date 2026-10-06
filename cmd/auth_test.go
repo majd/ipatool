@@ -30,24 +30,28 @@ var _ = Describe("Login command", func() {
 		Expect(cmd.Execute()).To(MatchError(message))
 		Expect(store.loginCalls).To(BeZero())
 	},
-		Entry("missing email", []string{"--password", "secret"}, "email is required when not running in interactive mode; use the \"--email\" flag"),
+		Entry("missing Apple ID", []string{"--password", "secret"}, "an Apple ID is required when not running in interactive mode; use the \"--email\" flag"),
 		Entry("missing password", []string{"--email", "user@example.com"}, "password is required when not running in interactive mode; use the \"--password\" flag"),
 	)
 
-	DescribeTable("uses supplied credentials", func(interactive bool) {
+	DescribeTable("uses supplied credentials", func(interactive bool, appleID string) {
 		cmd := loginCmd()
 		cmd.SetContext(context.WithValue(context.Background(), interactiveKey, interactive))
-		cmd.SetArgs([]string{"--email", "user@example.com", "--password", "secret"})
+		cmd.SetArgs([]string{"--email", appleID, "--password", "secret"})
 
 		Expect(cmd.Execute()).To(Succeed())
 		Expect(store.loginCalls).To(Equal(1))
-		Expect(store.input).To(Equal(appstore.LoginInput{Email: "user@example.com", Password: "secret"}))
+		Expect(store.input).To(Equal(appstore.LoginInput{Email: appleID, Password: "secret"}))
 	},
-		Entry("interactive", true),
-		Entry("non-interactive", false),
+		Entry("interactive email", true, "user@example.com"),
+		Entry("non-interactive email", false, "user@example.com"),
+		Entry("interactive Chinese phone number", true, "+8613912345678"),
+		Entry("non-interactive Chinese phone number", false, "+8613912345678"),
+		Entry("interactive Indian phone number", true, "9123456789"),
+		Entry("non-interactive Indian phone number", false, "9123456789"),
 	)
 
-	DescribeTable("prompts for email", func(input, message string) {
+	DescribeTable("prompts for an Apple ID", func(input, appleID, message string) {
 		dir := GinkgoT().TempDir()
 		inputPath := filepath.Join(dir, "stdin")
 		Expect(os.WriteFile(inputPath, []byte(input), 0o600)).To(Succeed())
@@ -72,7 +76,7 @@ var _ = Describe("Login command", func() {
 		if message == "" {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(store.loginCalls).To(Equal(1))
-			Expect(store.input).To(Equal(appstore.LoginInput{Email: "user@example.com", Password: "secret"}))
+			Expect(store.input).To(Equal(appstore.LoginInput{Email: appleID, Password: "secret"}))
 		} else {
 			Expect(err).To(MatchError(message))
 			Expect(store.loginCalls).To(BeZero())
@@ -80,10 +84,11 @@ var _ = Describe("Login command", func() {
 
 		prompt, err := os.ReadFile(stderr.Name())
 		Expect(err).NotTo(HaveOccurred())
-		Expect(string(prompt)).To(Equal("enter email: "))
+		Expect(string(prompt)).To(Equal("enter Apple ID (email address or phone number): "))
 	},
-		Entry("reads unmasked input without requiring a terminal", "user@example.com\n", ""),
-		Entry("reports input errors", "", "failed to read email: failed to read input: EOF"),
+		Entry("reads email without requiring a terminal", "user@example.com\n", "user@example.com", ""),
+		Entry("reads a phone number without requiring a terminal", "+91 91234-56789\n", "+91 91234-56789", ""),
+		Entry("reports input errors", "", "", "failed to read Apple ID: failed to read input: EOF"),
 	)
 })
 
