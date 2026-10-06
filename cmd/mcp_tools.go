@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/majd/ipatool/v2/pkg/appstore"
 )
@@ -53,6 +54,20 @@ type mcpVersionsOutput struct {
 	LatestExternalVersionID    string   `json:"latestExternalVersionID"`
 	BundleID                   string   `json:"bundleID"`
 	Success                    bool     `json:"success"`
+}
+
+type mcpVersionMetadataInput struct {
+	mcpAppInput
+	ExternalVersionID string `json:"external_version_id" jsonschema:"External version identifier of the target app (required)"`
+}
+
+type mcpVersionMetadataOutput struct {
+	mcpAppParameters
+	App               mcpApp    `json:"app"`
+	ExternalVersionID string    `json:"external_version_id"`
+	DisplayVersion    string    `json:"displayVersion" jsonschema:"Display version of the requested external version identifier"`
+	ReleaseDate       time.Time `json:"releaseDate"`
+	Success           bool      `json:"success"`
 }
 
 type mcpPurchasesInput struct {
@@ -244,6 +259,38 @@ func (t *mcpTools) listVersions(ctx context.Context, input mcpAppInput) (mcpVers
 			mcpAppParameters: appParameters(app, platform), App: newMCPApp(app),
 			ExternalVersionIdentifiers: append([]string{}, out.ExternalVersionIdentifiers...),
 			LatestExternalVersionID:    out.LatestExternalVersionID, BundleID: app.BundleID, Success: true,
+		}, nil
+	})
+}
+
+//nolint:wrapcheck
+func (t *mcpTools) getVersionMetadata(ctx context.Context, input mcpVersionMetadataInput) (mcpVersionMetadataOutput, error) {
+	platform, err := input.validate()
+	if err != nil {
+		return mcpVersionMetadataOutput{}, err
+	}
+
+	if strings.TrimSpace(input.ExternalVersionID) == "" {
+		return mcpVersionMetadataOutput{}, errors.New("external version identifier must not be empty")
+	}
+
+	return withMCPAccount(ctx, t.store, func(acc appstore.Account) (mcpVersionMetadataOutput, error) {
+		app, err := t.resolveApp(acc, input.mcpAppInput, platform, false)
+		if err != nil {
+			return mcpVersionMetadataOutput{}, err
+		}
+
+		out, err := t.store.GetVersionMetadata(appstore.GetVersionMetadataInput{
+			Context: ctx, Account: acc, App: app, VersionID: input.ExternalVersionID, Platform: platform,
+		})
+		if err != nil {
+			return mcpVersionMetadataOutput{}, err
+		}
+
+		return mcpVersionMetadataOutput{
+			mcpAppParameters: appParameters(app, platform), App: newMCPApp(app),
+			ExternalVersionID: input.ExternalVersionID, DisplayVersion: out.DisplayVersion,
+			ReleaseDate: out.ReleaseDate, Success: true,
 		}, nil
 	})
 }

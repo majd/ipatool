@@ -50,6 +50,7 @@ func newMCPServer(store appstore.AppStore) *mcp.Server {
 	addMCPTool(server, tools, "search_apps", "Search for apps on the App Store.", true, tools.search)
 	addMCPTool(server, tools, "download_app", "Download an app package to the local filesystem. Optionally acquire a free license if purchase is true.", false, tools.download)
 	addMCPTool(server, tools, "list_app_versions", "List available external version identifiers for an app.", true, tools.listVersions)
+	addMCPTool(server, tools, "get_version_metadata", "Retrieve the display version and release date for a specific external version identifier of an app.", true, tools.getVersionMetadata)
 	addMCPTool(server, tools, "list_purchases", "List apps owned by the authenticated account, with pagination.", true, tools.listPurchases)
 	addMCPTool(server, tools, "purchase_app", "Obtain a license for a free app. Paid apps are not supported.", false, tools.purchase)
 
