@@ -58,7 +58,7 @@ var _ = Describe("MCP server", func() {
 		Expect(command.Args(command, []string{"unexpected"})).NotTo(Succeed())
 	})
 
-	It("advertises exactly five tools and their schemas without auth functions", func() {
+	It("advertises exactly six tools and their schemas without auth functions", func() {
 		result, err := session.ListTools(ctx, nil)
 		Expect(err).NotTo(HaveOccurred())
 		names := make([]string, 0, len(result.Tools))
@@ -68,7 +68,7 @@ var _ = Describe("MCP server", func() {
 			Expect(tool.OutputSchema).NotTo(BeNil())
 			Expect(tool.Annotations.ReadOnlyHint).To(Equal(tool.Name != "download_app" && tool.Name != "purchase_app"))
 		}
-		Expect(names).To(ConsistOf("search_apps", "download_app", "list_app_versions", "list_purchases", "purchase_app"))
+		Expect(names).To(ConsistOf("search_apps", "download_app", "list_app_versions", "get_version_metadata", "list_purchases", "purchase_app"))
 	})
 
 	It("searches with CLI defaults and returns structured app data without credentials", func() {
@@ -125,6 +125,12 @@ var _ = Describe("MCP server", func() {
 		Entry("missing download app", "download_app", map[string]any{}),
 		Entry("negative app ID", "purchase_app", map[string]any{"app_id": -1}),
 		Entry("missing versions app", "list_app_versions", map[string]any{}),
+		Entry("missing metadata app", "get_version_metadata", map[string]any{"external_version_id": "200"}),
+		Entry("missing metadata version", "get_version_metadata", map[string]any{"app_id": 123}),
+		Entry("empty metadata version", "get_version_metadata", map[string]any{"app_id": 123, "external_version_id": ""}),
+		Entry("blank metadata version", "get_version_metadata", map[string]any{"app_id": 123, "external_version_id": "  "}),
+		Entry("invalid metadata version type", "get_version_metadata", map[string]any{"app_id": 123, "external_version_id": 200}),
+		Entry("invalid metadata platform", "get_version_metadata", map[string]any{"app_id": 123, "external_version_id": "200", "platform": "unknown"}),
 		Entry("invalid page", "list_purchases", map[string]any{"page": 0}),
 		Entry("invalid page size", "list_purchases", map[string]any{"max_results": 101}),
 	)
@@ -183,6 +189,109 @@ var _ = Describe("MCP server", func() {
 		Expect(result.StructuredContent).To(HaveKeyWithValue("app_id", float64(app.ID)))
 		Expect(result.StructuredContent).To(HaveKeyWithValue("bundle_identifier", app.BundleID))
 		Expect(result.StructuredContent).To(HaveKeyWithValue("platform", "ipad"))
+	})
+
+	It("resolves a bundle identifier and returns metadata for the requested version", func() {
+		var lookup appstore.LookupInput
+		var input appstore.GetVersionMetadataInput
+
+		app.Version = "2.0"
+		releasedAt := time.Date(2025, time.January, 2, 3, 4, 5, 0, time.UTC)
+		store.lookup = func(in appstore.LookupInput) (appstore.LookupOutput, error) {
+			lookup = in
+
+			return appstore.LookupOutput{App: app}, nil
+		}
+		store.getVersionMetadata = func(in appstore.GetVersionMetadataInput) (appstore.GetVersionMetadataOutput, error) {
+			input = in
+
+			return appstore.GetVersionMetadataOutput{DisplayVersion: "1.2.3", ReleaseDate: releasedAt}, nil
+		}
+		result := call("get_version_metadata", map[string]any{"app_id": 999, "bundle_identifier": app.BundleID, "external_version_id": "200", "platform": "ipados"})
+		Expect(result.IsError).To(BeFalse())
+		Expect(lookup).To(Equal(appstore.LookupInput{Account: account, BundleID: app.BundleID, Platform: appstore.PlatformIPad}))
+		Expect(input.Context).NotTo(BeNil())
+		Expect(input.Account).To(Equal(account))
+		Expect(input.App).To(Equal(app))
+		Expect(input.VersionID).To(Equal("200"))
+		Expect(input.Platform).To(Equal(appstore.PlatformIPad))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("app_id", float64(app.ID)))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("bundle_identifier", app.BundleID))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("platform", "ipad"))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("external_version_id", "200"))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("displayVersion", "1.2.3"))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("releaseDate", releasedAt.Format(time.RFC3339)))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("success", true))
+		Expect(result.StructuredContent.(map[string]any)["app"]).To(HaveKeyWithValue("version", "2.0"))
+		data, err := json.Marshal(result.StructuredContent)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(data)).NotTo(ContainSubstring("private-"))
+		Expect(result.Content[0].(*mcp.TextContent).Text).To(MatchJSON(string(data)))
+	})
+
+	DescribeTable("retrieves version metadata by app ID when catalog metadata is unavailable", func(platform string, expected appstore.Platform) {
+		var input appstore.GetVersionMetadataInput
+
+		store.getVersionMetadata = func(in appstore.GetVersionMetadataInput) (appstore.GetVersionMetadataOutput, error) {
+			input = in
+
+			return appstore.GetVersionMetadataOutput{DisplayVersion: "1.2.3"}, nil
+		}
+		result := call("get_version_metadata", map[string]any{"app_id": 123, "external_version_id": "200", "platform": platform})
+		Expect(result.IsError).To(BeFalse())
+		Expect(input.App).To(Equal(appstore.App{ID: 123}))
+		Expect(input.VersionID).To(Equal("200"))
+		Expect(input.Platform).To(Equal(expected))
+	},
+		Entry("CLI default", "", appstore.Platform("")),
+		Entry("iOS alias", "ios", appstore.PlatformIPhone),
+		Entry("macOS", "macos", appstore.PlatformMacOS),
+	)
+
+	It("returns bundle lookup failures as metadata tool errors", func() {
+		result := call("get_version_metadata", map[string]any{"bundle_identifier": app.BundleID, "external_version_id": "200"})
+		Expect(result.IsError).To(BeTrue())
+		Expect(result.Content[0].(*mcp.TextContent).Text).To(ContainSubstring(appstore.ErrAppNotFound.Error()))
+	})
+
+	DescribeTable("returns metadata failures as tool errors without acquiring a license", func(metadataErr error) {
+		store.getVersionMetadata = func(appstore.GetVersionMetadataInput) (appstore.GetVersionMetadataOutput, error) {
+			return appstore.GetVersionMetadataOutput{}, appstore.NewErrorWithMetadata(metadataErr, account)
+		}
+		result := call("get_version_metadata", map[string]any{"app_id": 123, "external_version_id": "200"})
+		Expect(result.IsError).To(BeTrue())
+		Expect(result.Content[0].(*mcp.TextContent).Text).To(ContainSubstring(metadataErr.Error()))
+		data, err := json.Marshal(result)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(string(data)).NotTo(ContainSubstring("private-"))
+	},
+		Entry("missing license", appstore.ErrLicenseRequired),
+		Entry("metadata unavailable", errors.New("metadata unavailable")),
+	)
+
+	It("refreshes an expired session when retrieving version metadata", func() {
+		var login appstore.LoginInput
+		var accounts []appstore.Account
+
+		refreshed := appstore.Account{PasswordToken: "refreshed-private-token"}
+		store.getVersionMetadata = func(in appstore.GetVersionMetadataInput) (appstore.GetVersionMetadataOutput, error) {
+			accounts = append(accounts, in.Account)
+			if len(accounts) == 1 {
+				return appstore.GetVersionMetadataOutput{}, appstore.ErrPasswordTokenExpired
+			}
+
+			return appstore.GetVersionMetadataOutput{DisplayVersion: "1.2.3"}, nil
+		}
+		store.login = func(in appstore.LoginInput) (appstore.LoginOutput, error) {
+			login = in
+
+			return appstore.LoginOutput{Account: refreshed}, nil
+		}
+		result := call("get_version_metadata", map[string]any{"app_id": 123, "external_version_id": "200"})
+		Expect(result.IsError).To(BeFalse())
+		Expect(login).To(Equal(appstore.LoginInput{Email: account.Email, Password: account.Password}))
+		Expect(accounts).To(Equal([]appstore.Account{account, refreshed}))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("displayVersion", "1.2.3"))
 	})
 
 	DescribeTable("purchases a free license", func(purchaseErr error, alreadyOwned bool) {
@@ -343,6 +452,9 @@ var _ = Describe("MCP server", func() {
 		store.listVersions = func(appstore.ListVersionsInput) (appstore.ListVersionsOutput, error) {
 			return appstore.ListVersionsOutput{ExternalVersionIdentifiers: []string{"200"}}, nil
 		}
+		store.getVersionMetadata = func(appstore.GetVersionMetadataInput) (appstore.GetVersionMetadataOutput, error) {
+			return appstore.GetVersionMetadataOutput{}, nil
+		}
 		store.purchase = func(appstore.PurchaseInput) error { return nil }
 		store.download = func(appstore.DownloadInput) (appstore.DownloadOutput, error) {
 			return appstore.DownloadOutput{DestinationPath: "/tmp/example.ipa"}, nil
@@ -370,6 +482,7 @@ var _ = Describe("MCP server", func() {
 		Entry("search", "search_apps", map[string]any{"term": "example"}, []string{"term", "limit", "platform", "count", "apps"}),
 		Entry("purchases", "list_purchases", map[string]any{}, []string{"page", "max_results", "platform", "count", "totalCount", "apps"}),
 		Entry("versions", "list_app_versions", map[string]any{"app_id": 123}, []string{"app_id", "bundle_identifier", "platform", "bundleID", "app", "externalVersionIdentifiers", "latestExternalVersionID", "success"}),
+		Entry("version metadata", "get_version_metadata", map[string]any{"app_id": 123, "external_version_id": "200"}, []string{"app_id", "bundle_identifier", "platform", "app", "external_version_id", "displayVersion", "releaseDate", "success"}),
 		Entry("purchase", "purchase_app", map[string]any{"app_id": 123}, []string{"app_id", "bundle_identifier", "platform", "app", "alreadyOwned", "success"}),
 		Entry("download", "download_app", map[string]any{"app_id": 123}, []string{"app_id", "bundle_identifier", "platform", "app", "output", "external_version_id", "purchase", "purchased", "success"}),
 	)
@@ -434,15 +547,16 @@ var _ = Describe("MCP server", func() {
 
 type fakeMCPAppStore struct {
 	appstore.AppStore
-	accountInfo   func() (appstore.AccountInfoOutput, error)
-	search        func(appstore.SearchInput) (appstore.SearchOutput, error)
-	lookup        func(appstore.LookupInput) (appstore.LookupOutput, error)
-	ownedApps     func(appstore.OwnedAppsInput) (appstore.OwnedAppsOutput, error)
-	listVersions  func(appstore.ListVersionsInput) (appstore.ListVersionsOutput, error)
-	purchase      func(appstore.PurchaseInput) error
-	download      func(appstore.DownloadInput) (appstore.DownloadOutput, error)
-	replicateSinf func(appstore.ReplicateSinfInput) error
-	login         func(appstore.LoginInput) (appstore.LoginOutput, error)
+	accountInfo        func() (appstore.AccountInfoOutput, error)
+	search             func(appstore.SearchInput) (appstore.SearchOutput, error)
+	lookup             func(appstore.LookupInput) (appstore.LookupOutput, error)
+	ownedApps          func(appstore.OwnedAppsInput) (appstore.OwnedAppsOutput, error)
+	listVersions       func(appstore.ListVersionsInput) (appstore.ListVersionsOutput, error)
+	getVersionMetadata func(appstore.GetVersionMetadataInput) (appstore.GetVersionMetadataOutput, error)
+	purchase           func(appstore.PurchaseInput) error
+	download           func(appstore.DownloadInput) (appstore.DownloadOutput, error)
+	replicateSinf      func(appstore.ReplicateSinfInput) error
+	login              func(appstore.LoginInput) (appstore.LoginOutput, error)
 }
 
 func (s *fakeMCPAppStore) AccountInfo() (appstore.AccountInfoOutput, error) {
@@ -463,6 +577,10 @@ func (s *fakeMCPAppStore) OwnedApps(input appstore.OwnedAppsInput) (appstore.Own
 
 func (s *fakeMCPAppStore) ListVersions(input appstore.ListVersionsInput) (appstore.ListVersionsOutput, error) {
 	return s.listVersions(input)
+}
+
+func (s *fakeMCPAppStore) GetVersionMetadata(input appstore.GetVersionMetadataInput) (appstore.GetVersionMetadataOutput, error) {
+	return s.getVersionMetadata(input)
 }
 
 func (s *fakeMCPAppStore) Purchase(input appstore.PurchaseInput) error {
