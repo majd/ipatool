@@ -367,7 +367,7 @@ var _ = Describe("AppStore (Download Product)", func() {
 
 		It("does not send an unpinned request when the app is absent from the catalog", func() {
 			mockPlatformClient.EXPECT().Send(gomock.Any()).
-				Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK}, nil).Times(3)
+				Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK}, nil).Times(4)
 
 			_, _, err := store.sendDownloadProduct(context.Background(), account, app, testGUID, "", PlatformIPhone)
 			Expect(err).To(MatchError(ContainSubstring("platform version lookup returned no app")))
