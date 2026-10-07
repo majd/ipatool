@@ -64,7 +64,12 @@ var _ = Describe("Platform version catalog fallback", func() {
 	)
 
 	DescribeTable("reports exhausted catalogs", func(empty platformVersionLookupResult, message string) {
-		gomock.InOrder(expectLookup("enterprisestore", 200, empty, nil), expectLookup("iphone", 200, empty, nil), expectLookup("ipad", 200, empty, nil))
+		gomock.InOrder(
+			expectLookup("enterprisestore", 200, empty, nil),
+			expectLookup("iphone", 200, empty, nil),
+			expectLookup("ipad", 200, empty, nil),
+			client.EXPECT().Send(gomock.Any()).Return(http.Result[platformVersionLookupResult]{StatusCode: 200}, nil),
+		)
 		version, err := store.lookupLatestExternalVersionID(account, app, PlatformIPhone)
 		Expect(version).To(BeEmpty())
 		Expect(err).To(MatchError(And(ContainSubstring(message), ContainSubstring("6472431552"), ContainSubstring("RU"), ContainSubstring("enterprisestore, iphone, ipad"))))

@@ -19,6 +19,7 @@ var (
 
 type platformVersionLookupResult struct {
 	Results map[string]platformVersionLookupItem `json:"results,omitempty"`
+	Data    []catalogVersionLookupItem           `json:"data,omitempty"`
 }
 
 type platformVersionLookupItem struct {
@@ -129,6 +130,17 @@ func (t *appstore) lookupLatestExternalVersionID(acc Account, app App, platform 
 		}
 
 		return externalVersionID, nil
+	}
+
+	if platform == PlatformIPhone || platform == PlatformIPad {
+		// Apple Arcade apps can be absent from every MDM catalog. The App
+		// Store's catalog API still exposes their current iOS version.
+		version, err := t.lookupLatestIOSExternalVersionID(app, countryCode, platform)
+		if err == nil {
+			return version, nil
+		}
+
+		lastErr = fmt.Errorf("%w; iOS catalog fallback failed: %w", lastErr, err)
 	}
 
 	return "", fmt.Errorf("app %d in storefront %s (catalogs: %s): %w", app.ID, countryCode, strings.Join(catalogs, ", "), lastErr)
