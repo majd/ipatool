@@ -50,6 +50,7 @@ Available Commands:
   help                 Help about any command
   list-purchases       List apps owned by the authenticated App Store account
   list-versions        List the available versions of an App Store app
+  mcp                  Serve App Store tools over MCP using stdio
   purchase             Obtain a license for the app from the App Store
   search               Search for iOS, iPadOS, tvOS, watchOS, visionOS, and macOS apps available on the App Store
 
@@ -66,6 +67,21 @@ Use "ipatool [command] --help" for more information about a command.
 
 **Note:** the tool runs in interactive mode by default. Use the `--non-interactive` flag
 if running in an automated environment.
+
+### MCP tools
+
+Run `ipatool auth login` in a terminal, then configure your MCP client to launch the stdio server:
+
+```json
+{
+  "mcpServers": {
+    "ipatool": {
+      "command": "ipatool",
+      "args": ["mcp"]
+    }
+  }
+}
+```
 
 ## Compiling
 
