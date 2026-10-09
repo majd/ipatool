@@ -118,6 +118,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 		Entry("explicit historical version", testVersionID, PlatformIPhone),
 		Entry("explicit macOS version", testVersionID, PlatformMacOS),
 		Entry("explicit tvOS version", testVersionID, PlatformAppleTV),
+		Entry("explicit watchOS version", testVersionID, PlatformWatchOS),
 		Entry("explicit version without a platform", testVersionID, Platform("")),
 	)
 

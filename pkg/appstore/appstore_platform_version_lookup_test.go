@@ -61,6 +61,8 @@ var _ = Describe("Platform version catalog fallback", func() {
 		Entry("empty offers until iPad", PlatformIPad, noOffers, 2, valid),
 		Entry("iPad request uses iPhone fallback first", PlatformIPad, missing, 1, valid),
 		Entry("consumer buy params version", PlatformIPhone, missing, 1, withOffer(platformVersionLookupOffer{BuyParams: "appExtVrsId=891116578"})),
+		Entry("watchOS shares the enterprise catalog", PlatformWatchOS, missing, 0, valid),
+		Entry("watchOS falls back to the consumer catalog", PlatformWatchOS, missing, 1, valid),
 	)
 
 	DescribeTable("reports exhausted catalogs", func(empty platformVersionLookupResult, message string) {

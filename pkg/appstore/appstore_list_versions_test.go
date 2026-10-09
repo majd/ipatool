@@ -70,6 +70,28 @@ var _ = Describe("AppStore (ListVersions)", func() {
 		Expect(err).To(MatchError(ContainSubstring("failed to resolve platform version")))
 	})
 
+	It("pins the watchOS version before requesting version history", func() {
+		mockMachine.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
+		gomock.InOrder(
+			mockPlatformClient.EXPECT().Send(gomock.Any()).Return(http.Result[platformVersionLookupResult]{
+				StatusCode: gohttp.StatusOK,
+				Data: platformVersionLookupResult{Results: map[string]platformVersionLookupItem{
+					"42": {Offers: []platformVersionLookupOffer{{Version: platformVersionLookupVersion{ExternalID: "123456"}}}},
+				}},
+			}, nil),
+			mockDownloadClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+				Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("externalVersionId", "123456"))
+			}).Return(http.Result[downloadResult]{StatusCode: gohttp.StatusOK, Data: downloadResult{Items: []downloadItemResult{{Metadata: map[string]interface{}{
+				"softwareVersionExternalIdentifiers": []interface{}{uint64(123455), uint64(123456)},
+				"softwareVersionExternalIdentifier":  uint64(123456),
+			}}}}}, nil),
+		)
+		out, err := as.ListVersions(ListVersionsInput{Account: Account{StoreFront: "143441"}, App: App{ID: 42}, Platform: PlatformWatchOS})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(out.ExternalVersionIdentifiers).To(Equal([]string{"123455", "123456"}))
+		Expect(out.LatestExternalVersionID).To(Equal("123456"))
+	})
+
 	It("rejects unsupported platforms before making requests", func() {
 		_, err := as.ListVersions(ListVersionsInput{Platform: PlatformUnknown})
 		Expect(err).To(MatchError(`invalid platform "unknown"`))

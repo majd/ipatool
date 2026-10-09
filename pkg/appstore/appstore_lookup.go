@@ -5,6 +5,7 @@ import (
 	"fmt"
 	gohttp "net/http"
 	"net/url"
+	"slices"
 	"strconv"
 
 	"github.com/majd/ipatool/v2/pkg/http"
@@ -50,6 +51,10 @@ func (t *appstore) Lookup(input LookupInput) (LookupOutput, error) {
 	}
 
 	if len(res.Data.Results) == 0 {
+		return LookupOutput{}, ErrAppNotFound
+	}
+
+	if input.Platform == PlatformWatchOS && !slices.Contains(res.Data.Results[0].Platforms, PlatformWatchOS) {
 		return LookupOutput{}, ErrAppNotFound
 	}
 

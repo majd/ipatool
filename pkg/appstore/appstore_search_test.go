@@ -47,12 +47,35 @@ var _ = Describe("AppStore (Search)", func() {
 		Entry("iPad only", `"supportedDevices":["iPadAir-iPadAir"]`, []Platform{PlatformIPad}),
 		Entry("iPod", `"supportedDevices":["iPodTouchSixthGen-iPodTouchSixthGen"]`, []Platform{PlatformIPhone}),
 		Entry("TV", `"supportedDevices":["AppleTV4-AppleTV4"]`, []Platform{PlatformAppleTV}),
+		Entry("Watch", `"supportedDevices":["Watch4-Watch4","Watch5-Watch5"]`, []Platform{PlatformWatchOS}),
+		Entry("iPhone with Watch", `"supportedDevices":["Watch4-Watch4","iPhone6-iPhone6"]`, []Platform{PlatformIPhone, PlatformWatchOS}),
 		Entry("vision", `"supportedDevices":["RealityDevice-RealityDevice"]`, []Platform{PlatformVisionOS}),
 		Entry("Mac", `"kind":"mac-software"`, []Platform{PlatformMacOS}),
 		Entry("multiple families", `"supportedDevices":["MacDesktop-MacDesktop","RealityDevice-RealityDevice","iPadAir-iPadAir"]`, []Platform{PlatformIPad, PlatformVisionOS, PlatformMacOS}),
 		Entry("missing metadata", `"kind":"software"`, []Platform{PlatformUnknown}),
 		Entry("unrecognized devices", `"supportedDevices":["FutureDevice"]`, []Platform{PlatformUnknown}),
 	)
+
+	It("filters watchOS searches to apps supporting Apple Watch", func() {
+		mockClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+			parsedURL, err := url.Parse(req.URL)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(parsedURL.Query().Get("entity")).To(Equal("software,watchSoftware"))
+		}).Return(http.Result[searchResult]{StatusCode: 200, Data: searchResult{
+			Count: 3,
+			Results: []App{
+				{ID: 1, Platforms: []Platform{PlatformIPhone}},
+				{ID: 2, Platforms: []Platform{PlatformWatchOS}},
+				{ID: 3, Platforms: []Platform{PlatformIPhone, PlatformWatchOS}},
+			},
+		}}, nil)
+		out, err := as.Search(SearchInput{Account: Account{StoreFront: "143441"}, Platform: PlatformWatchOS})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(out.Count).To(Equal(2))
+		Expect(out.Results).To(HaveLen(2))
+		Expect(out.Results[0].ID).To(Equal(int64(2)))
+		Expect(out.Results[1].ID).To(Equal(int64(3)))
+	})
 
 	When("request is successful", func() {
 		const (

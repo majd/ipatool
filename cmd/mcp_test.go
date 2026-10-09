@@ -92,7 +92,7 @@ var _ = Describe("MCP server", func() {
 		Expect(result.StructuredContent).To(HaveKeyWithValue("platform", ""))
 	})
 
-	It("passes search platform aliases and limits to the App Store", func() {
+	DescribeTable("passes search platform aliases and limits to the App Store", func(value string, platform appstore.Platform) {
 		var input appstore.SearchInput
 
 		store.search = func(in appstore.SearchInput) (appstore.SearchOutput, error) {
@@ -100,10 +100,13 @@ var _ = Describe("MCP server", func() {
 
 			return appstore.SearchOutput{}, nil
 		}
-		Expect(call("search_apps", map[string]any{"term": "example", "platform": "tvos", "limit": 7}).IsError).To(BeFalse())
-		Expect(input.Platform).To(Equal(appstore.PlatformAppleTV))
+		Expect(call("search_apps", map[string]any{"term": "example", "platform": value, "limit": 7}).IsError).To(BeFalse())
+		Expect(input.Platform).To(Equal(platform))
 		Expect(input.Limit).To(Equal(int64(7)))
-	})
+	},
+		Entry("tvOS", "tvos", appstore.PlatformAppleTV),
+		Entry("watchOS", "watch", appstore.PlatformWatchOS),
+	)
 
 	DescribeTable("rejects invalid inputs before accessing the account", func(name string, args map[string]any) {
 		accountCalls := 0

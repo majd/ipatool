@@ -228,6 +228,7 @@ var _ = Describe("AppStore (preferred kbsync download)", func() {
 		},
 		Entry("iPhone", PlatformIPhone), Entry("iPad", PlatformIPad), Entry("macOS", PlatformMacOS),
 		Entry("tvOS", PlatformAppleTV), Entry("visionOS", PlatformVisionOS),
+		Entry("watchOS", PlatformWatchOS),
 	)
 
 	It("pins the iOS offer before trying ent/download", func() {

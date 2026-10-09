@@ -28,7 +28,7 @@ func (t *appstore) GetVersionMetadata(input GetVersionMetadataInput) (GetVersion
 	}
 
 	switch platform {
-	case PlatformIPhone, PlatformIPad, PlatformAppleTV, PlatformVisionOS, PlatformMacOS:
+	case PlatformIPhone, PlatformIPad, PlatformAppleTV, PlatformWatchOS, PlatformVisionOS, PlatformMacOS:
 	default:
 		return GetVersionMetadataOutput{}, fmt.Errorf("invalid platform %q", platform)
 	}

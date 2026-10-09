@@ -101,7 +101,7 @@ func getVersionMetadataCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target app (overrides the app ID)")
 	cmd.Flags().StringVar(&externalVersionID, "external-version-id", "", "External version identifier of the target app (required)")
 
-	cmd.Flags().StringVar(&platformValue, "platform", "", "Platform to retrieve metadata for: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos")
+	cmd.Flags().StringVar(&platformValue, "platform", "", "Platform to retrieve metadata for: iphone (iOS), ipad (iPadOS), appletv (tvOS), watchos, visionos, or macos")
 
 	_ = cmd.MarkFlagRequired("external-version-id")
 

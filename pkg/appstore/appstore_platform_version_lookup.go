@@ -82,7 +82,7 @@ func (t *appstore) lookupLatestExternalVersionID(acc Account, app App, platform 
 	}
 
 	catalogs := []string{metadataPlatform}
-	if platform == PlatformIPhone || platform == PlatformIPad {
+	if platform == PlatformIPhone || platform == PlatformIPad || platform == PlatformWatchOS {
 		// Some storefronts have no enterprise listing even when the consumer
 		// catalogs contain the app. Keep the account's country for each lookup.
 		catalogs = append(catalogs, "iphone", "ipad")

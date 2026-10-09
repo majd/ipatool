@@ -130,25 +130,28 @@ var _ = Describe("Download command", func() {
 		Expect(err).To(MatchError("replication failed"))
 	})
 
-	It("propagates macOS when automatic purchase retries the download", func() {
+	DescribeTable("preserves the platform when automatic purchase retries the download", func(platform appstore.Platform) {
 		store := &fakeDownloadAppStore{downloadErrors: []error{appstore.ErrLicenseRequired, nil}}
 		previousDependencies := dependencies
 		DeferCleanup(func() { dependencies = previousDependencies })
 		dependencies.Logger = log.NewLogger(log.Args{})
 
 		cmd := downloadCmdWithAppStore(func() appstore.AppStore { return store })
-		cmd.SetArgs([]string{"--app-id", "42", "--platform", "macos", "--purchase"})
+		cmd.SetArgs([]string{"--app-id", "42", "--platform", string(platform), "--purchase"})
 		cmd.SetContext(context.WithValue(context.Background(), interactiveKey, false))
 
 		Expect(cmd.Execute()).To(Succeed())
 		Expect(store.accountInfoCalls).To(Equal(1))
 		Expect(store.purchaseInputs).To(HaveLen(1))
-		Expect(store.purchaseInputs[0].Platform).To(Equal(appstore.PlatformMacOS))
+		Expect(store.purchaseInputs[0].Platform).To(Equal(platform))
 		Expect(store.purchaseInputs[0].App).To(Equal(appstore.App{ID: 42}))
 		Expect(store.downloadInputs).To(HaveLen(2))
-		Expect(store.downloadInputs[0].Platform).To(Equal(appstore.PlatformMacOS))
-		Expect(store.downloadInputs[1].Platform).To(Equal(appstore.PlatformMacOS))
-	})
+		Expect(store.downloadInputs[0].Platform).To(Equal(platform))
+		Expect(store.downloadInputs[1].Platform).To(Equal(platform))
+	},
+		Entry("macOS", appstore.PlatformMacOS),
+		Entry("watchOS", appstore.PlatformWatchOS),
+	)
 
 	It("retains the pending automatic purchase after refreshing authentication", func() {
 		store := &fakeDownloadAppStore{
