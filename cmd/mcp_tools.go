@@ -13,7 +13,7 @@ import (
 type mcpSearchInput struct {
 	Term     string `json:"term" jsonschema:"Search term"`
 	Limit    *int64 `json:"limit,omitempty" jsonschema:"Maximum results; defaults to 5. visionOS supports up to 12."`
-	Platform string `json:"platform,omitempty" jsonschema:"iphone (ios), ipad (ipados), appletv (tvos), visionos, or macos; defaults to iOS and iPadOS"`
+	Platform string `json:"platform,omitempty" jsonschema:"iphone (ios), ipad (ipados), appletv (tvos), watchos, visionos, or macos; defaults to iOS and iPadOS"`
 }
 
 type mcpSearchOutput struct {
@@ -27,7 +27,7 @@ type mcpSearchOutput struct {
 type mcpAppInput struct {
 	AppID    int64  `json:"app_id,omitempty" jsonschema:"Numeric app ID; required unless bundle_identifier is provided"`
 	BundleID string `json:"bundle_identifier,omitempty" jsonschema:"Bundle identifier; overrides app_id when found"`
-	Platform string `json:"platform,omitempty" jsonschema:"iphone (ios), ipad (ipados), appletv (tvos), visionos, or macos; uses the CLI default when omitted"`
+	Platform string `json:"platform,omitempty" jsonschema:"iphone (ios), ipad (ipados), appletv (tvos), watchos, visionos, or macos; uses the CLI default when omitted"`
 }
 
 type mcpDownloadInput struct {

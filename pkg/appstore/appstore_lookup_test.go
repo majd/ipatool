@@ -159,6 +159,28 @@ var _ = Describe("AppStore (Lookup)", func() {
 		})
 	})
 
+	DescribeTable("checks watchOS support in lookup results", func(platforms []Platform, found bool) {
+		mockClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+			parsedURL, err := url.Parse(req.URL)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(parsedURL.Query().Get("entity")).To(Equal("watchSoftware"))
+		}).Return(http.Result[searchResult]{StatusCode: 200, Data: searchResult{
+			Count: 1, Results: []App{{ID: 42, Platforms: platforms}},
+		}}, nil)
+		out, err := as.Lookup(LookupInput{Account: Account{StoreFront: "143441"}, AppID: 42, Platform: PlatformWatchOS})
+		if found {
+			Expect(err).ToNot(HaveOccurred())
+			Expect(out.App.ID).To(Equal(int64(42)))
+		} else {
+			Expect(err).To(MatchError(ErrAppNotFound))
+		}
+	},
+		Entry("Watch app", []Platform{PlatformWatchOS}, true),
+		Entry("iPhone app with Watch support", []Platform{PlatformIPhone, PlatformWatchOS}, true),
+		Entry("iPhone only", []Platform{PlatformIPhone}, false),
+		Entry("unknown platforms", []Platform{PlatformUnknown}, false),
+	)
+
 	When("store front is invalid", func() {
 		It("returns error", func() {
 			_, err := as.Lookup(LookupInput{

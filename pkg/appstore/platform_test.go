@@ -19,6 +19,10 @@ var _ = Describe("Platform", func() {
 		Entry("iPadOS", "iPadOS", PlatformIPad),
 		Entry("AppleTV", "appletv", PlatformAppleTV),
 		Entry("tvOS", "tvos", PlatformAppleTV),
+		Entry("watchOS", "watchOS", PlatformWatchOS),
+		Entry("Watch", "watch", PlatformWatchOS),
+		Entry("Apple Watch", "applewatch", PlatformWatchOS),
+		Entry("Apple Watch hyphenated", "apple-watch", PlatformWatchOS),
 		Entry("visionOS", "visionOS", PlatformVisionOS),
 		Entry("Vision Pro", "visionpro", PlatformVisionOS),
 		Entry("xrOS", "xrOS", PlatformVisionOS),
@@ -38,6 +42,7 @@ var _ = Describe("Platform", func() {
 		Entry("iPhone", PlatformIPhone, "software"),
 		Entry("iPad", PlatformIPad, "iPadSoftware"),
 		Entry("Apple TV", PlatformAppleTV, "tvSoftware"),
+		Entry("watchOS", PlatformWatchOS, "watchSoftware"),
 		Entry("visionOS", PlatformVisionOS, "xrosSoftware"),
 		Entry("macOS", PlatformMacOS, "macSoftware"),
 	)
@@ -52,6 +57,7 @@ var _ = Describe("Platform", func() {
 		Entry("iPhone", PlatformIPhone, "software"),
 		Entry("iPad", PlatformIPad, "iPadSoftware"),
 		Entry("Apple TV", PlatformAppleTV, "software,tvSoftware"),
+		Entry("watchOS", PlatformWatchOS, "software,watchSoftware"),
 		Entry("visionOS", PlatformVisionOS, "xrosSoftware"),
 		Entry("macOS", PlatformMacOS, "macSoftware"),
 	)
@@ -65,16 +71,17 @@ var _ = Describe("Platform", func() {
 		Entry("iPhone", PlatformIPhone, "enterprisestore"),
 		Entry("iPad", PlatformIPad, "enterprisestore"),
 		Entry("Apple TV", PlatformAppleTV, "atv9"),
+		Entry("watchOS", PlatformWatchOS, "enterprisestore"),
 		Entry("visionOS", PlatformVisionOS, "realityDevice"),
 	)
 
 	It("returns an error for invalid platforms", func() {
-		_, err := ParsePlatform("watch")
+		_, err := ParsePlatform("unsupported")
 		Expect(err).To(HaveOccurred())
 	})
 
 	It("returns errors when an unknown platform is mapped", func() {
-		platform := Platform("watch")
+		platform := Platform("unsupported")
 
 		_, lookupErr := platform.lookupEntity()
 		_, searchErr := platform.searchEntity()

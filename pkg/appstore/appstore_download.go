@@ -52,7 +52,7 @@ func (t *appstore) Download(input DownloadInput) (DownloadOutput, error) {
 	}
 
 	externalVersionID := input.ExternalVersionID
-	if externalVersionID == "" && (input.Platform == PlatformAppleTV || input.Platform == PlatformVisionOS) {
+	if externalVersionID == "" && (input.Platform == PlatformAppleTV || input.Platform == PlatformWatchOS || input.Platform == PlatformVisionOS) {
 		externalVersionID, err = t.lookupLatestExternalVersionID(input.Account, input.App, input.Platform)
 		// Delisted tvOS apps may have no catalog offer but still be available
 		// for redownload. Validate the returned package's platform below.
@@ -159,6 +159,8 @@ func (*appstore) validatePackagePlatform(path string, platform Platform) error {
 		expectedPlatform = "iPhoneOS"
 	case PlatformAppleTV:
 		expectedPlatform = "AppleTVOS"
+	case PlatformWatchOS:
+		expectedPlatform = "WatchOS"
 	case PlatformVisionOS:
 		expectedPlatform = "XROS"
 	default:

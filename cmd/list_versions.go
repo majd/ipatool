@@ -92,7 +92,7 @@ func ListVersionsCmd() *cobra.Command {
 	cmd.Flags().Int64VarP(&appID, "app-id", "i", 0, "ID of the target app (required)")
 	cmd.Flags().StringVarP(&bundleID, "bundle-identifier", "b", "", "The bundle identifier of the target app (overrides the app ID)")
 
-	cmd.Flags().StringVar(&platformValue, "platform", "", "Platform to list versions for: iphone (iOS), ipad (iPadOS), appletv (tvOS), visionos, or macos")
+	cmd.Flags().StringVar(&platformValue, "platform", "", "Platform to list versions for: iphone (iOS), ipad (iPadOS), appletv (tvOS), watchos, visionos, or macos")
 
 	return cmd
 }

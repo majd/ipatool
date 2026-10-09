@@ -549,7 +549,7 @@ var _ = Describe("AppStore (GetVersionMetadata)", func() {
 			server.Close()
 		})
 
-		It("returns version metadata", func() {
+		DescribeTable("returns version metadata", func(platform Platform) {
 			output, err := as.GetVersionMetadata(GetVersionMetadataInput{
 				Account: Account{
 					DirectoryServicesID: "test-dsid",
@@ -558,6 +558,7 @@ var _ = Describe("AppStore (GetVersionMetadata)", func() {
 					ID: 1234567890,
 				},
 				VersionID: "test-version",
+				Platform:  platform,
 			})
 
 			Expect(err).NotTo(HaveOccurred())
@@ -565,6 +566,9 @@ var _ = Describe("AppStore (GetVersionMetadata)", func() {
 			Expect(output.ReleaseDate).To(Equal(releaseDate))
 			Expect(atomic.LoadInt64(wholeGetCount)).To(BeZero())
 			Expect(atomic.LoadInt64(servedBytes)).To(BeNumerically("<", int64(len(ipa)/2)))
-		})
+		},
+			Entry("default platform", Platform("")),
+			Entry("watchOS", PlatformWatchOS),
+		)
 	})
 })

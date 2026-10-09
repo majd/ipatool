@@ -49,6 +49,14 @@ func (t *appstore) Search(input SearchInput) (SearchOutput, error) {
 		return SearchOutput{}, NewErrorWithMetadata(errors.New("request failed"), res)
 	}
 
+	if input.Platform == PlatformWatchOS {
+		// Watch apps share the software search catalog with iOS apps.
+		res.Data.Results = slices.DeleteFunc(res.Data.Results, func(app App) bool {
+			return !slices.Contains(app.Platforms, PlatformWatchOS)
+		})
+		res.Data.Count = len(res.Data.Results)
+	}
+
 	return SearchOutput{
 		Count:   res.Data.Count,
 		Results: res.Data.Results,
@@ -164,6 +172,7 @@ func (r *searchResult) UnmarshalJSON(data []byte) error {
 			{"iPod", PlatformIPhone},
 			{"iPad", PlatformIPad},
 			{"AppleTV", PlatformAppleTV},
+			{"Watch", PlatformWatchOS},
 			{"RealityDevice", PlatformVisionOS},
 			{"Mac", PlatformMacOS},
 		} {

@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <code>ipatool</code> is a command line tool that allows you to search for iOS, iPadOS, tvOS, visionOS, and macOS apps on the <a href="https://apps.apple.com">App Store</a>, and download <code>.ipa</code> or macOS <code>.pkg</code> app packages.
+  <code>ipatool</code> is a command line tool that allows you to search for iOS, iPadOS, tvOS, watchOS, visionOS, and macOS apps on the <a href="https://apps.apple.com">App Store</a>, and download <code>.ipa</code> or macOS <code>.pkg</code> app packages.
 </p>
 
 <p align="center">
@@ -45,13 +45,13 @@ Usage:
 Available Commands:
   auth                 Authenticate with the App Store
   completion           Generate the autocompletion script for the specified shell
-  download             Download iOS, iPadOS, tvOS, visionOS, and macOS app packages from the App Store
+  download             Download iOS, iPadOS, tvOS, watchOS, visionOS, and macOS app packages from the App Store
   get-version-metadata Retrieves the metadata for a specific version of an app
   help                 Help about any command
   list-purchases       List apps owned by the authenticated App Store account
   list-versions        List the available versions of an App Store app
   purchase             Obtain a license for the app from the App Store
-  search               Search for iOS, iPadOS, tvOS, visionOS, and macOS apps available on the App Store
+  search               Search for iOS, iPadOS, tvOS, watchOS, visionOS, and macOS apps available on the App Store
 
 Flags:
       --format format                sets output format for command; can be 'text', 'json' (default text)

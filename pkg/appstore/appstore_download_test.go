@@ -196,6 +196,29 @@ var _ = Describe("AppStore (Download)", func() {
 		})
 	})
 
+	It("pins the latest watchOS version before downloading", func() {
+		mockMachine.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
+		gomock.InOrder(
+			mockPlatformClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+				parsedURL, err := url.Parse(req.URL)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(parsedURL.Query().Get("platform")).To(Equal("enterprisestore"))
+				Expect(parsedURL.Query().Get("id")).To(Equal("6764448634"))
+			}).Return(http.Result[platformVersionLookupResult]{StatusCode: 200, Data: platformVersionLookupResult{
+				Results: map[string]platformVersionLookupItem{"6764448634": {Offers: []platformVersionLookupOffer{
+					{Version: platformVersionLookupVersion{ExternalID: "885050618"}},
+				}}},
+			}}, nil),
+			mockDownloadClient.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+				Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("externalVersionId", "885050618"))
+			}).Return(http.Result[downloadResult]{Data: downloadResult{FailureType: FailureTypeLicenseNotFound}}, nil),
+		)
+		_, err := as.Download(DownloadInput{
+			Account: Account{StoreFront: "143441"}, App: App{ID: 6764448634}, Platform: PlatformWatchOS,
+		})
+		Expect(err).To(MatchError(ErrLicenseRequired))
+	})
+
 	When("platform is visionOS", func() {
 		It("resolves and sends the visionOS external version id", func() {
 			mockMachine.EXPECT().
@@ -831,6 +854,13 @@ var _ = Describe("AppStore (Download)", func() {
 		Entry("tvOS update accepts tvOS", PlatformAppleTV, "818970197", "update", "AppleTVOS", true),
 		Entry("tvOS update rejects iOS", PlatformAppleTV, "818970197", "update", "iPhoneOS", false),
 		Entry("tvOS update rejects visionOS", PlatformAppleTV, "818970197", "update", "XROS", false),
+		Entry("watchOS accepts WatchOS", PlatformWatchOS, "818970197", "", "WatchOS", true),
+		Entry("watchOS rejects iOS", PlatformWatchOS, "818970197", "", "iPhoneOS", false),
+		Entry("watchOS rejects tvOS", PlatformWatchOS, "818970197", "", "AppleTVOS", false),
+		Entry("watchOS redownload preserves the platform", PlatformWatchOS, "818970197", "redownload", "WatchOS", true),
+		Entry("watchOS update accepts WatchOS", PlatformWatchOS, "818970197", "update", "WatchOS", true),
+		Entry("watchOS update rejects iOS", PlatformWatchOS, "818970197", "update", "iPhoneOS", false),
+		Entry("iPhone still rejects WatchOS", PlatformIPhone, "", "", "WatchOS", false),
 	)
 
 	Describe("macOS packages", func() {
@@ -1141,6 +1171,17 @@ var _ = Describe("AppStore (Download)", func() {
 			err := (&appstore{}).validatePackagePlatform(path, PlatformAppleTV)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("AppleTVOS"))
+		})
+
+		It("does not accept watchOS support declared only by an embedded app", func() {
+			path := writePackageWithInfoPlists(map[string][]string{
+				"Payload/Test.app/Info.plist":                 {"iPhoneOS"},
+				"Payload/Test.app/Watch/Watch.app/Info.plist": {"WatchOS"},
+			})
+			defer os.Remove(path)
+
+			err := (&appstore{}).validatePackagePlatform(path, PlatformWatchOS)
+			Expect(err).To(MatchError("downloaded package does not declare WatchOS support"))
 		})
 
 		It("accepts XROS packages", func() {
