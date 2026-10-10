@@ -18,8 +18,6 @@ const sapGuestTimeout = time.Minute
 const (
 	returnAddress = uint64(0x0000000100000000)
 	coreFPBase    = uint64(0x0000100000000000)
-	commerceBase  = uint64(0x0000100040000000)
-	kitBase       = uint64(0x0000100080000000)
 	scratchBase   = uint64(0x0000300000000000)
 	scratchSize   = uint64(32 << 20)
 	heapBase      = uint64(0x0000400000000000)
@@ -50,6 +48,7 @@ type entryPoints struct {
 
 type Machine struct {
 	engine        *unicorn.Engine
+	arm64         *arm64Compatibility
 	services      *shims
 	entry         entryPoints
 	scratchCursor uint64
@@ -57,9 +56,12 @@ type Machine struct {
 }
 
 type imageSpec struct {
-	name string
-	data []byte
-	base uint64
+	name      string
+	data      []byte
+	base      uint64
+	prelinked map[uint64]string
+	slots     map[uint64]string
+	functions map[uint64]string
 }
 
 type runtimeOptions struct {
@@ -93,11 +95,16 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 		return nil, nil, fmt.Errorf("open SAP runtime: %w", err)
 	}
 
-	imageSpecs := make([]imageSpec, 0, 3+len(options.extraImages))
+	imageSpecs := make([]imageSpec, 0, 2+len(options.extraImages))
 	imageSpecs = append(imageSpecs,
 		imageSpec{name: "CoreFP", data: bundle.CoreFP, base: coreFPBase},
-		imageSpec{name: "CommerceCore", data: bundle.CommerceCore, base: commerceBase},
-		imageSpec{name: "CommerceKit", data: bundle.CommerceKit, base: kitBase},
+		imageSpec{
+			name:      "AppleMediaServices",
+			data:      bundle.AppleMediaServices,
+			prelinked: macOS27SharedCacheFunctions,
+			slots:     macOS27SharedCacheSlots,
+			functions: macOS27SharedCacheFunctions,
+		},
 	)
 	imageSpecs = append(imageSpecs, options.extraImages...)
 
@@ -126,16 +133,7 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 		coreExports[name] = address
 	}
 
-	commerceCore := images["CommerceCore"]
-	macAddress, err := commerceCore.Export("_get_mac_address", commerceBase)
-
-	if err != nil {
-		return nil, nil, fmt.Errorf("resolve CommerceCore MAC address export: %w", err)
-	}
-
-	exports["_get_mac_address"] = macAddress
-
-	commerceKit := images["CommerceKit"]
+	appleMediaServices := images["AppleMediaServices"]
 	for _, name := range []string{
 		"_cp2g1b9ro",
 		"_Mib5yocT",
@@ -143,9 +141,9 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 		"_IPaI1oem5iL",
 		"_jEHf8Xzsv8K",
 	} {
-		address, err := commerceKit.Export(name, kitBase)
+		address, err := appleMediaServices.Export(name, appleMediaServices.Base())
 		if err != nil {
-			return nil, nil, fmt.Errorf("resolve CommerceKit export %s: %w", name, err)
+			return nil, nil, fmt.Errorf("resolve AppleMediaServices export %s: %w", name, err)
 		}
 
 		exports[name] = address
@@ -160,7 +158,7 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 		return nil, nil, fmt.Errorf("create Unicorn engine: %w", err)
 	}
 
-	machine := &Machine{engine: engine}
+	machine := &Machine{engine: engine, arm64: newARM64Compatibility(engine)}
 	ready := false
 
 	defer func() {
@@ -183,7 +181,7 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 		}
 	}
 
-	if err := engine.MemWrite(returnAddress, []byte{0xF4}); err != nil {
+	if err := engine.MemWrite(returnAddress, []byte{0x00, 0x00, 0x20, 0xd4}); err != nil {
 		return nil, nil, fmt.Errorf("write SAP guest return instruction: %w", err)
 	}
 
@@ -201,8 +199,27 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 	}
 
 	for _, spec := range imageSpecs {
+		if err := loadPrelinkedSlots(engine, spec.slots, resolver); err != nil {
+			return nil, nil, fmt.Errorf("load %s shared-cache slots: %w", spec.name, err)
+		}
+
+		if err := loadPrelinkedFunctions(engine, spec.functions, resolver); err != nil {
+			return nil, nil, fmt.Errorf("load %s shared-cache functions: %w", spec.name, err)
+		}
+	}
+
+	for _, spec := range imageSpecs {
 		image := images[spec.name]
-		if err := image.Relocate(spec.base, resolver); err != nil {
+
+		var err error
+
+		if spec.prelinked != nil {
+			err = image.PreparePrelinked(spec.prelinked, resolver)
+		} else {
+			err = image.Relocate(spec.base, resolver)
+		}
+
+		if err != nil {
 			return nil, nil, fmt.Errorf("relocate SAP guest image: %w", err)
 		}
 
@@ -214,6 +231,69 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 	ready = true
 
 	return machine, exports, nil
+}
+
+func loadPrelinkedFunctions(engine *unicorn.Engine, functions map[uint64]string, resolve func(string) (uint64, error)) error {
+	pages := make(map[uint64]struct{})
+	for address := range functions {
+		pages[address-address%pageSize] = struct{}{}
+		end := address + 15
+		pages[end-end%pageSize] = struct{}{}
+	}
+
+	for address := range pages {
+		if err := engine.MemMap(address, pageSize); err != nil {
+			return fmt.Errorf("map function page at %#x: %w", address, err)
+		}
+	}
+
+	for address, name := range functions {
+		target, err := resolve(name)
+		if err != nil {
+			return fmt.Errorf("resolve %s: %w", name, err)
+		}
+
+		trampoline := make([]byte, 16)
+		binary.LittleEndian.PutUint32(trampoline[0:4], 0x58000050) // ldr x16, #8
+		binary.LittleEndian.PutUint32(trampoline[4:8], 0xd61f0200) // br x16
+		binary.LittleEndian.PutUint64(trampoline[8:16], target)
+
+		if err := engine.MemWrite(address, trampoline); err != nil {
+			return fmt.Errorf("write %s trampoline at %#x: %w", name, address, err)
+		}
+	}
+
+	return nil
+}
+
+func loadPrelinkedSlots(engine *unicorn.Engine, slots map[uint64]string, resolve func(string) (uint64, error)) error {
+	pages := make(map[uint64]struct{})
+	for address := range slots {
+		pages[address-address%pageSize] = struct{}{}
+	}
+
+	for address := range pages {
+		if err := engine.MemMap(address, pageSize); err != nil {
+			return fmt.Errorf("map slot page at %#x: %w", address, err)
+		}
+	}
+
+	for address, name := range slots {
+		value, err := resolve(name)
+		if err != nil {
+			return fmt.Errorf("resolve %s: %w", name, err)
+		}
+
+		var data [8]byte
+
+		binary.LittleEndian.PutUint64(data[:], value)
+
+		if err := engine.MemWrite(address, data[:]); err != nil {
+			return fmt.Errorf("write %s slot at %#x: %w", name, address, err)
+		}
+	}
+
+	return nil
 }
 
 func (m *Machine) Initialize(hardwareID []byte) (uint64, error) {
@@ -402,6 +482,7 @@ func (m *Machine) dispose(output uint64) error {
 	return nil
 }
 
+//nolint:wsl // Register setup and compatibility retries are clearer in execution order.
 func (m *Machine) invoke(function uint64, arguments ...uint64) (uint64, error) {
 	if m.closed {
 		return 0, errors.New("SAP guest machine is closed")
@@ -412,12 +493,14 @@ func (m *Machine) invoke(function uint64, arguments ...uint64) (uint64, error) {
 	}
 
 	registers := [...]int{
-		unicorn.RegRDI,
-		unicorn.RegRSI,
-		unicorn.RegRDX,
-		unicorn.RegRCX,
-		unicorn.RegR8,
-		unicorn.RegR9,
+		unicorn.RegX0,
+		unicorn.RegX1,
+		unicorn.RegX2,
+		unicorn.RegX3,
+		unicorn.RegX4,
+		unicorn.RegX5,
+		unicorn.RegX6,
+		unicorn.RegX7,
 	}
 	for index, register := range registers {
 		var value uint64
@@ -432,23 +515,20 @@ func (m *Machine) invoke(function uint64, arguments ...uint64) (uint64, error) {
 
 	extra := max(len(arguments)-len(registers), 0)
 
-	stackPointer := stackEnd - uint64(extra+1)*8
-	if stackPointer%16 != 8 {
-		stackPointer -= 8
-	}
-
-	if err := m.writeUint64(stackPointer, returnAddress); err != nil {
-		return 0, err
-	}
+	stackPointer := stackEnd - uint64(extra)*8
+	stackPointer -= stackPointer % 16
 
 	for index := range extra {
-		if err := m.writeUint64(stackPointer+8+uint64(index)*8, arguments[len(registers)+index]); err != nil {
+		if err := m.writeUint64(stackPointer+uint64(index)*8, arguments[len(registers)+index]); err != nil {
 			return 0, err
 		}
 	}
 
-	if err := m.engine.RegWrite(unicorn.RegRSP, stackPointer); err != nil {
+	if err := m.engine.RegWrite(unicorn.RegSP, stackPointer); err != nil {
 		return 0, fmt.Errorf("write SAP guest stack register: %w", err)
+	}
+	if err := m.engine.RegWrite(unicorn.RegLR, returnAddress); err != nil {
+		return 0, fmt.Errorf("write SAP guest return register: %w", err)
 	}
 
 	m.services.resetFault()
@@ -456,19 +536,49 @@ func (m *Machine) invoke(function uint64, arguments ...uint64) (uint64, error) {
 	// SAP's cryptographic routines have input- and host-dependent instruction
 	// counts. Bound execution by wall time without rejecting legitimate work on
 	// slower machines for crossing a fixed instruction limit.
-	if err := m.engine.StartBounded(function, returnAddress, sapGuestTimeout, 0); err != nil {
+	next := function
+
+	for {
+		executionErr := m.engine.StartBounded(next, returnAddress, sapGuestTimeout, 0)
+		if executionErr == nil {
+			break
+		}
 		if m.services.fault != nil {
 			return 0, m.services.fault
 		}
 
-		return 0, fmt.Errorf("execute SAP guest function: %w", err)
+		if m.arm64 != nil {
+			handled, compatibilityErr := m.arm64.emulateInvalidInstruction()
+			if compatibilityErr != nil {
+				return 0, compatibilityErr
+			}
+			if handled {
+				next, compatibilityErr = m.engine.RegRead(unicorn.RegPC)
+				if compatibilityErr != nil {
+					return 0, fmt.Errorf("resume SAP guest function: %w", compatibilityErr)
+				}
+
+				continue
+			}
+		}
+
+		instruction, readErr := m.engine.RegRead(unicorn.RegPC)
+		if readErr != nil {
+			return 0, fmt.Errorf("execute SAP guest function: %w", executionErr)
+		}
+		link, linkErr := m.engine.RegRead(unicorn.RegLR)
+		if linkErr != nil {
+			return 0, fmt.Errorf("execute SAP guest function at %#x: %w", instruction, executionErr)
+		}
+
+		return 0, fmt.Errorf("execute SAP guest function at %#x from %#x: %w", instruction, link, executionErr)
 	}
 
 	if m.services.fault != nil {
 		return 0, m.services.fault
 	}
 
-	instruction, err := m.engine.RegRead(unicorn.RegRIP)
+	instruction, err := m.engine.RegRead(unicorn.RegPC)
 	if err != nil {
 		return 0, fmt.Errorf("read SAP guest instruction register: %w", err)
 	}
@@ -477,7 +587,7 @@ func (m *Machine) invoke(function uint64, arguments ...uint64) (uint64, error) {
 		return 0, fmt.Errorf("SAP guest stopped unexpectedly at %#x", instruction)
 	}
 
-	result, err := m.engine.RegRead(unicorn.RegRAX)
+	result, err := m.engine.RegRead(unicorn.RegX0)
 	if err != nil {
 		return 0, fmt.Errorf("read SAP guest result register: %w", err)
 	}

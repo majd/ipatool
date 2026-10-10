@@ -105,11 +105,11 @@ func TestEngineOperationsFailAfterClose(t *testing.T) {
 		{"MemReadInto", func() error { return engine.MemReadInto(nil, 0) }},
 		{"MemWrite", func() error { return engine.MemWrite(0, nil) }},
 		{"RegRead", func() error {
-			_, err := engine.RegRead(RegRAX)
+			_, err := engine.RegRead(RegX0)
 
 			return err
 		}},
-		{"RegWrite", func() error { return engine.RegWrite(RegRAX, 0) }},
+		{"RegWrite", func() error { return engine.RegWrite(RegX0, 0) }},
 		{"Start", func() error { return engine.Start(0, 1) }},
 		{"StartBounded", func() error { return engine.StartBounded(0, 1, time.Second, 1) }},
 		{"Stop", engine.Stop},
@@ -214,7 +214,7 @@ func waitForResult(t *testing.T, result <-chan error) {
 	}
 }
 
-func TestEngineExecutesX8664(t *testing.T) {
+func TestEngineExecutesARM64(t *testing.T) {
 	engine := newTestEngine(t)
 	defer engine.Close()
 
@@ -223,8 +223,8 @@ func TestEngineExecutesX8664(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// mov rax, 0x1234; hlt
-	code := []byte{0x48, 0xc7, 0xc0, 0x34, 0x12, 0x00, 0x00, 0xf4}
+	// mov x0, #0x1234
+	code := []byte{0x80, 0x46, 0x82, 0xd2}
 	if err := engine.MemWrite(address, code); err != nil {
 		t.Fatal(err)
 	}
@@ -233,13 +233,13 @@ func TestEngineExecutesX8664(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	value, err := engine.RegRead(RegRAX)
+	value, err := engine.RegRead(RegX0)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	if value != 0x1234 {
-		t.Fatalf("RAX = %#x, want %#x", value, uint64(0x1234))
+		t.Fatalf("X0 = %#x, want %#x", value, uint64(0x1234))
 	}
 }
 
@@ -252,22 +252,22 @@ func TestStartBoundedReportsTimeout(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// jmp $-2
-	if err := engine.MemWrite(address, []byte{0xeb, 0xfe}); err != nil {
+	// b .
+	if err := engine.MemWrite(address, []byte{0x00, 0x00, 0x00, 0x14}); err != nil {
 		t.Fatal(err)
 	}
 
-	err := engine.StartBounded(address, address+2, 10*time.Millisecond, 0)
+	err := engine.StartBounded(address, address+4, 10*time.Millisecond, 0)
 	if !errors.Is(err, errTimeout) {
 		t.Fatalf("StartBounded error = %v, want %v", err, errTimeout)
 	}
 
 	const completionAddress = address + 0x10
-	if err := engine.MemWrite(completionAddress, []byte{0xf4}); err != nil {
+	if err := engine.MemWrite(completionAddress, []byte{0x1f, 0x20, 0x03, 0xd5}); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := engine.StartBounded(completionAddress, completionAddress+1, time.Second, 0); err != nil {
+	if err := engine.StartBounded(completionAddress, completionAddress+4, time.Second, 0); err != nil {
 		t.Fatalf("StartBounded after timeout: %v", err)
 	}
 }

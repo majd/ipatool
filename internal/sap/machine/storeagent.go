@@ -12,11 +12,11 @@ import (
 
 const (
 	storeAgentBase         = uint64(0x00001000c0000000)
-	storeAgentGlobalInit   = storeAgentBase + 0x0c5fc0
-	storeAgentKBSyncEntry  = storeAgentBase + 0x0c93c0
-	storeAgentSessionInit  = storeAgentBase + 0x0debd0
-	storeAgentDecryptEntry = storeAgentBase + 0x0ee700
-	storeAgentSessionClose = storeAgentBase + 0x1212d0
+	storeAgentGlobalInit   = storeAgentBase + 0x1312fc
+	storeAgentKBSyncEntry  = storeAgentBase + 0x19ae34
+	storeAgentSessionInit  = storeAgentBase + 0x13ac60
+	storeAgentDecryptEntry = storeAgentBase + 0x175390
+	storeAgentGlobalClose  = storeAgentBase + 0x130eb4
 	storeAgentChunkSize    = 0x8000
 	storeAgentSCInfoPath   = "/Users/Shared/SC Info"
 )
@@ -32,6 +32,7 @@ var storeAgentZeroReturnAliases = []string{
 type StoreAgent struct {
 	mu           sync.Mutex
 	guest        *Machine
+	global       uint32
 	session      uint64
 	decryptEntry uint64
 	closeEntry   uint64
@@ -47,20 +48,15 @@ func OpenStoreAgent(ctx context.Context, bundle assets.Bundle, hardwareID, dpInf
 		return nil, fmt.Errorf("open StoreAgent runtime: %w", err)
 	}
 
-	image, err := assets.LoadStoreAgent(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("load Apple StoreAgent asset: %w", err)
-	}
-
-	return openStoreAgent(ctx, bundle, image, hardwareID, dpInfo)
+	return openStoreAgent(ctx, bundle, hardwareID, dpInfo)
 }
 
-func openStoreAgent(ctx context.Context, bundle assets.Bundle, image, hardwareID, dpInfo []byte) (*StoreAgent, error) {
+func openStoreAgent(ctx context.Context, bundle assets.Bundle, hardwareID, dpInfo []byte) (*StoreAgent, error) {
 	if len(dpInfo) == 0 {
 		return nil, errors.New("StoreAgent dpInfo is empty")
 	}
 
-	agent, globalContext, err := openStoreAgentGlobal(ctx, bundle, image, hardwareID)
+	agent, globalContext, err := openStoreAgentGlobal(ctx, bundle, hardwareID)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +71,7 @@ func openStoreAgent(ctx context.Context, bundle assets.Bundle, image, hardwareID
 	return agent, nil
 }
 
-func openStoreAgentGlobal(ctx context.Context, bundle assets.Bundle, image, hardwareID []byte) (*StoreAgent, uint32, error) {
+func openStoreAgentGlobal(ctx context.Context, bundle assets.Bundle, hardwareID []byte) (*StoreAgent, uint32, error) {
 	if ctx == nil {
 		return nil, 0, errors.New("StoreAgent context is nil")
 	}
@@ -84,17 +80,13 @@ func openStoreAgentGlobal(ctx context.Context, bundle assets.Bundle, image, hard
 		return nil, 0, fmt.Errorf("open StoreAgent runtime: %w", err)
 	}
 
-	if err := assets.VerifyStoreAgent(image); err != nil {
-		return nil, 0, fmt.Errorf("verify Apple StoreAgent profile: %w", err)
-	}
-
 	hardware, err := hardwareBlock(hardwareID)
 	if err != nil {
 		return nil, 0, err
 	}
 
 	guest, exports, err := openRuntime(ctx, bundle, runtimeOptions{
-		extraImages: []imageSpec{{name: "storeagent", data: image, base: storeAgentBase}},
+		extraImages: []imageSpec{{name: "commerce", data: bundle.Commerce, base: storeAgentBase}},
 		shims: shimOptions{
 			zeroReturnAliases: storeAgentZeroReturnAliases,
 		},
@@ -108,7 +100,7 @@ func openStoreAgentGlobal(ctx context.Context, bundle assets.Bundle, image, hard
 	agent := &StoreAgent{
 		guest:        guest,
 		decryptEntry: storeAgentDecryptEntry,
-		closeEntry:   storeAgentSessionClose,
+		closeEntry:   storeAgentGlobalClose,
 	}
 
 	globalContext, err := agent.initializeGlobal(hardware)
@@ -117,6 +109,8 @@ func openStoreAgentGlobal(ctx context.Context, bundle assets.Bundle, image, hard
 
 		return nil, 0, err
 	}
+
+	agent.global = globalContext
 
 	return agent, globalContext, nil
 }
@@ -319,15 +313,16 @@ func (s *StoreAgent) Close() error {
 
 	var errs []error
 
-	if s.guest != nil && s.session != 0 {
-		session := s.session
+	if s.guest != nil && s.global != 0 {
+		global := s.global
+		s.global = 0
 		s.session = 0
 
-		status, err := s.guest.invoke(s.closeEntry, session)
+		status, err := s.guest.invoke(s.closeEntry, uint64(global))
 		if err != nil {
-			errs = append(errs, fmt.Errorf("close StoreAgent session: %w", err))
+			errs = append(errs, fmt.Errorf("close StoreAgent global context: %w", err))
 		} else if int32(status) != 0 {
-			errs = append(errs, fmt.Errorf("StoreAgent session close returned %d", int32(status)))
+			errs = append(errs, fmt.Errorf("StoreAgent global context close returned %d", int32(status)))
 		}
 	}
 

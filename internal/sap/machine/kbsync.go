@@ -23,12 +23,7 @@ func GenerateKBSync(ctx context.Context, bundle assets.Bundle, hardwareID []byte
 		return nil, errors.New("kbsync requires a nonzero account DSID")
 	}
 
-	image, err := assets.LoadStoreAgent(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("load Apple StoreAgent asset: %w", err)
-	}
-
-	agent, globalContext, err := openStoreAgentGlobal(ctx, bundle, image, hardwareID)
+	agent, globalContext, err := openStoreAgentGlobal(ctx, bundle, hardwareID)
 	if err != nil {
 		return nil, err
 	}
