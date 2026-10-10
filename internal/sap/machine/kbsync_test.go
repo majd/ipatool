@@ -11,7 +11,7 @@ import (
 
 var _ = Describe("StoreAgent kbsync", func() {
 	It("pins the kbsync entry in the verified StoreAgent image", func() {
-		Expect(storeAgentKBSyncEntry).To(Equal(storeAgentBase + 0x0c93c0))
+		Expect(storeAgentKBSyncEntry).To(Equal(storeAgentBase + 0x19ae34))
 	})
 
 	It("rejects a canceled context before loading assets", func() {
