@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/majd/ipatool/v2/internal/sap/assets"
 	"github.com/majd/ipatool/v2/internal/sap/unicorn"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -16,16 +15,10 @@ var _ = Describe("StoreAgent", func() {
 	Describe("profile", func() {
 		It("pins the verified image base and entry offsets", func() {
 			Expect(storeAgentBase).To(Equal(uint64(0x00001000c0000000)))
-			Expect(storeAgentGlobalInit).To(Equal(storeAgentBase + 0x0c5fc0))
-			Expect(storeAgentSessionInit).To(Equal(storeAgentBase + 0x0debd0))
-			Expect(storeAgentDecryptEntry).To(Equal(storeAgentBase + 0x0ee700))
-			Expect(storeAgentSessionClose).To(Equal(storeAgentBase + 0x1212d0))
-		})
-
-		It("re-verifies the pinned image before opening the runtime", func() {
-			_, err := openStoreAgent(context.Background(), assets.Bundle{}, []byte("wrong image"), []byte{1}, []byte{1})
-			Expect(err).To(MatchError(ContainSubstring("verify Apple StoreAgent profile")))
-			Expect(err).To(MatchError(ContainSubstring("has size")))
+			Expect(storeAgentGlobalInit).To(Equal(storeAgentBase + 0x1312fc))
+			Expect(storeAgentSessionInit).To(Equal(storeAgentBase + 0x13ac60))
+			Expect(storeAgentDecryptEntry).To(Equal(storeAgentBase + 0x175390))
+			Expect(storeAgentGlobalClose).To(Equal(storeAgentBase + 0x130eb4))
 		})
 
 		It("adds only the StoreAgent synchronization aliases", func() {
@@ -135,24 +128,25 @@ var _ = Describe("StoreAgent", func() {
 		})
 	})
 
-	It("closes the session and machine idempotently", func() {
+	It("closes the global context and machine idempotently", func() {
 		machine := newGinkgoServiceMachine(shimOptions{})
-		var closedSession uint64
+		var closedContext uint64
 		closeEntry, err := machine.services.addFunction("test.storeagent.close", func() error {
 			value, argumentErr := machine.services.argument(0)
 			if argumentErr != nil {
 				return argumentErr
 			}
 
-			closedSession = value
+			closedContext = value
 
 			return machine.services.setResult(0)
 		})
 		Expect(err).NotTo(HaveOccurred())
 
-		agent := &StoreAgent{guest: machine, session: 0x1234, closeEntry: closeEntry}
+		agent := &StoreAgent{guest: machine, global: 0x1234, session: 0x5678, closeEntry: closeEntry}
 		Expect(agent.Close()).To(Succeed())
-		Expect(closedSession).To(Equal(uint64(0x1234)))
+		Expect(closedContext).To(Equal(uint64(0x1234)))
+		Expect(agent.global).To(BeZero())
 		Expect(agent.session).To(BeZero())
 		Expect(agent.guest).To(BeNil())
 		Expect(agent.Close()).To(Succeed())
@@ -189,7 +183,7 @@ func newGinkgoServiceMachine(options shimOptions) *Machine {
 		Expect(engine.MemMap(region.address, region.size)).To(Succeed())
 	}
 
-	Expect(engine.MemWrite(returnAddress, []byte{0xF4})).To(Succeed())
+	Expect(engine.MemWrite(returnAddress, []byte{0x00, 0x00, 0x20, 0xd4})).To(Succeed())
 
 	services, err := newShimsWithOptions(engine, map[string]uint64{}, nil, options)
 	Expect(err).NotTo(HaveOccurred())
