@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 
 	"github.com/blacktop/go-macho"
+	"github.com/blacktop/go-macho/pkg/fixupchains"
 	"github.com/blacktop/go-macho/types"
 )
 
@@ -38,12 +40,18 @@ type Image struct {
 	segments   []segment
 	binds      []types.Bind
 	rebases    []types.Rebase
+	chained    *fixupchains.DyldChainedFixups
 	relocated  bool
 	loadedBase uint64
 }
 
+func (i *Image) Base() uint64 {
+	return i.base
+}
+
+//nolint:wsl // Image validation and fixup discovery are clearer in execution order.
 func Open(name string, input []byte) (*Image, error) {
-	data, err := amd64Slice(input)
+	data, err := arm64Slice(input)
 	if err != nil {
 		return nil, fmt.Errorf("open %s: %w", name, err)
 	}
@@ -53,8 +61,8 @@ func Open(name string, input []byte) (*Image, error) {
 		return nil, fmt.Errorf("open %s Mach-O: %w", name, err)
 	}
 
-	if file.CPU != types.CPUAmd64 {
-		return nil, fmt.Errorf("open %s: expected x86-64 Mach-O, found %s", name, file.CPU)
+	if file.CPU != types.CPUArm64 {
+		return nil, fmt.Errorf("open %s: expected arm64 Mach-O, found %s", name, file.CPU)
 	}
 
 	image := &Image{
@@ -76,40 +84,107 @@ func Open(name string, input []byte) (*Image, error) {
 	if err := image.validateSegments(); err != nil {
 		return nil, err
 	}
-
-	image.binds, err = file.GetBindInfo()
-	if err != nil {
-		return nil, fmt.Errorf("read %s bindings: %w", name, err)
+	if err := image.removePointerAuthentication(); err != nil {
+		return nil, err
 	}
 
-	image.rebases, err = file.GetRebaseInfo()
-	if err != nil {
-		return nil, fmt.Errorf("read %s rebases: %w", name, err)
+	if file.HasDyldChainedFixups() {
+		image.chained, err = file.DyldChainedFixups()
+		if err != nil {
+			return nil, fmt.Errorf("read %s chained fixups: %w", name, err)
+		}
+
+		if _, err := image.chained.Parse(); err != nil {
+			return nil, fmt.Errorf("parse %s chained fixups: %w", name, err)
+		}
+	} else {
+		image.binds, err = file.GetBindInfo()
+		if err != nil && !errors.Is(err, macho.ErrMachODyldInfoNotFound) {
+			return nil, fmt.Errorf("read %s bindings: %w", name, err)
+		}
+
+		image.rebases, err = file.GetRebaseInfo()
+		if err != nil && !errors.Is(err, macho.ErrMachODyldInfoNotFound) {
+			return nil, fmt.Errorf("read %s rebases: %w", name, err)
+		}
 	}
 
 	return image, nil
 }
 
-func amd64Slice(input []byte) ([]byte, error) {
+//nolint:wsl // Instruction decoding is clearer when related operations stay together.
+func (i *Image) removePointerAuthentication() error {
+	const nop = uint32(0xd503201f)
+
+	for _, section := range i.file.Sections {
+		if !section.Flags.IsPureInstructions() && !section.Flags.IsSomeInstructions() {
+			continue
+		}
+		start := uint64(section.Offset)
+		end, overflow := add(start, section.Size)
+		if overflow || end > uint64(len(i.data)) {
+			return fmt.Errorf("instruction section %s exceeds %s", section.Name, i.name)
+		}
+		for offset := start; offset+4 <= end; offset += 4 {
+			instruction := binary.LittleEndian.Uint32(i.data[offset:])
+			var replacement uint32
+
+			switch instruction & 0xfffffc00 {
+			case 0xd71f0800, 0xd71f0c00, 0xd61f0800, 0xd61f0c00:
+				replacement = 0xd61f0000 | (instruction & 0x3e0) // br xN
+			case 0xd73f0800, 0xd73f0c00, 0xd63f0800, 0xd63f0c00:
+				replacement = 0xd63f0000 | (instruction & 0x3e0) // blr xN
+			case 0xdac10000, 0xdac10400, 0xdac10800, 0xdac10c00,
+				0xdac11000, 0xdac11400, 0xdac11800, 0xdac11c00:
+				replacement = nop
+			default:
+				switch instruction {
+				case 0xd65f0bff, 0xd65f0fff:
+					replacement = 0xd65f03c0 // ret
+				case 0xd503211f, 0xd503215f, 0xd503219f, 0xd50321df,
+					0xd503233f, 0xd503237f, 0xd50323bf, 0xd50323ff,
+					0xd50320ff:
+					replacement = nop
+				default:
+					opcode := instruction & 0xffffffe0
+					if opcode == 0xdac123e0 || opcode == 0xdac127e0 ||
+						opcode == 0xdac12be0 || opcode == 0xdac12fe0 ||
+						opcode == 0xdac133e0 || opcode == 0xdac137e0 ||
+						opcode == 0xdac13be0 || opcode == 0xdac13fe0 ||
+						opcode == 0xdac143e0 || opcode == 0xdac147e0 {
+						replacement = nop
+					}
+				}
+			}
+			if replacement != 0 {
+				binary.LittleEndian.PutUint32(i.data[offset:], replacement)
+			}
+		}
+	}
+
+	return nil
+}
+
+func arm64Slice(input []byte) ([]byte, error) {
 	fat, err := macho.NewFatFile(bytes.NewReader(input))
 	if err != nil {
 		return bytes.Clone(input), nil
 	}
 
 	for _, architecture := range fat.Arches {
-		if architecture.CPU != types.CPUAmd64 {
+		if architecture.CPU != types.CPUArm64 || architecture.SubCPU&types.CpuSubtypeMask != types.CPUSubtypeArm64E {
 			continue
 		}
 
 		end, overflow := add(uint64(architecture.Offset), uint64(architecture.Size))
 		if overflow || end > uint64(len(input)) {
-			return nil, errors.New("x86-64 slice exceeds input size")
+			return nil, errors.New("arm64e slice exceeds input size")
 		}
 
 		return bytes.Clone(input[architecture.Offset:end]), nil
 	}
 
-	return nil, errors.New("universal binary has no x86-64 slice")
+	return nil, errors.New("universal binary has no arm64e slice")
 }
 
 func (i *Image) Export(name string, loadBase uint64) (uint64, error) {
@@ -185,8 +260,155 @@ func (i *Image) Relocate(loadBase uint64, resolve func(string) (uint64, error)) 
 		}
 	}
 
+	if err := i.relocateChained(loadBase, resolve); err != nil {
+		return err
+	}
+
 	i.relocated = true
 	i.loadedBase = loadBase
+
+	return nil
+}
+
+//nolint:wsl // Chained-fixup decoding is clearer when related operations stay together.
+func (i *Image) relocateChained(loadBase uint64, resolve func(string) (uint64, error)) error {
+	if i.chained == nil {
+		return nil
+	}
+
+	for _, start := range i.chained.Starts {
+		for _, fixup := range start.Fixups {
+			offset := fixup.Offset()
+			if offset > uint64(len(i.data)) || pointerSize > uint64(len(i.data))-offset {
+				return fmt.Errorf("chained fixup at %#x exceeds %s", offset, i.name)
+			}
+
+			var address uint64
+
+			switch {
+			case fixup.IsRebase():
+				var target uint64
+				switch rebase := fixup.(type) {
+				case fixupchains.DyldChainedPtr64RebaseOffset:
+					// DYLD_CHAINED_PTR_64_OFFSET encodes an image-relative
+					// target. go-macho's Rebase currently subtracts the
+					// preferred address from that offset a second time.
+					target = rebase.UnpackedTarget()
+				case fixupchains.DyldChainedPtrArm64eRebase:
+					target = rebase.Target()
+
+					if i.chained.PointerFormat == fixupchains.DYLD_CHAINED_PTR_ARM64E {
+						absolute := rebase.UnpackTarget() & 0x00ffffffffffffff
+						if absolute < i.base {
+							return fmt.Errorf("chained rebase at %#x precedes the base of %s", offset, i.name)
+						}
+						target = absolute - i.base
+					}
+				case fixupchains.DyldChainedPtrArm64eAuthRebase:
+					target = rebase.Target()
+				default:
+					var err error
+
+					target, err = i.chained.Rebase(offset, i.base)
+					if err != nil {
+						return fmt.Errorf("decode chained rebase at %#x in %s: %w", offset, i.name, err)
+					}
+				}
+
+				var overflow bool
+
+				address, overflow = add(loadBase, target)
+				if overflow {
+					return fmt.Errorf("chained rebase at %#x with target %#x, image base %#x, load base %#x, format %s, and type %T overflows in %s", offset, target, i.base, loadBase, i.chained.PointerFormat, fixup, i.name)
+				}
+			case fixup.IsBind():
+				binding, ok := fixup.(fixupchains.Bind)
+				if !ok {
+					return fmt.Errorf("invalid chained bind at %#x in %s", offset, i.name)
+				}
+
+				var err error
+
+				address, err = resolve(binding.Name())
+				if err != nil {
+					return fmt.Errorf("resolve %s for %s: %w", binding.Name(), i.name, err)
+				}
+
+				addend := int64(binding.Addend())
+				switch arm64e := fixup.(type) {
+				case fixupchains.DyldChainedPtrArm64eBind:
+					addend = arm64e.SignExtendedAddend()
+				case fixupchains.DyldChainedPtrArm64eBind24:
+					addend = arm64e.SignExtendedAddend()
+				}
+				if ordinal := binding.Ordinal(); ordinal < uint64(len(i.chained.Imports)) {
+					addend += int64(i.chained.Imports[ordinal].Addend())
+				}
+
+				address, err = addSigned(address, addend)
+				if err != nil {
+					return fmt.Errorf("apply chained addend for %s in %s: %w", binding.Name(), i.name, err)
+				}
+			default:
+				return fmt.Errorf("unknown chained fixup at %#x in %s", offset, i.name)
+			}
+
+			if err := i.putPointer(offset, address); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// PreparePrelinked prepares an image extracted from a dyld shared cache. Such
+// images have already had their cache slide information applied, so they must
+// remain at their preferred addresses. external maps cache symbol addresses to
+// the import names implemented by the emulator.
+func (i *Image) PreparePrelinked(external map[uint64]string, resolve func(string) (uint64, error)) error {
+	if i.relocated {
+		return fmt.Errorf("%s is already relocated", i.name)
+	}
+
+	patched := make(map[uint64]uint64, len(external))
+
+	for address, name := range external {
+		value, err := resolve(name)
+		if err != nil {
+			return fmt.Errorf("resolve %s for %s: %w", name, i.name, err)
+		}
+
+		patched[address] = value
+	}
+
+	for _, item := range i.segments {
+		if item.name == "__TEXT" || item.name == "__LINKEDIT" || item.fileSize < pointerSize {
+			continue
+		}
+
+		start := item.fileOff
+		if remainder := item.address % pointerSize; remainder != 0 {
+			start += pointerSize - remainder
+		}
+
+		end := item.fileOff + item.fileSize
+		for offset := start; offset <= end-pointerSize; offset += pointerSize {
+			current := binary.LittleEndian.Uint64(i.data[offset : offset+pointerSize])
+
+			value, ok := patched[current]
+			if !ok {
+				continue
+			}
+
+			if err := i.putPointer(offset, value); err != nil {
+				return err
+			}
+		}
+	}
+
+	i.relocated = true
+	i.loadedBase = i.base
 
 	return nil
 }
@@ -196,7 +418,12 @@ func (i *Image) Load(memory Memory) error {
 		return fmt.Errorf("%s must be relocated before loading", i.name)
 	}
 
-	var span uint64
+	type memoryRange struct {
+		start uint64
+		end   uint64
+	}
+
+	ranges := make([]memoryRange, 0, len(i.segments))
 
 	for _, item := range i.segments {
 		if item.name == "__PAGEZERO" || item.size == 0 {
@@ -207,25 +434,50 @@ func (i *Image) Load(memory Memory) error {
 			return fmt.Errorf("segment %s in %s precedes image base", item.name, i.name)
 		}
 
-		end, overflow := add(item.address-i.base, item.size)
-		if overflow || end > maxImageSpan {
-			return fmt.Errorf("segment %s makes %s too large", item.name, i.name)
+		address, overflow := add(i.loadedBase, item.address-i.base)
+		if overflow {
+			return fmt.Errorf("segment %s address overflows in %s", item.name, i.name)
 		}
 
-		span = max(span, end)
+		end, overflow := add(address, item.size)
+		if overflow {
+			return fmt.Errorf("segment %s range overflows in %s", item.name, i.name)
+		}
+
+		ranges = append(ranges, memoryRange{start: address - address%pageSize, end: align(end, pageSize)})
 	}
 
-	span = align(span, pageSize)
-	if span == 0 {
+	if len(ranges) == 0 {
 		return fmt.Errorf("%s has no loadable segments", i.name)
 	}
 
-	if _, overflow := add(i.loadedBase, span); overflow {
-		return fmt.Errorf("load range for %s overflows", i.name)
+	sort.Slice(ranges, func(left, right int) bool { return ranges[left].start < ranges[right].start })
+	merged := ranges[:0]
+
+	for _, current := range ranges {
+		last := len(merged) - 1
+		if last >= 0 && current.start <= merged[last].end {
+			merged[last].end = max(merged[last].end, current.end)
+
+			continue
+		}
+
+		merged = append(merged, current)
 	}
 
-	if err := memory.MemMap(i.loadedBase, span); err != nil {
-		return fmt.Errorf("map %s: %w", i.name, err)
+	var mapped uint64
+
+	for _, item := range merged {
+		size := item.end - item.start
+
+		mapped, _ = add(mapped, size)
+		if mapped > maxImageSpan {
+			return fmt.Errorf("mapped segments make %s too large", i.name)
+		}
+
+		if err := memory.MemMap(item.start, size); err != nil {
+			return fmt.Errorf("map %s: %w", i.name, err)
+		}
 	}
 
 	for _, item := range i.segments {

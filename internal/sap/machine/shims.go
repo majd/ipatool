@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	shimBase     = uint64(0x0000200000000000)
+	shimBase     = uint64(0x00007ff880000000)
 	shimCodeSize = uint64(0x0000000000080000)
 	shimSize     = uint64(0x0000000000100000)
 	shimSlotSize = uint64(16)
@@ -38,21 +38,22 @@ type shimOptions struct {
 }
 
 type shims struct {
-	engine      *unicorn.Engine
-	hook        *unicorn.Hook
-	entries     map[uint64]shimEntry
-	symbols     map[string]uint64
-	codeCursor  uint64
-	dataCursor  uint64
-	fault       error
-	coreExports map[string]uint64
-	icxs        []byte
-	icxsOffset  int
-	errno       uint64
-	heapCursor  uint64
-	allocations map[uint64]guestAllocation
-	freeBlocks  []freeBlock
-	iterator    uint32
+	engine          *unicorn.Engine
+	hook            *unicorn.Hook
+	entries         map[uint64]shimEntry
+	symbols         map[string]uint64
+	codeCursor      uint64
+	dataCursor      uint64
+	fault           error
+	coreExports     map[string]uint64
+	icxs            []byte
+	icxsOffset      int
+	errno           uint64
+	heapCursor      uint64
+	allocations     map[uint64]guestAllocation
+	freeBlocks      []freeBlock
+	iterator        uint32
+	callbackReturns []uint64
 }
 
 func newShims(engine *unicorn.Engine, coreExports map[string]uint64, icxs []byte) (*shims, error) {
@@ -143,7 +144,7 @@ func (s *shims) addFunction(name string, handler shimHandler) (uint64, error) {
 	address := s.codeCursor
 	s.codeCursor += shimSlotSize
 
-	if err := s.engine.MemWrite(address, []byte{0xC3}); err != nil {
+	if err := s.engine.MemWrite(address, []byte{0xc0, 0x03, 0x5f, 0xd6}); err != nil {
 		return 0, fmt.Errorf("write guest service stub: %w", err)
 	}
 
@@ -204,12 +205,14 @@ func (s *shims) resetFault() {
 
 func (s *shims) argument(index int) (uint64, error) {
 	registers := [...]int{
-		unicorn.RegRDI,
-		unicorn.RegRSI,
-		unicorn.RegRDX,
-		unicorn.RegRCX,
-		unicorn.RegR8,
-		unicorn.RegR9,
+		unicorn.RegX0,
+		unicorn.RegX1,
+		unicorn.RegX2,
+		unicorn.RegX3,
+		unicorn.RegX4,
+		unicorn.RegX5,
+		unicorn.RegX6,
+		unicorn.RegX7,
 	}
 	if index >= 0 && index < len(registers) {
 		value, err := s.engine.RegRead(registers[index])
@@ -224,12 +227,12 @@ func (s *shims) argument(index int) (uint64, error) {
 		return 0, errors.New("negative guest argument index")
 	}
 
-	stack, err := s.engine.RegRead(unicorn.RegRSP)
+	stack, err := s.engine.RegRead(unicorn.RegSP)
 	if err != nil {
 		return 0, fmt.Errorf("read guest stack register: %w", err)
 	}
 
-	data, err := s.engine.MemRead(stack+8+uint64(index-len(registers))*8, 8)
+	data, err := s.engine.MemRead(stack+uint64(index-len(registers))*8, 8)
 	if err != nil {
 		return 0, fmt.Errorf("read guest stack argument: %w", err)
 	}
@@ -238,7 +241,7 @@ func (s *shims) argument(index int) (uint64, error) {
 }
 
 func (s *shims) setResult(value uint64) error {
-	if err := s.engine.RegWrite(unicorn.RegRAX, value); err != nil {
+	if err := s.engine.RegWrite(unicorn.RegX0, value); err != nil {
 		return fmt.Errorf("write guest result register: %w", err)
 	}
 
