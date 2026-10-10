@@ -21,6 +21,10 @@ func (s *shims) registerMemoryServices() error {
 		{[]string{"_calloc"}, s.calloc},
 		{[]string{"_realloc", "_reallocf"}, s.realloc},
 		{[]string{"_free"}, s.free},
+		{[]string{"_mmap"}, s.mmap},
+		{[]string{"_munmap"}, s.munmap},
+		{[]string{"_vm_allocate"}, s.vmAllocate},
+		{[]string{"_vm_deallocate"}, s.vmDeallocate},
 		{[]string{"_memcpy", "_memmove"}, s.memmove},
 		{[]string{"_memset"}, s.memset},
 		{[]string{"___bzero"}, s.bzero},
@@ -216,6 +220,102 @@ func (s *shims) allocate(size uint64) (uint64, error) {
 	s.allocations[address] = guestAllocation{size: size, reserved: reserved}
 
 	return address, nil
+}
+
+func (s *shims) allocateAligned(size, alignment uint64) (uint64, error) {
+	if size > maxGuestTransfer {
+		return 0, fmt.Errorf("allocation size %d exceeds limit", size)
+	}
+
+	reserved := align(max(size, 1), alignment)
+
+	cursor := align(s.heapCursor, alignment)
+	if cursor > heapSize || reserved > heapSize-cursor {
+		return 0, errors.New("guest heap exhausted")
+	}
+
+	address := heapBase + cursor
+	s.heapCursor = cursor + reserved
+	s.allocations[address] = guestAllocation{size: size, reserved: reserved}
+
+	return address, nil
+}
+
+func (s *shims) mmap() error {
+	length, err := s.argument(1)
+	if err != nil {
+		return err
+	}
+
+	address, err := s.allocateAligned(length, pageSize)
+	if err != nil {
+		return s.returnMinusOne()
+	}
+
+	if err := s.engine.MemWrite(address, make([]byte, length)); err != nil {
+		_ = s.release(address)
+
+		return fmt.Errorf("clear mapped guest memory: %w", err)
+	}
+
+	return s.setResult(address)
+}
+
+func (s *shims) munmap() error {
+	address, err := s.argument(0)
+	if err != nil {
+		return err
+	}
+
+	if err := s.release(address); err != nil {
+		return s.setResult(math.MaxUint64)
+	}
+
+	return s.setResult(0)
+}
+
+func (s *shims) vmAllocate() error {
+	field, err := s.argument(1)
+	if err != nil {
+		return err
+	}
+
+	size, err := s.argument(2)
+	if err != nil {
+		return err
+	}
+
+	address, err := s.allocateAligned(size, pageSize)
+	if err != nil {
+		return s.setResult(3) // KERN_NO_SPACE
+	}
+
+	if err := s.engine.MemWrite(address, make([]byte, size)); err != nil {
+		_ = s.release(address)
+
+		return fmt.Errorf("clear allocated VM memory: %w", err)
+	}
+
+	if err := s.writeUint64(field, address); err != nil {
+		_ = s.release(address)
+
+		return err
+	}
+
+	return s.setResult(0)
+}
+
+func (s *shims) vmDeallocate() error {
+	address, err := s.argument(1)
+	if err != nil {
+		return err
+	}
+
+	if err := s.release(address); err != nil {
+		return s.setResult(1) // KERN_INVALID_ADDRESS
+	}
+
+	return s.setResult(0)
 }
 
 func (s *shims) release(address uint64) error {

@@ -11,8 +11,8 @@ func TestCodeHookStopsEmulation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// mov rax, 1; inc rax; ud2
-	code := []byte{0x48, 0xc7, 0xc0, 0x01, 0x00, 0x00, 0x00, 0x48, 0xff, 0xc0, 0x0f, 0x0b}
+	// mov x0, #1; add x0, x0, #1; brk #0
+	code := []byte{0x20, 0x00, 0x80, 0xd2, 0x00, 0x04, 0x00, 0x91, 0x00, 0x00, 0x20, 0xd4}
 	if err := engine.MemWrite(address, code); err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func TestCodeHookStopsEmulation(t *testing.T) {
 		stopErr     error
 	)
 
-	hook, err := engine.AddCodeHook(address+7, address+7, func(current uint64, size uint32) {
+	hook, err := engine.AddCodeHook(address+4, address+4, func(current uint64, size uint32) {
 		calls++
 		hookAddress = current
 		hookSize = size
@@ -48,8 +48,8 @@ func TestCodeHookStopsEmulation(t *testing.T) {
 		t.Fatalf("callback calls = %d, want 1", calls)
 	}
 
-	if hookAddress != address+7 || hookSize != 3 {
-		t.Fatalf("callback instruction = (%#x, %d), want (%#x, 3)", hookAddress, hookSize, address+7)
+	if hookAddress != address+4 || hookSize != 4 {
+		t.Fatalf("callback instruction = (%#x, %d), want (%#x, 4)", hookAddress, hookSize, address+4)
 	}
 }
 
@@ -62,7 +62,7 @@ func TestClosedCodeHookDoesNotRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := engine.MemWrite(address, []byte{0x90, 0xf4}); err != nil {
+	if err := engine.MemWrite(address, []byte{0x1f, 0x20, 0x03, 0xd5}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -83,7 +83,7 @@ func TestClosedCodeHookDoesNotRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := engine.Start(address, address+2); err != nil {
+	if err := engine.Start(address, address+4); err != nil {
 		t.Fatal(err)
 	}
 

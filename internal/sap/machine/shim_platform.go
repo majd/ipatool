@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/majd/ipatool/v2/internal/sap/unicorn"
@@ -33,6 +34,7 @@ func (s *shims) registerPlatformServices() error {
 		{[]string{"_CFStringCreateWithCString"}, s.cfStringCreate},
 		{[]string{"_CFStringCreateWithCStringNoCopy"}, s.returnZero},
 		{[]string{"_CFStringGetCString"}, s.cfStringGetCString},
+		{[]string{"___chkstk_darwin", "____chkstk_darwin"}, s.returnUnchanged},
 		{[]string{"_IOIteratorNext"}, s.ioIteratorNext},
 		{[]string{"_IORegistryEntryGetParentEntry"}, s.ioRegistryEntryGetParentEntry},
 		{[]string{"_IOServiceGetMatchingServices"}, s.ioServiceGetMatchingServices},
@@ -41,6 +43,9 @@ func (s *shims) registerPlatformServices() error {
 		{[]string{"___error"}, s.errorPointer},
 		{[]string{"_abort", "___stack_chk_fail", "dyld_stub_binder"}, s.abort},
 		{[]string{"_arc4random"}, s.arc4random},
+		{[]string{"_basename"}, s.basename},
+		{[]string{"_bootstrap_look_up"}, s.bootstrapLookUp},
+		{[]string{"_dispatch_once"}, s.dispatchOnce},
 		{[]string{"_dlopen"}, s.dlopen},
 		{[]string{"_dlsym"}, s.dlsym},
 		{[]string{"_fcntl", "_fcntl$UNIX2003", "_lstat$INODE64", "_statfs", "_statfs$INODE64"}, s.returnMinusOne},
@@ -51,6 +56,7 @@ func (s *shims) registerPlatformServices() error {
 		{[]string{"_read", "_read$UNIX2003"}, s.read},
 		{[]string{"_sysctl"}, s.returnMinusOne},
 		{[]string{"_sysctlbyname"}, s.sysctlbyname},
+		{[]string{"_sysconf"}, s.sysconf},
 	}
 	for _, service := range services {
 		if err := s.addAliases(service.names, service.handler); err != nil {
@@ -80,11 +86,19 @@ func (s *shims) registerPlatformServices() error {
 		}
 	}
 
+	if _, err := s.addFunction("callback.complete", s.callbackComplete); err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (s *shims) returnZero() error {
 	return s.setResult(0)
+}
+
+func (s *shims) returnUnchanged() error {
+	return nil
 }
 
 func (s *shims) returnFakeHandle() error {
@@ -230,6 +244,40 @@ func (s *shims) arc4random() error {
 	return s.setResult(uint64(binary.LittleEndian.Uint32(value[:])))
 }
 
+func (s *shims) basename() error {
+	address, err := s.argument(0)
+	if err != nil {
+		return err
+	}
+
+	value, err := s.readCString(address)
+	if err != nil {
+		return err
+	}
+
+	value = strings.TrimRight(value, "/")
+	if index := strings.LastIndexByte(value, '/'); index >= 0 {
+		address += uint64(index + 1)
+	}
+
+	return s.setResult(address)
+}
+
+func (s *shims) bootstrapLookUp() error {
+	service, err := s.argument(2)
+	if err != nil {
+		return err
+	}
+
+	if service != 0 {
+		if err := s.writeUint32(service, 0); err != nil {
+			return err
+		}
+	}
+
+	return s.setResult(5) // KERN_FAILURE
+}
+
 func (s *shims) dlopen() error {
 	pathAddress, err := s.argument(0)
 	if err != nil {
@@ -351,26 +399,84 @@ func (s *shims) pthreadOnce() error {
 		return err
 	}
 
-	if value == 0 {
+	if value == 0 || value == 0x4f4e4345 {
 		return s.setResult(0)
 	}
 
-	if err := s.writeUint64(control, 0); err != nil {
+	if err := s.writeUint64(control, 0x4f4e4345); err != nil {
 		return err
 	}
 
-	stack, err := s.engine.RegRead(unicorn.RegRSP)
+	return s.invokeCallback(initializer)
+}
+
+func (s *shims) dispatchOnce() error {
+	predicate, err := s.argument(0)
 	if err != nil {
-		return fmt.Errorf("read guest stack register: %w", err)
-	}
-
-	stack -= 8
-	if err := s.writeUint64(stack, initializer); err != nil {
 		return err
 	}
 
-	if err := s.engine.RegWrite(unicorn.RegRSP, stack); err != nil {
-		return fmt.Errorf("write guest stack register: %w", err)
+	block, err := s.argument(1)
+	if err != nil {
+		return err
+	}
+
+	value, err := s.readUint64(predicate)
+	if err != nil {
+		return err
+	}
+
+	if value == math.MaxUint64 {
+		return s.setResult(0)
+	}
+
+	if err := s.writeUint64(predicate, math.MaxUint64); err != nil {
+		return err
+	}
+
+	initializer, err := s.readUint64(block + 16)
+	if err != nil {
+		return err
+	}
+
+	if err := s.engine.RegWrite(unicorn.RegX0, block); err != nil {
+		return fmt.Errorf("write dispatch block argument: %w", err)
+	}
+
+	return s.invokeCallback(initializer)
+}
+
+func (s *shims) invokeCallback(initializer uint64) error {
+	returnAddress, err := s.engine.RegRead(unicorn.RegLR)
+	if err != nil {
+		return fmt.Errorf("read guest return register: %w", err)
+	}
+
+	s.callbackReturns = append(s.callbackReturns, returnAddress)
+
+	completion := s.symbols["callback.complete"]
+	if err := s.engine.RegWrite(unicorn.RegLR, completion); err != nil {
+		return fmt.Errorf("write callback return register: %w", err)
+	}
+
+	if err := s.engine.RegWrite(unicorn.RegPC, initializer); err != nil {
+		return fmt.Errorf("write callback instruction register: %w", err)
+	}
+
+	return nil
+}
+
+func (s *shims) callbackComplete() error {
+	if len(s.callbackReturns) == 0 {
+		return errors.New("guest callback completion has no return address")
+	}
+
+	last := len(s.callbackReturns) - 1
+	returnAddress := s.callbackReturns[last]
+	s.callbackReturns = s.callbackReturns[:last]
+
+	if err := s.engine.RegWrite(unicorn.RegLR, returnAddress); err != nil {
+		return fmt.Errorf("restore guest return register: %w", err)
 	}
 
 	return s.setResult(0)
@@ -430,4 +536,22 @@ func (s *shims) sysctlbyname() error {
 	}
 
 	return s.setResult(0)
+}
+
+func (s *shims) sysconf() error {
+	name, err := s.argument(0)
+	if err != nil {
+		return err
+	}
+
+	switch name {
+	case 29: // _SC_PAGESIZE
+		return s.setResult(pageSize)
+	case 57, 58: // _SC_NPROCESSORS_CONF, _SC_NPROCESSORS_ONLN
+		return s.setResult(1)
+	case 200: // _SC_PHYS_PAGES
+		return s.setResult(heapSize / pageSize)
+	default:
+		return s.returnMinusOne()
+	}
 }

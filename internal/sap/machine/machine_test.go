@@ -294,7 +294,7 @@ func newServiceTestMachine(t *testing.T) *Machine {
 		}
 	}
 
-	if err := engine.MemWrite(returnAddress, []byte{0xF4}); err != nil {
+	if err := engine.MemWrite(returnAddress, []byte{0x00, 0x00, 0x20, 0xd4}); err != nil {
 		_ = engine.Close()
 
 		t.Fatal(err)
