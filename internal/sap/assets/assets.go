@@ -1,8 +1,6 @@
 package assets
 
 import (
-	"bytes"
-	"compress/bzip2"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -10,67 +8,64 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"time"
-
-	"github.com/blacktop/go-macho/pkg/xar"
-	"howett.net/ranger"
-
-	"github.com/majd/ipatool/v2/internal/sap/cpio"
 )
 
 const (
-	updateURL       = "https://swcdn.apple.com/content/downloads/27/34/041-98128-A_SYPWICN3KH/5dqkl4rqgbsr18yzy61yeie9g3cmjc5hiv/OSXUpd10.9.pkg"
-	payloadName     = "Payload"
-	payloadBZOffset = int64(0x352F40D5)
-	payloadCPIO     = int64(0x3A4)
+	macOSVersion        = "27.0.1"
+	macOSBuild          = "26A434"
+	macOSRestoreURL     = "https://updates.cdn-apple.com/2026FallFCS/59241290-5d51-4ca8-9df4-31624b9a4eac/UniversalMac_27.0.1_26A434_Restore.ipsw"
+	assetCacheDirectory = "apple-assets-macos-27-26A434-arm64-v1"
 )
 
 type Bundle struct {
-	CommerceKit  []byte
-	CommerceCore []byte
-	CoreFP       []byte
-	CoreFPICXS   []byte
+	AppleMediaServices []byte
+	Commerce           []byte
+	CoreFP             []byte
+	CoreFPICXS         []byte
 }
 
 type fileSpec struct {
 	name   string
-	path   string
 	size   int
 	digest [32]byte
 }
 
 var requiredFiles = []fileSpec{
 	{
-		name:   "CommerceKit",
-		path:   "./System/Library/PrivateFrameworks/CommerceKit.framework/Versions/A/CommerceKit",
-		size:   3271840,
-		digest: mustDigest("b84ff12c21987856c0a17b78f1ad82b73195a6dec5f3b208a17d245555a2c8a2"),
+		name:   "AppleMediaServices",
+		size:   14813888,
+		digest: mustDigest("95f4558aa2c0ccd9f96ed479e336b630b46bf4b4e0baabc1c1ac8c7d55e21ab4"),
 	},
 	{
-		name:   "CommerceCore",
-		path:   "./System/Library/PrivateFrameworks/CommerceKit.framework/Versions/A/Frameworks/CommerceCore.framework/Versions/A/CommerceCore",
-		size:   207744,
-		digest: mustDigest("c5401e57402230f3c876409d295319ddf1e61287bc882683c5d61277be7bc1f2"),
+		name:   "commerce",
+		size:   8092640,
+		digest: mustDigest("76de40a4a32f691947cb926ce3b128d2fc446f7cac9755f831c406cf5a316ac9"),
 	},
 	{
 		name:   "CoreFP",
-		path:   "./System/Library/PrivateFrameworks/CoreFP.framework/Versions/A/CoreFP",
-		size:   29014912,
-		digest: mustDigest("f19141336be4198d0f8991bb00017c915efc7aeaece36c345f7faa1237ea6074"),
+		size:   94842464,
+		digest: mustDigest("2c30fa2b5f695fd66c0360dce72f54757d03ddb7107549715c12cb359a003b46"),
 	},
 	{
 		name:   "CoreFP.icxs",
-		path:   "./System/Library/PrivateFrameworks/CoreFP.framework/Versions/A/CoreFP.icxs",
-		size:   5288352,
-		digest: mustDigest("473e78af86979f5bd4f6269561caf770b3d16c098d918846eeac8cdd2fe6566a"),
+		size:   7365344,
+		digest: mustDigest("cb8f55330ec567da3e692dab5f5388bed0312dd9093340477c5759078cc2aa7b"),
 	},
 }
 
+// Load resolves and caches the pinned macOS framework profile used by SAP,
+// kbsync generation, and package decryption.
 func Load(ctx context.Context) (Bundle, error) {
+	if ctx == nil {
+		return Bundle{}, errors.New("apple asset context is nil")
+	}
+
+	if err := ctx.Err(); err != nil {
+		return Bundle{}, fmt.Errorf("load Apple assets: %w", err)
+	}
+
 	directory, err := cacheDirectory()
 	if err != nil {
 		return Bundle{}, err
@@ -80,7 +75,7 @@ func Load(ctx context.Context) (Bundle, error) {
 		return bundle, nil
 	}
 
-	bundle, err := download(ctx)
+	bundle, err := resolveRemoteImage(ctx)
 	if err != nil {
 		return Bundle{}, err
 	}
@@ -92,117 +87,13 @@ func Load(ctx context.Context) (Bundle, error) {
 	return bundle, nil
 }
 
-func download(ctx context.Context) (Bundle, error) {
-	found, err := downloadFiles(ctx, requiredFiles, "download Apple SAP assets")
-	if err != nil {
-		return Bundle{}, err
-	}
-
-	bundle := bundleFrom(found)
-	if err := validate(bundle); err != nil {
-		return Bundle{}, err
-	}
-
-	return bundle, nil
-}
-
-func downloadFiles(ctx context.Context, specs []fileSpec, operation string) (map[string][]byte, error) {
-	parsed, err := url.Parse(updateURL)
-	if err != nil {
-		return nil, fmt.Errorf("parse Apple software update URL: %w", err)
-	}
-
-	client := &http.Client{
-		Timeout:   2 * time.Minute,
-		Transport: contextTransport{ctx: ctx, next: http.DefaultTransport},
-	}
-
-	remote, err := ranger.NewReader(&ranger.HTTPRanger{Client: client, URL: parsed})
-	if err != nil {
-		return nil, fmt.Errorf("open Apple software update: %w", err)
-	}
-
-	length, err := remote.Length()
-	if err != nil {
-		return nil, fmt.Errorf("measure Apple software update: %w", err)
-	}
-
-	container, err := xar.NewReader(remote, length)
-	if err != nil {
-		return nil, fmt.Errorf("read Apple software update: %w", err)
-	}
-
-	var payload *xar.File
-
-	for _, candidate := range container.Files {
-		if candidate.Name == payloadName {
-			payload = candidate
-
-			break
-		}
-	}
-
-	if payload == nil {
-		return nil, &fs.PathError{Op: "open", Path: payloadName, Err: fs.ErrNotExist}
-	}
-
-	raw := payload.OpenRaw()
-	if _, err := raw.Seek(payloadBZOffset, io.SeekStart); err != nil {
-		return nil, fmt.Errorf("seek Apple update payload: %w", err)
-	}
-
-	compressed := io.MultiReader(bytes.NewReader([]byte{'B', 'Z', 'h', '9'}), raw)
-
-	archive := bzip2.NewReader(compressed)
-	if _, err := io.CopyN(io.Discard, archive, payloadCPIO); err != nil {
-		return nil, fmt.Errorf("seek Apple payload archive: %w", err)
-	}
-
-	wanted := make(map[string]fileSpec, len(specs))
-	for _, spec := range specs {
-		wanted[spec.path] = spec
-	}
-
-	found := make(map[string][]byte, len(specs))
-	reader := cpio.NewReader(archive)
-
-	for len(found) != len(wanted) {
-		if err := ctx.Err(); err != nil {
-			return nil, fmt.Errorf("%s: %w", operation, err)
-		}
-
-		path, body, err := reader.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-
-		if err != nil {
-			return nil, fmt.Errorf("read Apple payload archive: %w", err)
-		}
-
-		spec, ok := wanted[path]
-		if !ok {
-			continue
-		}
-
-		data, err := io.ReadAll(io.LimitReader(body, int64(spec.size)+1))
-		if err != nil {
-			return nil, fmt.Errorf("read %s: %w", spec.name, err)
-		}
-
-		found[spec.name] = data
-	}
-
-	return found, nil
-}
-
 func cacheDirectory() (string, error) {
 	root, err := os.UserCacheDir()
 	if err != nil {
 		return "", fmt.Errorf("find user cache directory: %w", err)
 	}
 
-	return filepath.Join(root, "ipatool", "sap", "apple-assets-v2"), nil
+	return filepath.Join(root, "ipatool", "sap", assetCacheDirectory), nil
 }
 
 func readCache(directory string) (Bundle, error) {
@@ -338,19 +229,19 @@ func validate(bundle Bundle) error {
 
 func bundleFrom(files map[string][]byte) Bundle {
 	return Bundle{
-		CommerceKit:  files["CommerceKit"],
-		CommerceCore: files["CommerceCore"],
-		CoreFP:       files["CoreFP"],
-		CoreFPICXS:   files["CoreFP.icxs"],
+		AppleMediaServices: files["AppleMediaServices"],
+		Commerce:           files["commerce"],
+		CoreFP:             files["CoreFP"],
+		CoreFPICXS:         files["CoreFP.icxs"],
 	}
 }
 
 func bundleFiles(bundle Bundle) map[string][]byte {
 	return map[string][]byte{
-		"CommerceKit":  bundle.CommerceKit,
-		"CommerceCore": bundle.CommerceCore,
-		"CoreFP":       bundle.CoreFP,
-		"CoreFP.icxs":  bundle.CoreFPICXS,
+		"AppleMediaServices": bundle.AppleMediaServices,
+		"commerce":           bundle.Commerce,
+		"CoreFP":             bundle.CoreFP,
+		"CoreFP.icxs":        bundle.CoreFPICXS,
 	}
 }
 
@@ -369,18 +260,4 @@ func mustDigest(value string) [32]byte {
 	copy(digest[:], decoded)
 
 	return digest
-}
-
-type contextTransport struct {
-	ctx  context.Context
-	next http.RoundTripper
-}
-
-func (t contextTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	response, err := t.next.RoundTrip(request.Clone(t.ctx))
-	if err != nil {
-		return nil, fmt.Errorf("fetch Apple software update: %w", err)
-	}
-
-	return response, nil
 }
