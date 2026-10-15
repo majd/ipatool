@@ -376,6 +376,31 @@ var _ = Describe("AppStore (preferred kbsync download)", func() {
 		Expect(generated).To(BeZero())
 	})
 
+	It("reaches unpinned redownload after the preferred catalog lookup and volumeStore miss", func() {
+		bag.URLBag.RedownloadEndpoint = testRedownloadEndpoint
+		bag.URLBag.UpdateEndpoint = testUpdateEndpoint
+		gomock.InOrder(
+			bags.EXPECT().Send(gomock.Any()).Return(http.Result[bagResult]{StatusCode: gohttp.StatusOK, Data: bag}, nil),
+			platforms.EXPECT().Send(gomock.Any()).Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK}, nil).Times(3),
+			platforms.EXPECT().Send(gomock.Any()).Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusNotFound}, nil),
+			downloads.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+				Expect(req.URL).To(ContainSubstring("volumeStoreDownloadProduct"))
+				Expect(req.Payload.(*http.XMLPayload).Content).NotTo(HaveKey("externalVersionId"))
+			}).Return(unavailable, nil),
+			platforms.EXPECT().Send(gomock.Any()).Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK}, nil).Times(3),
+			platforms.EXPECT().Send(gomock.Any()).Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusNotFound}, nil),
+			downloads.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
+				Expect(req.URL).To(Equal(testRedownloadEndpoint + "?guid=" + guid))
+				Expect(req.Payload.(*http.XMLPayload).Content).NotTo(HaveKey("appExtVrsId"))
+			}).Return(success, nil),
+		)
+		actual, platform, err := store.sendDownloadProduct(context.Background(), account, app, guid, "", "")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(actual).To(Equal(success))
+		Expect(platform).To(Equal(PlatformIPhone))
+		Expect(generated).To(BeZero())
+	})
+
 	It("does not send credentials to an invalid preferred endpoint and falls back", func() {
 		bag.URLBag.EntDownloadEndpoint = "https://example.com/WebObjects/DownloadDispatch.woa/wa/ent/download"
 		gomock.InOrder(

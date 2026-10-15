@@ -365,7 +365,7 @@ var _ = Describe("AppStore (Download Product)", func() {
 			Expect(err).To(MatchError(ContainSubstring("failed to resolve latest iOS version for redownload")))
 		})
 
-		It("does not send an unpinned request when the app is absent from the catalog", func() {
+		It("does not send an unpinned request when the public catalog response is empty", func() {
 			mockPlatformClient.EXPECT().Send(gomock.Any()).
 				Return(http.Result[platformVersionLookupResult]{StatusCode: gohttp.StatusOK}, nil).Times(4)
 

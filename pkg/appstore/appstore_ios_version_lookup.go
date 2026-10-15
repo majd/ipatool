@@ -11,6 +11,9 @@ import (
 	"github.com/majd/ipatool/v2/pkg/http"
 )
 
+// Only a catalog 404 confirms absence; empty or malformed metadata is an error.
+var errIOSCatalogAppNotFound = errors.New("iOS catalog lookup returned HTTP 404")
+
 type catalogVersionLookupItem struct {
 	ID         string `json:"id,omitempty"`
 	Type       string `json:"type,omitempty"`
@@ -34,6 +37,10 @@ func (t *appstore) lookupLatestIOSExternalVersionID(app App, countryCode string,
 	})
 	if err != nil {
 		return "", fmt.Errorf("iOS catalog lookup request failed: %w", err)
+	}
+
+	if res.StatusCode == gohttp.StatusNotFound {
+		return "", errIOSCatalogAppNotFound
 	}
 
 	if res.StatusCode != gohttp.StatusOK {

@@ -139,7 +139,7 @@ func (t *appstore) sendEntDownloadRequest(ctx context.Context, endpoint download
 		return res, NewErrorWithMetadata(fmt.Errorf("received ent/download error: %s", res.Data.FailureType), res)
 	}
 
-	if err := validateVersionedDownloadResponse(res, app, versionID, "ent/download"); err != nil {
+	if err := validateDownloadResponse(res, app, versionID, "ent/download"); err != nil {
 		return res, err
 	}
 
