@@ -99,12 +99,20 @@ func (t *appstore) sendDownloadProduct(ctx context.Context, acc Account, app App
 
 	if externalVersionID == "" && (platform == "" || platform == PlatformIPhone || platform == PlatformIPad) {
 		// Unpinned redownloads can fail or return a tvOS package. Select
-		// the current iOS build before sending.
+		// the current iOS build when the catalog has an offer.
 		if platform == "" {
 			platform = PlatformIPhone
 		}
 
 		externalVersionID, err = t.lookupLatestExternalVersionID(acc, app, platform)
+		if errors.Is(err, errIOSCatalogAppNotFound) {
+			// A delisted app can still be available to this account. Try once
+			// without a version; Download validates the returned package's platform.
+			res, err := t.sendUnpinnedRedownload(ctx, redownload, acc, app, guid)
+
+			return res, platform, err
+		}
+
 		if err != nil {
 			return res, platform, fmt.Errorf("failed to resolve latest iOS version for redownload: %w", err)
 		}
@@ -130,6 +138,33 @@ func (t *appstore) sendDownloadProduct(ctx context.Context, acc Account, app App
 	return redownloadRes, platform, nil
 }
 
+func (t *appstore) sendUnpinnedRedownload(ctx context.Context, endpoint downloadProductEndpoint, acc Account, app App, guid string) (http.Result[downloadResult], error) {
+	requestContext, cancel := context.WithTimeout(ctx, http.DefaultAuthenticationTimeout)
+	defer cancel()
+
+	if err := requestContext.Err(); err != nil {
+		return http.Result[downloadResult]{}, fmt.Errorf("redownload request canceled: %w", err)
+	}
+
+	request := t.downloadProductRequest(endpoint, acc, app, guid, "")
+	request.Context = requestContext
+
+	res, err := t.downloadClient.Send(request)
+	if err != nil {
+		return res, fmt.Errorf("failed to send redownload request: %w", err)
+	}
+
+	if err := validateDownloadResponse(res, app, "", "redownload"); err != nil {
+		return res, err
+	}
+
+	if res.Data.FailureType == "" && res.Data.Items[0].URL == "" {
+		return res, errors.New("redownload response has no package URL")
+	}
+
+	return res, nil
+}
+
 func isEmptyRedownloadError(err error) bool {
 	var unexpected *http.UnexpectedResponseError
 
@@ -151,10 +186,12 @@ func (t *appstore) sendUpdateProduct(endpoint string, acc Account, app App, guid
 		return res, fmt.Errorf("failed to send update request: %w", err)
 	}
 
-	return res, validateVersionedDownloadResponse(res, app, externalVersionID, "update")
+	return res, validateDownloadResponse(res, app, externalVersionID, "update")
 }
 
-func validateVersionedDownloadResponse(res http.Result[downloadResult], app App, externalVersionID, source string) error {
+// An empty externalVersionID allows the server to select a version while retaining
+// the app identity checks. Explicit and catalog-selected versions must match.
+func validateDownloadResponse(res http.Result[downloadResult], app App, externalVersionID, source string) error {
 	if res.Data.FailureType != "" {
 		return nil
 	}
@@ -173,7 +210,7 @@ func validateVersionedDownloadResponse(res http.Result[downloadResult], app App,
 
 	metadata := res.Data.Items[0].Metadata
 	if fmt.Sprint(metadata["itemId"]) != fmt.Sprint(app.ID) ||
-		fmt.Sprint(metadata["softwareVersionExternalIdentifier"]) != externalVersionID {
+		(externalVersionID != "" && fmt.Sprint(metadata["softwareVersionExternalIdentifier"]) != externalVersionID) {
 		return fmt.Errorf("%s response does not match the requested app or version", source)
 	}
 
