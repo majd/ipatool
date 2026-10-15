@@ -201,6 +201,12 @@ func (*appstore) validatePackagePlatform(path string, platform Platform) error {
 			return fmt.Errorf("failed to decode info plist: %w", err)
 		}
 
+		// Legacy iOS apps may predate CFBundleSupportedPlatforms. Only a
+		// missing declaration qualifies; an empty or conflicting one does not.
+		if expectedPlatform == "iPhoneOS" && info.SupportedPlatforms == nil {
+			return nil
+		}
+
 		for _, supportedPlatform := range info.SupportedPlatforms {
 			if supportedPlatform == expectedPlatform {
 				return nil

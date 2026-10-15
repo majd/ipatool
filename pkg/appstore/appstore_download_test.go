@@ -750,9 +750,11 @@ var _ = Describe("AppStore (Download)", func() {
 			packageWriter := zip.NewWriter(packageBuffer)
 			infoWriter, err := packageWriter.Create("Payload/Test.app/Info.plist")
 			Expect(err).ToNot(HaveOccurred())
-			info, err := plist.Marshal(map[string]interface{}{
-				"CFBundleSupportedPlatforms": []string{supportedPlatform},
-			}, plist.BinaryFormat)
+			infoValues := map[string]interface{}{"CFBundleIdentifier": "com.example.app"}
+			if supportedPlatform != "" {
+				infoValues["CFBundleSupportedPlatforms"] = []string{supportedPlatform}
+			}
+			info, err := plist.Marshal(infoValues, plist.BinaryFormat)
 			Expect(err).ToNot(HaveOccurred())
 			_, err = infoWriter.Write(info)
 			Expect(err).ToNot(HaveOccurred())
@@ -836,6 +838,11 @@ var _ = Describe("AppStore (Download)", func() {
 			}
 			Expect(outputPath + ".tmp").ToNot(BeAnExistingFile())
 		},
+		Entry("legacy iPhone download accepts a missing declaration", PlatformIPhone, "", "", "", true),
+		Entry("legacy iPad download accepts a missing declaration", PlatformIPad, "", "", "", true),
+		Entry("legacy default redownload accepts a missing declaration", Platform(""), "", "redownload", "", true),
+		Entry("legacy default update accepts a missing declaration", Platform(""), "", "update", "", true),
+		Entry("legacy pinned update accepts a missing declaration", Platform(""), "18372", "update", "", true),
 		Entry("iPhone accepts iOS", PlatformIPhone, "", "", "iPhoneOS", true),
 		Entry("iPad accepts iOS", PlatformIPad, "", "", "iPhoneOS", true),
 		Entry("iPhone rejects tvOS", PlatformIPhone, "", "", "AppleTVOS", false),
@@ -1107,9 +1114,11 @@ var _ = Describe("AppStore (Download)", func() {
 				w, err := zipFile.Create(path)
 				Expect(err).ToNot(HaveOccurred())
 
-				info, err := plist.Marshal(map[string]interface{}{
-					"CFBundleSupportedPlatforms": platforms,
-				}, plist.BinaryFormat)
+				infoValues := map[string]interface{}{"CFBundleIdentifier": "com.example.app"}
+				if platforms != nil {
+					infoValues["CFBundleSupportedPlatforms"] = platforms
+				}
+				info, err := plist.Marshal(infoValues, plist.BinaryFormat)
 				Expect(err).ToNot(HaveOccurred())
 
 				_, err = w.Write(info)
@@ -1150,7 +1159,50 @@ var _ = Describe("AppStore (Download)", func() {
 			Entry("iPad accepts iPhoneOS", PlatformIPad, []string{"iPhoneOS"}, true),
 			Entry("iPhone rejects AppleTVOS", PlatformIPhone, []string{"AppleTVOS"}, false),
 			Entry("iPad rejects XROS", PlatformIPad, []string{"XROS"}, false),
-			Entry("missing platform declaration", PlatformIPhone, []string{}, false),
+			Entry("iPhone accepts a missing platform declaration", PlatformIPhone, nil, true),
+			Entry("iPad accepts a missing platform declaration", PlatformIPad, nil, true),
+			Entry("iPhone rejects an empty platform declaration", PlatformIPhone, []string{}, false),
+			Entry("iPad rejects an empty platform declaration", PlatformIPad, []string{}, false),
+		)
+
+		DescribeTable("rejects missing declarations for other platforms",
+			func(platform Platform) {
+				path := writePackage(nil)
+				defer os.Remove(path)
+
+				Expect((&appstore{}).validatePackagePlatform(path, platform)).To(HaveOccurred())
+			},
+			Entry("tvOS", PlatformAppleTV),
+			Entry("watchOS", PlatformWatchOS),
+			Entry("visionOS", PlatformVisionOS),
+		)
+
+		It("rejects a package without a top-level app plist", func() {
+			path := writePackageWithInfoPlists(map[string][]string{
+				"Payload/Test.app/PlugIns/Legacy.app/Info.plist": nil,
+			})
+			defer os.Remove(path)
+
+			Expect((&appstore{}).validatePackagePlatform(path, PlatformIPhone)).To(HaveOccurred())
+		})
+
+		DescribeTable("rejects malformed legacy app metadata",
+			func(info string) {
+				path := filepath.Join(GinkgoT().TempDir(), "app.ipa")
+				buffer := new(bytes.Buffer)
+				writer := zip.NewWriter(buffer)
+				entry, err := writer.Create("Payload/Test.app/Info.plist")
+				Expect(err).ToNot(HaveOccurred())
+				_, err = io.WriteString(entry, info)
+				Expect(err).ToNot(HaveOccurred())
+				Expect(writer.Close()).To(Succeed())
+				Expect(os.WriteFile(path, buffer.Bytes(), 0600)).To(Succeed())
+
+				Expect((&appstore{}).validatePackagePlatform(path, PlatformIPhone)).To(
+					MatchError(ContainSubstring("failed to decode info plist")))
+			},
+			Entry("invalid plist", "not a plist"),
+			Entry("invalid declaration type", `<plist version="1.0"><dict><key>CFBundleSupportedPlatforms</key><integer>1</integer></dict></plist>`),
 		)
 
 		It("does not accept iOS support declared only by an embedded app", func() {
