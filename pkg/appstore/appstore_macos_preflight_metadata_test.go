@@ -96,7 +96,7 @@ var _ = Describe("Mac preflight version metadata", func() {
 		defer server.Close()
 		downloads := http.NewMockClient[downloadResult](ctrl)
 		machines := machine.NewMockMachine(ctrl)
-		store := &appstore{downloadClient: downloads, machine: machines, os: operatingsystem.New(), httpClient: http.NewClient[interface{}](http.Args{})}
+		store := &appstore{downloadClient: downloads, machine: machines, os: operatingsystem.New(), httpClient: newDownloadTestClient()}
 		machines.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
 		downloads.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
 			Expect(req.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("externalVersionId", versionID))

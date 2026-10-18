@@ -3,6 +3,7 @@ package sap
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 )
 
@@ -11,6 +12,9 @@ const supportedVersion = uint32(200)
 var errSignerClosed = errors.New("SAP signer is closed")
 
 type Config struct {
+	HTTPClient interface {
+		Do(*http.Request) (*http.Response, error)
+	}
 	SetupURL       string
 	CertificateURL string
 	Version        uint32

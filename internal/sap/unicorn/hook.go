@@ -10,6 +10,11 @@ import (
 
 const hookCode = 1 << 2
 
+const hookUnmappedMemory = 1<<4 | 1<<5 | 1<<6
+
+// MemoryFaultHook may map missing guest memory and return true to retry access.
+type MemoryFaultHook func(address uint64, size uint32) bool
+
 type CodeHook func(address uint64, size uint32)
 
 type hookState struct {
@@ -41,22 +46,45 @@ var (
 
 		return 0
 	})
+	memoryFaultTrampoline = purego.NewCallback(func(
+		_ purego.CDecl, _ uintptr, _ int32, address uint64, size int32, _ int64, userData uintptr,
+	) uintptr {
+		callback, ok := codeHookCallbacks.Load(userData)
+		if ok && callback.(MemoryFaultHook)(address, uint32(size)) {
+			return 1
+		}
+
+		return 0
+	})
 )
 
 // AddCodeHook registers callback for instructions whose start address is in
 // the inclusive range [begin, end]. The callback is retained until the Hook or
 // Engine is closed; it runs through a C ABI trampoline and must not panic.
 func (e *Engine) AddCodeHook(begin, end uint64, callback CodeHook) (*Hook, error) {
+	if callback == nil {
+		return nil, errors.New("unicorn code hook callback is nil")
+	}
+
+	return e.addHook(hookCode, codeHookTrampoline, begin, end, callback)
+}
+
+// AddMemoryFaultHook supports demand loading verified cache pages during bootstrap.
+func (e *Engine) AddMemoryFaultHook(callback MemoryFaultHook) (*Hook, error) {
+	if callback == nil {
+		return nil, errors.New("unicorn memory hook callback is nil")
+	}
+
+	return e.addHook(hookUnmappedMemory, memoryFaultTrampoline, 1, 0, callback)
+}
+
+func (e *Engine) addHook(kind int32, trampoline uintptr, begin, end uint64, callback any) (*Hook, error) {
 	handle, done, err := e.beginOperation()
 	if err != nil {
 		return nil, err
 	}
 
 	defer done()
-
-	if callback == nil {
-		return nil, errors.New("unicorn code hook callback is nil")
-	}
 
 	id := uintptr(codeHookID.Add(1))
 	if id == 0 {
@@ -66,7 +94,7 @@ func (e *Engine) AddCodeHook(begin, end uint64, callback CodeHook) (*Hook, error
 	codeHookCallbacks.Store(id, callback)
 
 	var hookHandle uintptr
-	if err := e.err(e.api.hookAdd(handle, &hookHandle, hookCode, codeHookTrampoline, id, begin, end)); err != nil {
+	if err := e.err(e.api.hookAdd(handle, &hookHandle, kind, trampoline, id, begin, end)); err != nil {
 		codeHookCallbacks.Delete(id)
 
 		return nil, err

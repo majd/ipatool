@@ -3,6 +3,8 @@ package appstore
 import (
 	"time"
 
+	"github.com/majd/ipatool/v2/internal/store"
+
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	"github.com/majd/ipatool/v2/pkg/util/machine"
@@ -65,28 +67,36 @@ type Args struct {
 	ActionSignerFactory ActionSignerFactory
 }
 
+// NewAppStore creates a client using the compiled Store profile.
 func NewAppStore(args Args) AppStore {
+	var macAddress func() (string, error)
+	if args.Machine != nil {
+		macAddress = args.Machine.MacAddress
+	}
+
+	backend := store.New(args.CookieJar, macAddress)
 	clientArgs := http.Args{
 		CookieJar: args.CookieJar,
+		Executor:  backend.Client("request"),
 	}
 
 	actionSignerFactory := args.ActionSignerFactory
 	if actionSignerFactory == nil {
-		actionSignerFactory = defaultActionSignerFactory
+		actionSignerFactory = frameworkActionSignerFactory(backend.Client("api"))
 	}
 
 	return &appstore{
 		keychain:            args.Keychain,
-		loginClient:         http.NewClient[loginResult](http.Args{CookieJar: args.CookieJar, Authentication: true}),
+		loginClient:         http.NewClient[loginResult](http.Args{CookieJar: args.CookieJar, Authentication: true, Executor: backend.Client("authenticate")}),
 		searchClient:        http.NewClient[searchResult](clientArgs),
-		purchaseClient:      http.NewClient[purchaseResult](clientArgs),
+		purchaseClient:      http.NewClient[purchaseResult](http.Args{CookieJar: args.CookieJar, Executor: backend.Client("purchase")}),
 		downloadClient:      http.NewClient[downloadResult](clientArgs),
 		kbsyncGenerator:     defaultKBSyncGenerator,
 		platformClient:      http.NewClient[platformVersionLookupResult](clientArgs),
 		storefrontClient:    http.NewClient[[]byte](clientArgs),
-		bagClient:           http.NewClient[bagResult](http.Args{CookieJar: args.CookieJar, Timeout: http.DefaultAuthenticationTimeout}),
+		bagClient:           http.NewClient[bagResult](http.Args{CookieJar: args.CookieJar, Timeout: http.DefaultAuthenticationTimeout, Executor: backend.Client("bag")}),
 		ownedAppsClient:     http.NewClient[[]byte](clientArgs),
-		httpClient:          http.NewClient[interface{}](clientArgs),
+		httpClient:          http.NewClient[interface{}](http.Args{CookieJar: args.CookieJar, Executor: backend.Client("transfer")}),
 		macDecrypterFactory: defaultMacPackageDecrypterFactory,
 		actionSignerFactory: actionSignerFactory,
 		authRetrySleep:      time.Sleep,
@@ -94,3 +104,9 @@ func NewAppStore(args Args) AppStore {
 		os:                  args.OperatingSystem,
 	}
 }
+
+// NewAppStoreWithSetup is retained for source compatibility. The callback is no
+// longer invoked because Store profiles are precomputed.
+//
+// Deprecated: Use NewAppStore.
+func NewAppStoreWithSetup(args Args, _ func()) AppStore { return NewAppStore(args) }

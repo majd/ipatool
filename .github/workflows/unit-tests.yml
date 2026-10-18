@@ -6,6 +6,45 @@ on:
       - main
 
 jobs:
+  cross_build_library:
+    name: Cross-build Windows library consumer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+          cache: true
+      - name: Build from an independent module without dependency replacements
+        shell: bash
+        env:
+          GOWORK: "off"
+          CGO_ENABLED: "0"
+        run: |
+          consumer_dir=$(mktemp -d)
+          cd "$consumer_dir"
+          go mod init example.com/ipatool-consumer
+          go mod edit -require=github.com/majd/ipatool/v2@v2.0.0
+          go mod edit -replace="github.com/majd/ipatool/v2=$GITHUB_WORKSPACE"
+          cat > main.go <<'EOF'
+          package main
+
+          import (
+              "context"
+              "github.com/majd/ipatool/v2/pkg/appstore"
+          )
+
+          func main() {
+              _ = appstore.NewAppStore(appstore.Args{})
+              if err := appstore.Prepare(context.Background()); err != nil {
+                  panic(err)
+              }
+          }
+          EOF
+          go mod tidy
+          GOOS=windows GOARCH=amd64 go build -o consumer-amd64.exe .
+          GOOS=windows GOARCH=arm64 go build -o consumer-arm64.exe .
+
   run_tests:
     name: Run tests
     runs-on: ${{ matrix.runner }}
@@ -19,5 +58,5 @@ jobs:
         with:
           go-version: "1.26.5"
           cache: true
-      - run: go generate github.com/majd/ipatool/...
-      - run: go test -v github.com/majd/ipatool/...
+      - run: go generate ./...
+      - run: go test -v -timeout 20m ./...

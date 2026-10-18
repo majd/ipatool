@@ -66,15 +66,16 @@ type api struct {
 }
 
 type Engine struct {
-	api       api
-	handle    uintptr
-	library   library
-	hooks     hookState
-	stateMu   sync.Mutex
-	active    sync.WaitGroup
-	closing   bool
-	closeDone chan struct{}
-	closeErr  error
+	memoryGuard *memoryGuard
+	api         api
+	handle      uintptr
+	library     library
+	hooks       hookState
+	stateMu     sync.Mutex
+	active      sync.WaitGroup
+	closing     bool
+	closeDone   chan struct{}
+	closeErr    error
 }
 
 func New(ctx context.Context) (*Engine, error) {
@@ -196,6 +197,10 @@ func (e *Engine) MemRead(address, size uint64) ([]byte, error) {
 	}
 	defer done()
 
+	if err := e.checkMemory(address, size); err != nil {
+		return nil, err
+	}
+
 	data := make([]byte, size)
 	if len(data) == 0 {
 		return data, nil
@@ -217,6 +222,10 @@ func (e *Engine) MemReadInto(data []byte, address uint64) error {
 		return nil
 	}
 
+	if err := e.checkMemory(address, uint64(len(data))); err != nil {
+		return err
+	}
+
 	return e.err(e.api.memRead(handle, address, unsafe.Pointer(&data[0]), uint64(len(data))))
 }
 
@@ -229,6 +238,10 @@ func (e *Engine) MemWrite(address uint64, data []byte) error {
 
 	if len(data) == 0 {
 		return nil
+	}
+
+	if err := e.checkMemory(address, uint64(len(data))); err != nil {
+		return err
 	}
 
 	return e.err(e.api.memWrite(handle, address, unsafe.Pointer(&data[0]), uint64(len(data))))
@@ -289,7 +302,11 @@ func (e *Engine) Start(begin, end uint64) error {
 
 	defer done()
 
-	return e.err(e.api.emuStart(handle, begin, end, 0, 0))
+	if err := e.executionError(nil); err != nil {
+		return err
+	}
+
+	return e.executionError(e.err(e.api.emuStart(handle, begin, end, 0, 0)))
 }
 
 func (e *Engine) StartBounded(begin, end uint64, timeout time.Duration, instructionLimit uint64) error {
@@ -309,7 +326,11 @@ func (e *Engine) StartBounded(begin, end uint64, timeout time.Duration, instruct
 
 	defer done()
 
-	if err := e.err(e.api.emuStart(handle, begin, end, microseconds, instructionLimit)); err != nil {
+	if err := e.executionError(nil); err != nil {
+		return err
+	}
+
+	if err := e.executionError(e.err(e.api.emuStart(handle, begin, end, microseconds, instructionLimit))); err != nil {
 		return err
 	}
 

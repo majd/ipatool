@@ -16,12 +16,12 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/blacktop/go-apfs"
-	"github.com/blacktop/go-apfs/pkg/disk"
-	"github.com/blacktop/go-apfs/pkg/disk/dmg"
-	"github.com/blacktop/go-apfs/types"
 	"github.com/deploymenttheory/go-macos-pkg/pkg/lzbitmap"
 	"github.com/go-compressions/lzfse"
+	"github.com/majd/go-apfs"
+	"github.com/majd/go-apfs/pkg/disk"
+	"github.com/majd/go-apfs/pkg/disk/dmg"
+	"github.com/majd/go-apfs/types"
 )
 
 const (

@@ -31,9 +31,10 @@ const (
 )
 
 type dyldCache struct {
-	members []*dyldCacheMember
-	primary *dyldCacheMember
-	slide5  *dyldSlideInfo5
+	members              []*dyldCacheMember
+	primary              *dyldCacheMember
+	slide5               *dyldSlideInfo5
+	relativeSelectorBase uint64
 }
 
 type dyldCacheMember struct {
@@ -89,11 +90,14 @@ func extractDyldImageFromFiles(opener dyldCacheOpener, imagePath, outputPath str
 	if err != nil {
 		return fmt.Errorf("find %s in shared cache: %w", imagePath, err)
 	}
-	imageMachO, err := cache.openImage(image)
+	imageMachO, err := cache.openImage(image, machotypes.LC_SYMTAB, machotypes.LC_DYSYMTAB)
 	if err != nil {
 		return fmt.Errorf("read %s from shared cache: %w", imagePath, err)
 	}
 	defer imageMachO.Close()
+	if err = cache.imageSymbols(image, imageMachO); err != nil {
+		return fmt.Errorf("read %s symbols: %w", imagePath, err)
+	}
 
 	var chainedFixups *fixupchains.DyldChainedFixups
 	if imageMachO.HasFixups() {
@@ -113,7 +117,7 @@ func extractDyldImageFromFiles(opener dyldCacheOpener, imagePath, outputPath str
 	return nil
 }
 
-func (c *dyldCache) openImage(image *dyldImage) (*macho.File, error) {
+func (c *dyldCache) openImage(image *dyldImage, excluding ...machotypes.LoadCmd) (*macho.File, error) {
 	linkeditAddress, err := image.linkeditAddress()
 	if err != nil {
 		return nil, err
@@ -143,10 +147,12 @@ func (c *dyldCache) openImage(image *dyldImage) (*macho.File, error) {
 	file, err := macho.NewFile(
 		io.NewSectionReader(image.member.file, int64(image.offset), image.member.size-int64(image.offset)),
 		macho.FileConfig{
-			Offset:          int64(image.offset),
-			SectionReader:   sectionReader,
-			CacheReader:     reader,
-			VMAddrConverter: converter,
+			Offset:               int64(image.offset),
+			SectionReader:        sectionReader,
+			CacheReader:          reader,
+			VMAddrConverter:      converter,
+			RelativeSelectorBase: c.relativeSelectorBase,
+			LoadExcluding:        excluding,
 		},
 	)
 	if err != nil {

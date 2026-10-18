@@ -1,8 +1,13 @@
 package http
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 type Request struct {
+	// Timeout applies to transport I/O after runtime asset preparation.
+	Timeout        time.Duration
 	Context        context.Context
 	NoRedirects    bool
 	Method         string
