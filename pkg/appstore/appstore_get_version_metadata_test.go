@@ -154,7 +154,7 @@ var _ = Describe("HTTPRangeReaderAt", func() {
 		server, _, _ := testIPAServerWithRangeLog(data, &rangeLog)
 		defer server.Close()
 
-		reader, size, err := newHTTPRangeReaderAt(http.NewClient[interface{}](http.Args{}), server.URL)
+		reader, size, err := newHTTPRangeReaderAt(newDownloadTestClient(), server.URL)
 		Expect(err).NotTo(HaveOccurred())
 		Expect(size).To(Equal(int64(len(data))))
 
@@ -185,7 +185,7 @@ var _ = Describe("AppStore (GetVersionMetadata)", func() {
 			machine:        mockMachine,
 			bagClient:      mockBagClient,
 			downloadClient: mockDownloadClient,
-			httpClient:     http.NewClient[interface{}](http.Args{}),
+			httpClient:     newDownloadTestClient(),
 		}
 	})
 

@@ -2,12 +2,10 @@ package http
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -15,8 +13,6 @@ import (
 
 	"howett.net/plist"
 )
-
-const appStoreAuthPath = "/WebObjects/MZFinance.woa/wa/authenticate"
 
 const DefaultAuthenticationTimeout = 30 * time.Second
 
@@ -46,14 +42,17 @@ type Client[R interface{}] interface {
 }
 
 type client[R interface{}] struct {
-	internalClient http.Client
+	executor       Executor
+	timeout        time.Duration
 	cookieJar      CookieJar
 	authentication bool
 }
 
 type Args struct {
+	Executor  Executor
 	CookieJar CookieJar
-	// Authentication isolates login connections and reports only allowlisted response diagnostics.
+	// Authentication enables allowlisted login diagnostics and its default timeout.
+	// The executor owns connection isolation and redirect handling.
 	Authentication bool
 	// Timeout covers the request and response body. Zero uses the authentication
 	// default for login clients and leaves other clients without an overall limit.
@@ -84,108 +83,44 @@ func (e *UnexpectedResponseError) Error() string {
 	return fmt.Sprintf("unexpected response from Apple (HTTP %d): %s", e.StatusCode, e.Snippet)
 }
 
-type AddHeaderTransport struct {
-	T http.RoundTripper
-}
-
-func (t *AddHeaderTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if req.Header.Get("User-Agent") == "" {
-		req.Header.Set("User-Agent", DefaultUserAgent)
-	}
-
-	res, err := t.T.RoundTrip(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make round trip: %w", err)
-	}
-
-	return res, nil
-}
-
+// NewClient creates a typed response adapter. Requests require an explicit
+// executor; production Store clients always supply the framework backend.
 func NewClient[R interface{}](args Args) Client[R] {
-	transport := http.DefaultTransport
 	timeout := args.Timeout
-
-	if args.Authentication {
-		if timeout == 0 {
-			timeout = DefaultAuthenticationTimeout
-		}
-
-		// Keep the cookie jar, but do not share pooled connections with other
-		// Store operations or reuse a connection for the next login attempt.
-		isolated := http.DefaultTransport.(*http.Transport).Clone()
-		isolated.DisableKeepAlives = true
-		isolated.DialContext = (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext
-		transport = isolated
+	if args.Authentication && timeout == 0 {
+		timeout = DefaultAuthenticationTimeout
 	}
 
-	return &client[R]{
-		authentication: args.Authentication,
-		internalClient: http.Client{
-			Timeout: timeout,
-			Jar:     args.CookieJar,
-			CheckRedirect: func(req *http.Request, via []*http.Request) error {
-				// Login validates destinations and replays the signed POST itself.
-				// Never let net/http turn an authentication redirect into a GET.
-				if args.Authentication || (len(via) > 0 &&
-					(via[len(via)-1].URL.Path == appStoreAuthPath || via[len(via)-1].URL.Path == appStoreAuthPath+"/")) {
-					return http.ErrUseLastResponse
-				}
-
-				return nil
-			},
-			Transport: &AddHeaderTransport{transport},
-		},
-		cookieJar: args.CookieJar,
-	}
+	return &client[R]{executor: args.Executor, timeout: timeout, cookieJar: args.CookieJar, authentication: args.Authentication}
 }
 
 func (c *client[R]) Send(req Request) (Result[R], error) {
-	var (
-		data []byte
-		err  error
-	)
-
-	if req.Payload != nil {
-		data, err = req.Payload.data()
-		if err != nil {
-			return Result[R]{}, fmt.Errorf("failed to get payload data: %w", err)
-		}
+	var data []byte
+	if payload, ok := req.Payload.(*RawPayload); ok {
+		data = bytes.Clone(payload.Content)
 	}
 
-	request, err := http.NewRequest(req.Method, req.URL, bytes.NewReader(data))
-	if err != nil {
-		return Result[R]{}, fmt.Errorf("failed to create request: %w", err)
+	if c.executor == nil {
+		return Result[R]{}, errors.New("request executor is not configured")
 	}
 
-	if req.Context != nil {
-		request = request.WithContext(req.Context)
-	}
+	req.Timeout = c.timeout
+	res, err := c.executor.Send(req, data)
 
-	for key, val := range req.Headers {
-		request.Header.Set(key, val)
-	}
-
-	if req.ActionSigner != nil {
-		signature, err := req.ActionSigner.Sign(data)
-		if err != nil {
-			return Result[R]{}, fmt.Errorf("failed to sign Apple action: %w", err)
-		}
-
-		request.Header.Set(HeaderAppleActionSignature, base64.StdEncoding.EncodeToString(signature))
-	}
-
-	client := c.internalClient
-	if req.NoRedirects {
-		client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	}
-
-	res, err := client.Do(request)
 	if err != nil {
 		return Result[R]{}, fmt.Errorf("request failed: %w", &TransportError{Err: err})
 	}
+
+	if res == nil || res.Body == nil {
+		return Result[R]{}, errors.New("request returned no HTTP response")
+	}
+
 	defer res.Body.Close()
 
-	err = c.cookieJar.Save()
+	if c.cookieJar != nil {
+		err = c.cookieJar.Save()
+	}
+
 	if err != nil {
 		return Result[R]{}, fmt.Errorf("failed to save cookies: %w", err)
 	}
@@ -224,7 +159,11 @@ func (c *client[R]) handleRawResponse(res *http.Response) (Result[R], error) {
 }
 
 func (c *client[R]) Do(req *http.Request) (*http.Response, error) {
-	res, err := c.internalClient.Do(req)
+	if c.executor == nil {
+		return nil, errors.New("request executor is not configured")
+	}
+
+	res, err := c.executor.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("received error: %w", err)
 	}
@@ -319,6 +258,16 @@ func (c *client[R]) handleXMLResponse(res *http.Response) (Result[R], error) {
 		Headers:    responseHeaders(res),
 		Data:       data,
 	}, nil
+}
+
+// DecodePropertyList accepts the legacy XML envelope used by Apple's URL bag.
+// The framework backend uses the same normalization as the typed HTTP client.
+func DecodePropertyList(data []byte, value any) error {
+	if _, err := plist.Unmarshal(normalizeXMLPlistBody(data), value); err != nil {
+		return fmt.Errorf("decode Apple property list: %w", err)
+	}
+
+	return nil
 }
 
 func responseHeaders(res *http.Response) map[string]string {

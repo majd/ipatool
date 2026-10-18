@@ -20,8 +20,8 @@ type remoteFile struct {
 }
 
 //nolint:wsl // Request construction and validation are clearer in protocol order.
-func openRemoteFile(ctx context.Context, client *http.Client, source string) (*remoteFile, error) {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, source, nil)
+func openRemoteFile(ctx context.Context, client *http.Client) (*remoteFile, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, macOSRestoreURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("create remote image request: %w", err)
 	}
@@ -47,7 +47,7 @@ func openRemoteFile(ctx context.Context, client *http.Client, source string) (*r
 		return nil, fmt.Errorf("open remote image: server returned unexpected byte range %d-%d", start, end)
 	}
 
-	return &remoteFile{ctx: ctx, client: client, url: source, size: size}, nil
+	return &remoteFile{ctx: ctx, client: client, url: macOSRestoreURL, size: size}, nil
 }
 
 //nolint:wsl // Parsing checks are clearer in wire-format order.

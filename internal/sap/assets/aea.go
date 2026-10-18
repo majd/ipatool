@@ -23,6 +23,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 
 	"github.com/go-compressions/lzfse"
@@ -544,6 +545,12 @@ func (r *aeaReader) decodeSegment(cacheIndex int, segment aeaSegment) ([]byte, e
 		decoded = compressed
 	} else {
 		decoded, err = lzfse.Decompress(compressed)
+		if err != nil && strings.Contains(err.Error(), "fse: stream too short") {
+			padded, e := padLZFSEStreams(compressed)
+			if e == nil {
+				decoded, err = lzfse.Decompress(padded)
+			}
+		}
 		if err != nil {
 			return nil, fmt.Errorf("decompress AEA cluster %d segment %d: %w", segment.cluster, segment.index, err)
 		}

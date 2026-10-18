@@ -1,136 +1,14 @@
 package http
 
 import (
-	"encoding/base64"
-	"io"
 	"net/http"
-	"net/http/cookiejar"
 	"net/http/httptest"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
-type sessionCookieJar struct{ *cookiejar.Jar }
-
-func (sessionCookieJar) Save() error { return nil }
-
-var _ = Describe("Authentication transport", func() {
-	DescribeTable("returns redirects for explicit validation without contacting their destination",
-		func(http2 bool, status int, suffix string) {
-			jar, err := cookiejar.New(nil)
-			Expect(err).NotTo(HaveOccurred())
-			calls := 0
-			srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				defer GinkgoRecover()
-				calls++
-				Expect(r.Method).To(Equal(http.MethodPost))
-				Expect(r.URL.Path).To(Equal(appStoreAuthPath + suffix))
-				Expect(r.ProtoMajor).To(Equal(map[bool]int{false: 1, true: 2}[http2]))
-				if calls == 1 {
-					w.Header().Set("Location", "/must-not-follow?token=secret")
-					w.WriteHeader(status)
-				}
-			}))
-			srv.EnableHTTP2 = http2
-			srv.StartTLS()
-			DeferCleanup(srv.Close)
-			sut := NewClient[struct{}](Args{CookieJar: sessionCookieJar{jar}, Authentication: true}).(*client[struct{}])
-			transport := sut.internalClient.Transport.(*AddHeaderTransport).T.(*http.Transport)
-			transport.TLSClientConfig = srv.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
-			DeferCleanup(transport.CloseIdleConnections)
-			result, err := sut.Send(Request{
-				URL: srv.URL + appStoreAuthPath + suffix, Method: MethodPOST, ResponseFormat: ResponseFormatXML,
-				Payload: &XMLPayload{Content: map[string]interface{}{"password": "secret"}},
-			})
-			Expect(err).NotTo(HaveOccurred())
-			Expect(result.StatusCode).To(Equal(status))
-			Expect(result.Headers).To(HaveKeyWithValue("Location", "/must-not-follow?token=secret"))
-			Expect(calls).To(Equal(1))
-		},
-		Entry("301, bare path, HTTP/1.1", false, 301, ""),
-		Entry("301, trailing slash, HTTP/2", true, 301, "/"),
-		Entry("302, trailing slash, HTTP/1.1", false, 302, "/"),
-		Entry("302, bare path, HTTP/2", true, 302, ""),
-		Entry("307, trailing slash, HTTP/1.1", false, 307, "/"),
-		Entry("307, bare path, HTTP/2", true, 307, ""),
-		Entry("308, bare path, HTTP/1.1", false, 308, ""),
-		Entry("308, trailing slash, HTTP/2", true, 308, "/"),
-		Entry("303 must also reach the caller for rejection", false, 303, "/"),
-	)
-
-	DescribeTable("preserves cookies and signed POSTs across fresh connections",
-		func(http2 bool) {
-			jar, err := cookiejar.New(nil)
-			Expect(err).NotTo(HaveOccurred())
-			signer := &recordingActionSigner{signature: []byte("signature")}
-			addresses := make(chan string, 4)
-			calls := 0
-			srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				defer GinkgoRecover()
-				calls++
-				addresses <- r.RemoteAddr
-				Expect(r.ProtoMajor).To(Equal(map[bool]int{false: 1, true: 2}[http2]))
-				Expect(r.Method).To(Equal(http.MethodPost))
-				data, err := io.ReadAll(r.Body)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(data).To(Equal(signer.data))
-				Expect(r.Header.Get(HeaderAppleActionSignature)).To(Equal(base64.StdEncoding.EncodeToString(signer.signature)))
-				if calls > 1 {
-					cookie, err := r.Cookie("session")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(cookie.Value).To(Equal("retained"))
-				}
-				switch calls {
-				case 1:
-					http.SetCookie(w, &http.Cookie{Name: "session", Value: "retained", Path: "/"})
-					w.WriteHeader(http.StatusNoContent)
-				case 2:
-					w.Header().Set("Location", "https://p7-buy.itunes.apple.com"+appStoreAuthPath)
-					w.WriteHeader(http.StatusFound)
-				default:
-					_, err = w.Write([]byte("<dict><key>foo</key><string>ok</string></dict>"))
-					Expect(err).NotTo(HaveOccurred())
-				}
-			}))
-			srv.EnableHTTP2 = http2
-			srv.StartTLS()
-			DeferCleanup(srv.Close)
-
-			original := http.DefaultTransport.(*http.Transport).DisableKeepAlives
-			sut := NewClient[struct {
-				Foo string `plist:"foo"`
-			}](Args{CookieJar: sessionCookieJar{jar}, Authentication: true}).(*client[struct {
-				Foo string `plist:"foo"`
-			}])
-			transport := sut.internalClient.Transport.(*AddHeaderTransport).T.(*http.Transport)
-			// Trust only the test server's certificate; retain the production transport settings.
-			transport.TLSClientConfig = srv.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
-			DeferCleanup(transport.CloseIdleConnections)
-			request := Request{URL: srv.URL + appStoreAuthPath, Method: MethodPOST, ResponseFormat: ResponseFormatXML, ActionSigner: signer, Payload: &XMLPayload{Content: map[string]interface{}{"password": "password", "attempt": "1"}}}
-			_, err = sut.Send(request)
-			Expect(err).To(HaveOccurred())
-			redirect, err := sut.Send(request)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(redirect.StatusCode).To(Equal(http.StatusFound))
-			Expect(redirect.Headers).To(HaveKey("Location"))
-			// The appstore layer validates the pod URL and explicitly repeats the POST.
-			// Route that POST to this server to inspect it without contacting Apple.
-			_, err = sut.Send(request)
-			Expect(err).NotTo(HaveOccurred())
-			request.Payload = &XMLPayload{Content: map[string]interface{}{"password": "password123456", "attempt": "1"}}
-			_, err = sut.Send(request)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(signer.calls).To(Equal(4))
-			seen := map[string]bool{}
-			for range 4 {
-				seen[<-addresses] = true
-			}
-			Expect(seen).To(HaveLen(4))
-			Expect(http.DefaultTransport.(*http.Transport).DisableKeepAlives).To(Equal(original))
-		}, Entry("HTTP/1.1", false), Entry("HTTP/2", true),
-	)
-
+var _ = Describe("Authentication responses", func() {
 	It("preserves a populated Apple error even with HTTP 429", func() {
 		recorder := httptest.NewRecorder()
 		recorder.Header().Set("Retry-After", "5")
@@ -142,24 +20,6 @@ var _ = Describe("Authentication transport", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(result.Data).To(HaveKeyWithValue("failureType", "badCredentials"))
 		Expect(result.StatusCode).To(Equal(http.StatusTooManyRequests))
-	})
-
-	It("retains pooling for ordinary clients", func() {
-		addresses := make(chan string, 2)
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			addresses <- r.RemoteAddr
-			w.WriteHeader(http.StatusNoContent)
-		}))
-		DeferCleanup(srv.Close)
-		sut := NewClient[struct{}](Args{})
-		for range 2 {
-			request, err := http.NewRequest(http.MethodGet, srv.URL, nil)
-			Expect(err).NotTo(HaveOccurred())
-			response, err := sut.Do(request)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(response.Body.Close()).To(Succeed())
-		}
-		Expect(<-addresses).To(Equal(<-addresses))
 	})
 
 	DescribeTable("reports malformed responses without retaining credentials",

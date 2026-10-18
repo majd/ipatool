@@ -114,8 +114,6 @@ func Open(name string, input []byte) (*Image, error) {
 
 //nolint:wsl // Instruction decoding is clearer when related operations stay together.
 func (i *Image) removePointerAuthentication() error {
-	const nop = uint32(0xd503201f)
-
 	for _, section := range i.file.Sections {
 		if !section.Flags.IsPureInstructions() && !section.Flags.IsSomeInstructions() {
 			continue
@@ -127,42 +125,56 @@ func (i *Image) removePointerAuthentication() error {
 		}
 		for offset := start; offset+4 <= end; offset += 4 {
 			instruction := binary.LittleEndian.Uint32(i.data[offset:])
-			var replacement uint32
-
-			switch instruction & 0xfffffc00 {
-			case 0xd71f0800, 0xd71f0c00, 0xd61f0800, 0xd61f0c00:
-				replacement = 0xd61f0000 | (instruction & 0x3e0) // br xN
-			case 0xd73f0800, 0xd73f0c00, 0xd63f0800, 0xd63f0c00:
-				replacement = 0xd63f0000 | (instruction & 0x3e0) // blr xN
-			case 0xdac10000, 0xdac10400, 0xdac10800, 0xdac10c00,
-				0xdac11000, 0xdac11400, 0xdac11800, 0xdac11c00:
-				replacement = nop
-			default:
-				switch instruction {
-				case 0xd65f0bff, 0xd65f0fff:
-					replacement = 0xd65f03c0 // ret
-				case 0xd503211f, 0xd503215f, 0xd503219f, 0xd50321df,
-					0xd503233f, 0xd503237f, 0xd50323bf, 0xd50323ff,
-					0xd50320ff:
-					replacement = nop
-				default:
-					opcode := instruction & 0xffffffe0
-					if opcode == 0xdac123e0 || opcode == 0xdac127e0 ||
-						opcode == 0xdac12be0 || opcode == 0xdac12fe0 ||
-						opcode == 0xdac133e0 || opcode == 0xdac137e0 ||
-						opcode == 0xdac13be0 || opcode == 0xdac13fe0 ||
-						opcode == 0xdac143e0 || opcode == 0xdac147e0 {
-						replacement = nop
-					}
-				}
-			}
-			if replacement != 0 {
+			replacement := WithoutPointerAuthentication(instruction)
+			if replacement != instruction {
 				binary.LittleEndian.PutUint32(i.data[offset:], replacement)
 			}
 		}
 	}
 
 	return nil
+}
+
+// WithoutPointerAuthentication rewrites ARM64e authentication operations for a
+// VM with canonical, unsigned pointers. Other instructions are unchanged.
+func WithoutPointerAuthentication(instruction uint32) uint32 {
+	const nop = uint32(0xd503201f)
+
+	var replacement uint32
+
+	switch instruction & 0xfffffc00 {
+	case 0xd71f0800, 0xd71f0c00, 0xd61f0800, 0xd61f0c00:
+		replacement = 0xd61f0000 | (instruction & 0x3e0) // br xN
+	case 0xd73f0800, 0xd73f0c00, 0xd63f0800, 0xd63f0c00:
+		replacement = 0xd63f0000 | (instruction & 0x3e0) // blr xN
+	case 0xdac10000, 0xdac10400, 0xdac10800, 0xdac10c00,
+		0xdac11000, 0xdac11400, 0xdac11800, 0xdac11c00:
+		replacement = nop
+	default:
+		switch instruction {
+		case 0xd65f0bff, 0xd65f0fff:
+			replacement = 0xd65f03c0 // ret
+		case 0xd503211f, 0xd503215f, 0xd503219f, 0xd50321df,
+			0xd503233f, 0xd503237f, 0xd50323bf, 0xd50323ff,
+			0xd50320ff:
+			replacement = nop
+		default:
+			opcode := instruction & 0xffffffe0
+			if opcode == 0xdac123e0 || opcode == 0xdac127e0 ||
+				opcode == 0xdac12be0 || opcode == 0xdac12fe0 ||
+				opcode == 0xdac133e0 || opcode == 0xdac137e0 ||
+				opcode == 0xdac13be0 || opcode == 0xdac13fe0 ||
+				opcode == 0xdac143e0 || opcode == 0xdac147e0 {
+				replacement = nop
+			}
+		}
+	}
+
+	if replacement == 0 {
+		return instruction
+	}
+
+	return replacement
 }
 
 func arm64Slice(input []byte) ([]byte, error) {

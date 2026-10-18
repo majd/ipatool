@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	apphttp "github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 	"github.com/schollz/progressbar/v3"
 )
@@ -33,7 +32,7 @@ func TestDownloadFileResumesWithAndWithoutProgress(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			store := &appstore{httpClient: apphttp.NewClient[interface{}](apphttp.Args{}), os: operatingsystem.New()}
+			store := &appstore{httpClient: newDownloadTestClient(), os: operatingsystem.New()}
 
 			var progress *progressbar.ProgressBar
 			if interactive {
@@ -105,7 +104,7 @@ func TestDownloadFileValidatesResumeResponses(t *testing.T) {
 				}))
 				defer server.Close()
 
-				store := &appstore{httpClient: apphttp.NewClient[interface{}](apphttp.Args{}), os: operatingsystem.New()}
+				store := &appstore{httpClient: newDownloadTestClient(), os: operatingsystem.New()}
 
 				var progress *progressbar.ProgressBar
 				if interactive {

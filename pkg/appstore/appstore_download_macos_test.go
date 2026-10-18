@@ -15,7 +15,6 @@ import (
 	"os"
 	"path/filepath"
 
-	apphttp "github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -57,7 +56,7 @@ var _ = Describe("AppStore (macOS download)", func() {
 
 	download := func(operatingSystem operatingsystem.OperatingSystem) (DownloadOutput, error) {
 		store := &appstore{
-			httpClient:          apphttp.NewClient[interface{}](apphttp.Args{}),
+			httpClient:          newDownloadTestClient(),
 			macDecrypterFactory: factory,
 			os:                  operatingSystem,
 		}
@@ -138,7 +137,7 @@ var _ = Describe("AppStore (macOS download)", func() {
 
 		ctx, cancel := context.WithCancel(context.Background())
 		store := &appstore{
-			httpClient:          apphttp.NewClient[interface{}](apphttp.Args{}),
+			httpClient:          newDownloadTestClient(),
 			macDecrypterFactory: factory,
 			os:                  operatingsystem.New(),
 		}
@@ -227,7 +226,7 @@ var _ = Describe("AppStore (macOS download)", func() {
 			return decrypter, nil
 		}
 		store := &appstore{
-			httpClient:          apphttp.NewClient[interface{}](apphttp.Args{}),
+			httpClient:          newDownloadTestClient(),
 			macDecrypterFactory: factory,
 			os:                  operatingsystem.New(),
 		}

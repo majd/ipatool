@@ -20,7 +20,9 @@ const (
 )
 
 type setupProtocol struct {
-	client *http.Client
+	client interface {
+		Do(*http.Request) (*http.Response, error)
+	}
 }
 
 func (p setupProtocol) certificate(ctx context.Context, endpoint string) ([]byte, error) {

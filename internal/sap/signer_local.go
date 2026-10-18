@@ -61,6 +61,9 @@ func NewSigner(ctx context.Context, config Config) (ActionSigner, error) {
 	}
 
 	protocol := setupProtocol{client: &http.Client{Timeout: 30 * time.Second}}
+	if config.HTTPClient != nil {
+		protocol.client = config.HTTPClient
+	}
 
 	certificate, err := protocol.certificate(ctx, config.CertificateURL)
 	if err != nil {

@@ -73,7 +73,7 @@ var _ = Describe("Mac version metadata", func() {
 		defer server.Close()
 		downloads := http.NewMockClient[downloadResult](ctrl)
 		machines := machine.NewMockMachine(ctrl)
-		store := &appstore{downloadClient: downloads, machine: machines, httpClient: http.NewClient[interface{}](http.Args{})}
+		store := &appstore{downloadClient: downloads, machine: machines, httpClient: newDownloadTestClient()}
 		machines.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
 		downloads.EXPECT().Send(gomock.Any()).Return(http.Result[downloadResult]{StatusCode: 200, Data: downloadResult{Items: []downloadItemResult{{
 			URL: server.URL, Sinfs: []Sinf{{Data: []byte("sinf")}}, Metadata: map[string]interface{}{"software-platform": "ios"},
@@ -96,7 +96,7 @@ var _ = Describe("Mac version metadata", func() {
 		downloads := http.NewMockClient[downloadResult](ctrl)
 		machines := machine.NewMockMachine(ctrl)
 		decrypter := &fakeMacPackageDecrypter{output: macMetadataXAR(info, modified)}
-		store := &appstore{downloadClient: downloads, machine: machines, os: operatingsystem.New(), httpClient: http.NewClient[interface{}](http.Args{}), macDecrypterFactory: func(ctx context.Context, hw, dp []byte) (macPackageDecrypter, error) {
+		store := &appstore{downloadClient: downloads, machine: machines, os: operatingsystem.New(), httpClient: newDownloadTestClient(), macDecrypterFactory: func(ctx context.Context, hw, dp []byte) (macPackageDecrypter, error) {
 			Expect(hw).To(Equal([]byte{0, 17, 34, 51, 68, 85}))
 			Expect(dp).To(Equal([]byte("dpInfo")))
 

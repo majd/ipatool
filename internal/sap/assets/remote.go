@@ -30,7 +30,7 @@ var frameworkImagePaths = []string{
 
 func resolveRemoteImage(ctx context.Context) (Bundle, error) {
 	client := &http.Client{}
-	remote, err := openRemoteFile(ctx, client, macOSRestoreURL)
+	remote, err := openRemoteFile(ctx, client)
 	if err != nil {
 		return Bundle{}, fmt.Errorf("resolve macOS %s (%s) frameworks: %w", macOSVersion, macOSBuild, err)
 	}

@@ -306,7 +306,7 @@ func retryableAuthenticationError(err error) (int, bool) {
 		}
 
 		// A url.Error can report Timeout false when its cause is wrapped by
-		// AddHeaderTransport, so inspect each underlying error as well.
+		// the framework transport, so inspect each underlying error as well.
 		for cause := transportErr.Err; cause != nil; cause = errors.Unwrap(cause) {
 			if networkErr, ok := cause.(net.Error); ok && networkErr.Timeout() {
 				return 0, true

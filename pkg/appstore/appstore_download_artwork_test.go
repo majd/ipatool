@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	apphttp "github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/util/operatingsystem"
 )
 
@@ -23,7 +22,7 @@ func TestDownloadArtworkAndIncludeInIPA(t *testing.T) {
 	}))
 	defer server.Close()
 
-	store := &appstore{httpClient: apphttp.NewClient[interface{}](apphttp.Args{}), os: operatingsystem.New()}
+	store := &appstore{httpClient: newDownloadTestClient(), os: operatingsystem.New()}
 	for _, url := range []string{"", server.URL} {
 		data, err := store.downloadArtwork(context.Background(), url)
 		if err != nil {
@@ -101,7 +100,7 @@ func TestDownloadArtworkRejectsFailedResponse(t *testing.T) {
 	server := httptest.NewServer(http.NotFoundHandler())
 	defer server.Close()
 
-	store := &appstore{httpClient: apphttp.NewClient[interface{}](apphttp.Args{})}
+	store := &appstore{httpClient: newDownloadTestClient()}
 	if _, err := store.downloadArtwork(context.Background(), server.URL); err == nil {
 		t.Fatal("accepted error page as artwork")
 	}

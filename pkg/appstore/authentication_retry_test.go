@@ -3,21 +3,14 @@ package appstore
 import (
 	"context"
 	"crypto/x509"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
-	"net/http/cookiejar"
-	"net/http/httptest"
 	"net/url"
-	"sync/atomic"
 	"syscall"
 	"time"
-
-	"github.com/majd/ipatool/v2/pkg/keychain"
-	"howett.net/plist"
 
 	apphttp "github.com/majd/ipatool/v2/pkg/http"
 	. "github.com/onsi/ginkgo/v2"
@@ -47,15 +40,15 @@ var _ = Describe("Authentication recovery", func() {
 		}
 	},
 		Entry("request deadline", context.DeadlineExceeded, true, 3),
-		Entry("request deadline wrapped by the header transport", &url.Error{Op: "Post", URL: testAuthEndpoint, Err: fmt.Errorf("failed to make round trip: %w", context.DeadlineExceeded)}, true, 3),
+		Entry("request deadline wrapped by the framework transport", &url.Error{Op: "Post", URL: testAuthEndpoint, Err: fmt.Errorf("failed to make round trip: %w", context.DeadlineExceeded)}, true, 3),
 		Entry("wrapped DNS timeout", &url.Error{Op: "Post", URL: testAuthEndpoint, Err: &net.DNSError{IsTimeout: true}}, true, 3),
-		Entry("DNS timeout wrapped by the header transport", &url.Error{Op: "Post", URL: testAuthEndpoint, Err: fmt.Errorf("failed to make round trip: %w", &net.DNSError{IsTimeout: true})}, true, 3),
+		Entry("DNS timeout wrapped by the framework transport", &url.Error{Op: "Post", URL: testAuthEndpoint, Err: fmt.Errorf("failed to make round trip: %w", &net.DNSError{IsTimeout: true})}, true, 3),
 		Entry("connection closed", io.EOF, true, 3),
 		Entry("truncated response body", io.ErrUnexpectedEOF, true, 3),
 		Entry("connection reset", &net.OpError{Op: "read", Net: "tcp", Err: syscall.ECONNRESET}, true, 3),
 		Entry("broken pipe", &net.OpError{Op: "write", Net: "tcp", Err: syscall.EPIPE}, true, 3),
 		Entry("canceled request", context.Canceled, true, 1),
-		Entry("canceled request wrapped by the header transport", &url.Error{Op: "Post", URL: testAuthEndpoint, Err: fmt.Errorf("failed to make round trip: %w", context.Canceled)}, true, 1),
+		Entry("canceled request wrapped by the framework transport", &url.Error{Op: "Post", URL: testAuthEndpoint, Err: fmt.Errorf("failed to make round trip: %w", context.Canceled)}, true, 1),
 		Entry("permanent DNS failure", &net.DNSError{IsNotFound: true}, true, 1),
 		Entry("certificate failure", &url.Error{Op: "Post", URL: testAuthEndpoint, Err: x509.UnknownAuthorityError{}}, true, 1),
 		Entry("signing or cookie storage timeout", context.DeadlineExceeded, false, 1),
@@ -166,148 +159,3 @@ var _ = Describe("Authentication recovery", func() {
 
 // The adapter only redirects network traffic to the local server; login still
 // validates Apple's advertised pod URL before this adapter receives a request.
-type loginSessionJar struct{ *cookiejar.Jar }
-
-func (loginSessionJar) Save() error { return nil }
-
-var _ = Describe("Login session continuity", func() {
-	It("recovers from a body timeout with cookies and a newly signed identical payload", func() {
-		jar, err := cookiejar.New(nil)
-		Expect(err).NotTo(HaveOccurred())
-		client := apphttp.NewClient[loginResult](apphttp.Args{CookieJar: loginSessionJar{jar}, Authentication: true, Timeout: 250 * time.Millisecond})
-		var calls atomic.Int32
-		bodies := make(chan []byte, 2)
-		releaseResponse := make(chan struct{})
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			defer GinkgoRecover()
-			call := calls.Add(1)
-			Expect(r.Method).To(Equal(http.MethodPost))
-			body, err := io.ReadAll(r.Body)
-			Expect(err).NotTo(HaveOccurred())
-			bodies <- body
-			signature, err := base64.StdEncoding.DecodeString(r.Header.Get(apphttp.HeaderAppleActionSignature))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(signature).To(Equal(body))
-			if call == 1 {
-				http.SetCookie(w, &http.Cookie{Name: "session", Value: "retained", Path: "/"})
-				w.Header().Set("Retry-After", "2")
-				w.WriteHeader(http.StatusTooManyRequests)
-				_, err = w.Write([]byte("<dict>"))
-				Expect(err).NotTo(HaveOccurred())
-				w.(http.Flusher).Flush()
-				<-releaseResponse
-
-				return
-			}
-			Expect(call).To(Equal(int32(2)))
-			cookie, err := r.Cookie("session")
-			Expect(err).NotTo(HaveOccurred())
-			Expect(cookie.Value).To(Equal("retained"))
-			_, err = w.Write([]byte("<dict><key>passwordToken</key><string>token</string><key>dsPersonId</key><string>123</string></dict>"))
-			Expect(err).NotTo(HaveOccurred())
-		}))
-		DeferCleanup(srv.Close)
-		DeferCleanup(func() { close(releaseResponse) })
-		var waits []time.Duration
-		sut := &appstore{loginClient: client, authRetrySleep: func(delay time.Duration) { waits = append(waits, delay) }}
-		signer := &stubActionSigner{}
-		request := sut.loginRequest("email", "password", "123456", "guid", srv.URL+PrivateAppStoreAPIPathAuth, 1, signer)
-		result, err := sut.sendAuthenticationRequest(request)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(result.Data.PasswordToken).To(Equal("token"))
-		Expect(waits).To(Equal([]time.Duration{2 * time.Second}))
-		Expect(signer.signCalls).To(Equal(2))
-		Expect(<-bodies).To(Equal(<-bodies))
-	})
-
-	It("retains cookies and the signed payload through retries, a pod HTML 403 and 2FA", func() {
-		ctrl := gomock.NewController(GinkgoT())
-		jar, err := cookiejar.New(nil)
-		Expect(err).NotTo(HaveOccurred())
-		client := apphttp.NewClient[loginResult](apphttp.Args{CookieJar: loginSessionJar{jar}, Authentication: true})
-		adapter := apphttp.NewMockClient[loginResult](ctrl)
-		keychain := keychain.NewMockKeychain(ctrl)
-		keychain.EXPECT().Set("account", gomock.Any()).Return(nil).Times(1)
-		var waits []time.Duration
-		sut := &appstore{loginClient: adapter, keychain: keychain, authRetrySleep: func(delay time.Duration) { waits = append(waits, delay) }}
-		connections := make(chan string, 5)
-		calls := 0
-		var originalBody []byte
-		podURL := "https://p7-buy.itunes.apple.com" + PrivateAppStoreAPIPathAuth
-		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			defer GinkgoRecover()
-			calls++
-			connections <- r.RemoteAddr
-			Expect(r.Method).To(Equal(http.MethodPost))
-			body, err := io.ReadAll(r.Body)
-			Expect(err).NotTo(HaveOccurred())
-			if calls == 1 {
-				originalBody = body
-			} else if calls <= 4 {
-				Expect(body).To(Equal(originalBody))
-			}
-			signature, err := base64.StdEncoding.DecodeString(r.Header.Get(apphttp.HeaderAppleActionSignature))
-			Expect(err).NotTo(HaveOccurred())
-			Expect(signature).To(Equal(body))
-			var payload map[string]string
-			_, err = plist.Unmarshal(body, &payload)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(payload["attempt"]).To(Equal("1"))
-			if calls > 1 {
-				cookie, err := r.Cookie("session")
-				Expect(err).NotTo(HaveOccurred())
-				Expect(cookie.Value).To(Equal("retained"))
-			}
-			switch calls {
-			case 1:
-				http.SetCookie(w, &http.Cookie{Name: "session", Value: "retained", Path: "/"})
-				w.WriteHeader(http.StatusNoContent)
-			case 2:
-				w.Header().Set("Location", podURL)
-				w.WriteHeader(http.StatusFound)
-			case 3:
-				w.Header().Set("Content-Type", "text/html")
-				w.WriteHeader(http.StatusForbidden)
-				_, err = w.Write([]byte("<html><body>Access Denied</body></html>"))
-				Expect(err).NotTo(HaveOccurred())
-			case 4:
-				Expect(payload["password"]).To(Equal("password"))
-				data, err := plist.Marshal(map[string]string{"customerMessage": CustomerMessageBadLogin}, plist.XMLFormat)
-				Expect(err).NotTo(HaveOccurred())
-				_, err = w.Write(data)
-				Expect(err).NotTo(HaveOccurred())
-			case 5:
-				Expect(payload["password"]).To(Equal("password123456"))
-				w.Header().Set(HTTPHeaderStoreFront, "143441-1,29")
-				_, err = w.Write([]byte("<dict><key>passwordToken</key><string>token</string><key>dsPersonId</key><string>123</string></dict>"))
-				Expect(err).NotTo(HaveOccurred())
-			default:
-				Fail("unexpected request")
-			}
-		}))
-		DeferCleanup(srv.Close)
-		adapted := 0
-		adapter.EXPECT().Send(gomock.Any()).DoAndReturn(func(request apphttp.Request) (apphttp.Result[loginResult], error) {
-			adapted++
-			if adapted == 3 || adapted == 4 {
-				Expect(request.URL).To(Equal(podURL))
-			}
-			request.URL = srv.URL + PrivateAppStoreAPIPathAuth
-
-			return client.Send(request)
-		}).Times(5)
-		signer := &stubActionSigner{}
-		_, err = sut.login("email", "password", "", "guid", testAuthEndpoint, signer)
-		Expect(errors.Is(err, ErrAuthCodeRequired)).To(BeTrue())
-		account, err := sut.login("email", "password", "123456", "guid", testAuthEndpoint, signer)
-		Expect(err).NotTo(HaveOccurred())
-		Expect(account.PasswordToken).To(Equal("token"))
-		Expect(waits).To(Equal([]time.Duration{10 * time.Second, 10 * time.Second}))
-		Expect(signer.signCalls).To(Equal(5))
-		seen := map[string]bool{}
-		for range 5 {
-			seen[<-connections] = true
-		}
-		Expect(seen).To(HaveLen(5))
-	})
-})

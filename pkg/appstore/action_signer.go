@@ -22,16 +22,13 @@ type ActionSigner interface {
 
 type ActionSignerFactory func(config SAPConfig, machineID []byte) (ActionSigner, error)
 
-func defaultActionSignerFactory(config SAPConfig, machineID []byte) (ActionSigner, error) {
-	signer, err := sap.NewSigner(context.Background(), sap.Config{
-		SetupURL:       config.SetupURL,
-		CertificateURL: config.CertificateURL,
-		Version:        config.Version,
-		HardwareID:     machineID,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("create SAP signer: %w", err)
-	}
+func frameworkActionSignerFactory(client http.Executor) ActionSignerFactory {
+	return func(config SAPConfig, machineID []byte) (ActionSigner, error) {
+		signer, err := sap.NewSigner(context.Background(), sap.Config{SetupURL: config.SetupURL, CertificateURL: config.CertificateURL, Version: config.Version, HardwareID: machineID, HTTPClient: client})
+		if err != nil {
+			return nil, fmt.Errorf("create SAP signer: %w", err)
+		}
 
-	return signer, nil
+		return signer, nil
+	}
 }

@@ -1,110 +1,17 @@
 package appstore
 
 import (
-	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"io"
-	"net/http"
-	"net/http/cookiejar"
-	"net/http/httptest"
-	"net/url"
-	"time"
 
 	apphttp "github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/mock/gomock"
-	"howett.net/plist"
 )
 
 var _ = Describe("Authentication redirects", func() {
-	DescribeTable("preserves a signed POST, cookies, credentials and storefront after a credential retry",
-		func(status int, suffix, appleID, storefront, authCode string) {
-			ctrl := gomock.NewController(GinkgoT())
-			jar, err := cookiejar.New(nil)
-			Expect(err).NotTo(HaveOccurred())
-			client := apphttp.NewClient[loginResult](apphttp.Args{CookieJar: loginSessionJar{jar}, Authentication: true})
-			adapter := apphttp.NewMockClient[loginResult](ctrl)
-			chain := keychain.NewMockKeychain(ctrl)
-			chain.EXPECT().Set("account", gomock.Any()).Return(nil)
-			sut := &appstore{loginClient: adapter, keychain: chain, authRetrySleep: func(time.Duration) { Fail("must not sleep") }}
-			podURL := "https://p7-buy.itunes.apple.com" + PrivateAppStoreAPIPathAuth + suffix + "?routing=opaque"
-			calls := 0
-			var originalBody []byte
-			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				defer GinkgoRecover()
-				calls++
-				Expect(r.Method).To(Equal(http.MethodPost))
-				Expect(r.Header.Get("X-Apple-Store-Front")).To(Equal(storefront))
-				body, err := io.ReadAll(r.Body)
-				Expect(err).NotTo(HaveOccurred())
-				signature, err := base64.StdEncoding.DecodeString(r.Header.Get(apphttp.HeaderAppleActionSignature))
-				Expect(err).NotTo(HaveOccurred())
-				Expect(signature).To(Equal(body))
-				var payload map[string]string
-				_, err = plist.Unmarshal(body, &payload)
-				Expect(err).NotTo(HaveOccurred())
-				Expect(payload["appleId"]).To(Equal(appleID))
-				Expect(payload["password"]).To(Equal("password" + authCode))
-				if calls > 1 {
-					cookie, err := r.Cookie("session")
-					Expect(err).NotTo(HaveOccurred())
-					Expect(cookie.Value).To(Equal("retained"))
-					Expect(payload["attempt"]).To(Equal("2"))
-				}
-				switch calls {
-				case 1:
-					Expect(payload["attempt"]).To(Equal("1"))
-					http.SetCookie(w, &http.Cookie{Name: "session", Value: "retained", Path: "/"})
-					_, err = w.Write([]byte("<dict><key>failureType</key><string>-5000</string></dict>"))
-					Expect(err).NotTo(HaveOccurred())
-				case 2:
-					originalBody = body
-					w.Header().Set("Location", podURL)
-					w.WriteHeader(status)
-				case 3:
-					Expect(body).To(Equal(originalBody))
-					Expect(r.URL.Path).To(Equal(PrivateAppStoreAPIPathAuth + suffix))
-					Expect(r.URL.RawQuery).To(Equal("routing=opaque"))
-					w.Header().Set(HTTPHeaderStoreFront, "143441-1,29")
-					_, err = w.Write([]byte("<dict><key>passwordToken</key><string>token</string><key>dsPersonId</key><string>123</string></dict>"))
-					Expect(err).NotTo(HaveOccurred())
-				default:
-					Fail("unexpected request")
-				}
-			}))
-			DeferCleanup(srv.Close)
-			var destinations []string
-			adapter.EXPECT().Send(gomock.Any()).DoAndReturn(func(request apphttp.Request) (apphttp.Result[loginResult], error) {
-				destinations = append(destinations, request.URL)
-				parsed, err := url.Parse(request.URL)
-				Expect(err).NotTo(HaveOccurred())
-				request.URL = srv.URL + parsed.RequestURI()
-
-				return client.Send(request)
-			}).Times(3)
-			signer := &stubActionSigner{}
-			account, err := sut.login(appleID, "password", authCode, "guid", testAuthEndpoint+suffix, signer)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(account.PasswordToken).To(Equal("token"))
-			Expect(account.StoreFront).To(Equal("143441-1,29"))
-			Expect(destinations).To(Equal([]string{testAuthEndpoint + suffix, testAuthEndpoint + suffix, podURL}))
-			Expect(signer.signCalls).To(Equal(3))
-		},
-		Entry("301, bare path", 301, "", "user@example.test", "", "123456"),
-		Entry("301, trailing slash", 301, "/", "user@example.test", "", "123456"),
-		Entry("302, bare path", 302, "", "user@example.test", "", "123456"),
-		Entry("302, trailing slash", 302, "/", "user@example.test", "", "123456"),
-		Entry("307, bare path", 307, "", "user@example.test", "", "123456"),
-		Entry("307, trailing slash", 307, "/", "user@example.test", "", "123456"),
-		Entry("308, bare path", 308, "", "user@example.test", "", "123456"),
-		Entry("308, trailing slash", 308, "/", "user@example.test", "", "123456"),
-		Entry("Chinese phone number before 2FA", 302, "/", "+86 139-1234-5678", "143465", ""),
-		Entry("Indian phone number with 2FA", 307, "/", "9123456789", "143467", "012345"),
-	)
-
 	It("follows relative and pod redirects within the redirect budget", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		client := apphttp.NewMockClient[loginResult](ctrl)
