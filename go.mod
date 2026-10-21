@@ -12,7 +12,7 @@ require (
 	github.com/ebitengine/purego v0.10.2
 	github.com/go-compressions/lzfse v0.3.0
 	github.com/juju/persistent-cookiejar v1.0.0
-	github.com/klauspost/compress v1.18.6
+	github.com/klauspost/compress v1.18.7
 	github.com/majd/go-apfs v1.0.29
 	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/onsi/ginkgo/v2 v2.5.0
