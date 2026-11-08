@@ -15,12 +15,17 @@ func (s *shims) registerMemoryServices() error {
 		names   []string
 		handler shimHandler
 	}{
-		{[]string{"_malloc"}, s.malloc},
+		{[]string{"_malloc", "_IOMalloc", "_IOMallocData"}, s.malloc},
+		{[]string{"_IOMallocAligned"}, s.mallocAligned},
+		{[]string{"_IOMallocTypeImpl"}, s.mallocTyped},
+		{[]string{"_IOMallocTypeVarImpl", "_OSObject_typed_operator_new"}, s.mallocTypedVariable},
+		{[]string{"_IOLockAlloc", "_IORWLockAlloc"}, s.mallocLock},
 		{[]string{"_malloc_good_size"}, s.mallocGoodSize},
 		{[]string{"_malloc_size"}, s.mallocSize},
 		{[]string{"_calloc"}, s.calloc},
 		{[]string{"_realloc", "_reallocf"}, s.realloc},
-		{[]string{"_free"}, s.free},
+		{[]string{"_free", "_IOFree", "_IOFreeAligned", "_IOFreeData", "_IOLockFree", "_IORWLockFree", "_OSObject_typed_operator_delete"}, s.free},
+		{[]string{"_IOFreeTypeImpl", "_IOFreeTypeVarImpl"}, s.freeTyped},
 		{[]string{"_mmap"}, s.mmap},
 		{[]string{"_munmap"}, s.munmap},
 		{[]string{"_vm_allocate"}, s.vmAllocate},
@@ -34,6 +39,7 @@ func (s *shims) registerMemoryServices() error {
 		{[]string{"_strcmp"}, s.strcmp},
 		{[]string{"_strncmp"}, s.strncmp},
 		{[]string{"_strlen"}, s.strlen},
+		{[]string{"_strnlen"}, s.strnlen},
 	}
 	for _, service := range services {
 		if err := s.addAliases(service.names, service.handler); err != nil {
@@ -56,6 +62,90 @@ func (s *shims) malloc() error {
 	}
 
 	return s.setResult(address)
+}
+
+func (s *shims) mallocAligned() error {
+	size, err := s.argument(0)
+	if err != nil {
+		return err
+	}
+
+	alignment, err := s.argument(1)
+	if err != nil {
+		return err
+	}
+
+	if alignment == 0 || alignment&(alignment-1) != 0 {
+		return fmt.Errorf("invalid allocation alignment %#x", alignment)
+	}
+
+	address, err := s.allocateAligned(size, alignment)
+	if err != nil {
+		return err
+	}
+
+	return s.setResult(address)
+}
+
+func (s *shims) mallocTyped() error {
+	view, err := s.argument(0)
+	if err != nil {
+		return err
+	}
+
+	size, err := s.readUint32(view + 44)
+	if err != nil {
+		return fmt.Errorf("read typed allocation size: %w", err)
+	}
+
+	address, err := s.allocate(uint64(size & 0x00ff_ffff))
+	if err != nil {
+		return err
+	}
+
+	return s.setResult(address)
+}
+
+func (s *shims) mallocTypedVariable() error {
+	size, err := s.argument(1)
+	if err != nil {
+		return err
+	}
+
+	address, err := s.allocate(size)
+	if err != nil {
+		return err
+	}
+
+	return s.setResult(address)
+}
+
+func (s *shims) mallocLock() error {
+	address, err := s.allocate(8)
+	if err != nil {
+		return err
+	}
+
+	if err := s.engine.MemWrite(address, make([]byte, 8)); err != nil {
+		return fmt.Errorf("initialize malloc lock: %w", err)
+	}
+
+	return s.setResult(address)
+}
+
+func (s *shims) freeTyped() error {
+	address, err := s.argument(1)
+	if err != nil {
+		return err
+	}
+
+	if address != 0 {
+		if err := s.release(address); err != nil {
+			return err
+		}
+	}
+
+	return s.setResult(0)
 }
 
 func (s *shims) mallocGoodSize() error {
@@ -613,4 +703,37 @@ func (s *shims) strlen() error {
 	}
 
 	return s.setResult(uint64(len(value)))
+}
+
+func (s *shims) strnlen() error {
+	address, err := s.argument(0)
+	if err != nil {
+		return err
+	}
+
+	limit, err := s.argument(1)
+	if err != nil {
+		return err
+	}
+
+	if limit > maxGuestTransfer {
+		return fmt.Errorf("string length limit %d exceeds maximum", limit)
+	}
+
+	for offset := uint64(0); offset < limit; {
+		chunk := min(limit-offset, pageSize-(address+offset)%pageSize)
+
+		data, err := s.engine.MemRead(address+offset, chunk)
+		if err != nil {
+			return fmt.Errorf("read bounded guest string: %w", err)
+		}
+
+		if index := bytes.IndexByte(data, 0); index >= 0 {
+			return s.setResult(offset + uint64(index))
+		}
+
+		offset += chunk
+	}
+
+	return s.setResult(limit)
 }

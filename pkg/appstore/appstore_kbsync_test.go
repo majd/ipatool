@@ -214,7 +214,7 @@ var _ = Describe("AppStore (preferred kbsync download)", func() {
 				Expect(req.Headers).To(HaveKeyWithValue("iCloud-DSID", account.DirectoryServicesID))
 				Expect(req.Headers).To(HaveKeyWithValue("X-Apple-Store-Front", account.StoreFront))
 				Expect(req.Headers).To(HaveKeyWithValue("Content-Type", "application/x-www-form-urlencoded; charset=utf-8"))
-				Expect(req.Headers["User-Agent"]).To(HavePrefix("Configurator/2.18 "))
+				Expect(req.Headers["User-Agent"]).To(HavePrefix("Configurator/2.21 "))
 				Expect(req.Payload.(*http.XMLPayload).Content).To(Equal(map[string]interface{}{
 					"creditDisplay": "", "guid": guid, "salableAdamId": "42", "externalVersionId": versionID,
 					"serialNumber": base64.StdEncoding.EncodeToString([]byte{0x54, 0xc8, 0xb0, 0xa9, 0x88, 0x22, 0x33, 0x44, 0x55}),

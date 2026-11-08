@@ -133,7 +133,7 @@ var _ = Describe("AppStore (Bag)", func() {
 				Send(gomock.Any()).
 				Do(func(req http.Request) {
 					Expect(req.Method).To(Equal(http.MethodGET))
-					Expect(req.URL).To(Equal("https://init.itunes.apple.com/bag.xml?guid=AABBCCDDEEFF"))
+					Expect(req.URL).To(Equal("https://init.itunes.apple.com/bag.xml?ix=6&guid=AABBCCDDEEFF"))
 					Expect(req.ResponseFormat).To(Equal(http.ResponseFormatXML))
 					Expect(req.Headers).To(HaveKeyWithValue("Accept", "application/xml"))
 				}).

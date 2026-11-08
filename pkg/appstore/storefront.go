@@ -6,10 +6,11 @@ import (
 )
 
 func countryCodeFromStoreFront(storeFront string) (string, error) {
-	for key, val := range storeFronts {
-		parts := strings.Split(storeFront, "-")
+	identifier, _, _ := strings.Cut(strings.TrimSpace(storeFront), ",")
+	identifier, _, _ = strings.Cut(identifier, "-")
 
-		if len(parts) >= 1 && parts[0] == val {
+	for key, val := range storeFronts {
+		if identifier == val {
 			return key, nil
 		}
 	}

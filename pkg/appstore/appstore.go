@@ -1,9 +1,12 @@
 package appstore
 
 import (
+	gohttp "net/http"
+	"sync"
 	"time"
 
 	"github.com/majd/ipatool/v2/internal/store"
+	"github.com/majd/ipatool/v2/internal/storeauth"
 
 	"github.com/majd/ipatool/v2/pkg/http"
 	"github.com/majd/ipatool/v2/pkg/keychain"
@@ -40,23 +43,28 @@ type AppStore interface {
 }
 
 type appstore struct {
-	keychain            keychain.Keychain
-	loginClient         http.Client[loginResult]
-	searchClient        http.Client[searchResult]
-	purchaseClient      http.Client[purchaseResult]
-	downloadClient      http.Client[downloadResult]
-	kbsyncGenerator     kbsyncGenerator
-	kbsyncCache         kbsyncCache
-	platformClient      http.Client[platformVersionLookupResult]
-	storefrontClient    http.Client[[]byte]
-	bagClient           http.Client[bagResult]
-	ownedAppsClient     http.Client[[]byte]
-	httpClient          http.Client[interface{}]
-	macDecrypterFactory macPackageDecrypterFactory
-	actionSignerFactory ActionSignerFactory
-	authRetrySleep      func(time.Duration)
-	machine             machine.Machine
-	os                  operatingsystem.OperatingSystem
+	keychain              keychain.Keychain
+	loginClient           http.Client[loginResult]
+	searchClient          http.Client[searchResult]
+	purchaseClient        http.Client[purchaseResult]
+	downloadClient        http.Client[downloadResult]
+	kbsyncGenerator       kbsyncGenerator
+	kbsyncCache           kbsyncCache
+	platformClient        http.Client[platformVersionLookupResult]
+	storefrontClient      http.Client[[]byte]
+	bagClient             http.Client[bagResult]
+	ownedAppsClient       http.Client[[]byte]
+	httpClient            http.Client[interface{}]
+	macDecrypterFactory   macPackageDecrypterFactory
+	actionSignerFactory   ActionSignerFactory
+	authRetrySleep        func(time.Duration)
+	machine               machine.Machine
+	os                    operatingsystem.OperatingSystem
+	authBackend           *store.Backend
+	authHTTP              *gohttp.Client
+	authStateMu           sync.Mutex
+	anisetteState         []byte
+	authenticationHeaders gohttp.Header
 }
 
 type Args struct {
@@ -75,6 +83,7 @@ func NewAppStore(args Args) AppStore {
 	}
 
 	backend := store.New(args.CookieJar, macAddress)
+	authHTTP := storeauth.NewHTTPClient(args.CookieJar)
 	clientArgs := http.Args{
 		CookieJar: args.CookieJar,
 		Executor:  backend.Client("request"),
@@ -82,7 +91,7 @@ func NewAppStore(args Args) AppStore {
 
 	actionSignerFactory := args.ActionSignerFactory
 	if actionSignerFactory == nil {
-		actionSignerFactory = frameworkActionSignerFactory(backend.Client("api"))
+		actionSignerFactory = frameworkActionSignerFactory(backend.Client("sap"))
 	}
 
 	return &appstore{
@@ -94,7 +103,7 @@ func NewAppStore(args Args) AppStore {
 		kbsyncGenerator:     defaultKBSyncGenerator,
 		platformClient:      http.NewClient[platformVersionLookupResult](clientArgs),
 		storefrontClient:    http.NewClient[[]byte](clientArgs),
-		bagClient:           http.NewClient[bagResult](http.Args{CookieJar: args.CookieJar, Timeout: http.DefaultAuthenticationTimeout, Executor: backend.Client("bag")}),
+		bagClient:           http.NewClient[bagResult](http.Args{CookieJar: args.CookieJar, Timeout: http.DefaultAuthenticationTimeout, Executor: backend.Client("bag-direct")}),
 		ownedAppsClient:     http.NewClient[[]byte](clientArgs),
 		httpClient:          http.NewClient[interface{}](http.Args{CookieJar: args.CookieJar, Executor: backend.Client("transfer")}),
 		macDecrypterFactory: defaultMacPackageDecrypterFactory,
@@ -102,6 +111,8 @@ func NewAppStore(args Args) AppStore {
 		authRetrySleep:      time.Sleep,
 		machine:             args.Machine,
 		os:                  args.OperatingSystem,
+		authBackend:         backend,
+		authHTTP:            authHTTP,
 	}
 }
 

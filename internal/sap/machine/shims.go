@@ -33,27 +33,55 @@ type freeBlock struct {
 	size    uint64
 }
 
+type xpcObject struct {
+	data        []byte
+	dataAddress uint64
+	hasData     bool
+}
+
 type shimOptions struct {
 	zeroReturnAliases []string
+	pauseRunLoop      bool
 }
 
 type shims struct {
-	engine          *unicorn.Engine
-	hook            *unicorn.Hook
-	entries         map[uint64]shimEntry
-	symbols         map[string]uint64
-	codeCursor      uint64
-	dataCursor      uint64
-	fault           error
-	coreExports     map[string]uint64
-	icxs            []byte
-	icxsOffset      int
-	errno           uint64
-	heapCursor      uint64
-	allocations     map[uint64]guestAllocation
-	freeBlocks      []freeBlock
-	iterator        uint32
-	callbackReturns []uint64
+	engine           *unicorn.Engine
+	hook             *unicorn.Hook
+	entries          map[uint64]shimEntry
+	symbols          map[string]uint64
+	codeCursor       uint64
+	dataCursor       uint64
+	fault            error
+	coreExports      map[string]uint64
+	icxs             []byte
+	icxsOffset       int
+	errno            uint64
+	heapCursor       uint64
+	allocations      map[uint64]guestAllocation
+	freeBlocks       []freeBlock
+	iterator         uint32
+	callbackReturns  []uint64
+	xpcData          []byte
+	xpcObjects       map[uint64]*xpcObject
+	xpcNextObject    uint64
+	xpcEventHandler  uint64
+	xpcReply         []byte
+	xpcReplied       bool
+	xpcSyncReply     []byte
+	machPortCallback uint64
+	machPortContext  uint64
+	machPortInfo     uint64
+	fairPlayHandler  func([]byte, []byte, int) ([]byte, []byte, int32, error)
+	machRPCHandler   func([]byte, int) ([]byte, error)
+	machMessageReply []byte
+	adiFiles         map[string][]byte
+	adiPath          string
+	adiOffset        int
+	hostUUID         [16]byte
+	pauseRunLoop     bool
+	aesVtable        uint64
+	aesService       uint64
+	bufferVtable     uint64
 }
 
 func newShims(engine *unicorn.Engine, coreExports map[string]uint64, icxs []byte) (*shims, error) {
@@ -66,15 +94,20 @@ func newShimsWithOptions(engine *unicorn.Engine, coreExports map[string]uint64, 
 	}
 
 	s := &shims{
-		engine:      engine,
-		entries:     make(map[uint64]shimEntry),
-		symbols:     make(map[string]uint64),
-		codeCursor:  shimBase,
-		dataCursor:  shimBase + shimCodeSize,
-		coreExports: coreExports,
-		icxs:        icxs,
-		allocations: make(map[uint64]guestAllocation),
+		engine:        engine,
+		entries:       make(map[uint64]shimEntry),
+		symbols:       make(map[string]uint64),
+		codeCursor:    shimBase,
+		dataCursor:    shimBase + shimCodeSize,
+		coreExports:   coreExports,
+		icxs:          icxs,
+		allocations:   make(map[uint64]guestAllocation),
+		xpcObjects:    make(map[uint64]*xpcObject),
+		xpcNextObject: 0xffff000000000000,
+		adiFiles:      make(map[string][]byte),
+		pauseRunLoop:  options.pauseRunLoop,
 	}
+
 	if err := s.registerMemoryServices(); err != nil {
 		return nil, err
 	}

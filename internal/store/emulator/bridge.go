@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/sha512"
+	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"math"
@@ -25,6 +26,13 @@ func (r *Runtime) symbol(name string) {
 	}
 
 	switch name {
+	case "xpc_get_type":
+		object := r.objects[r.arg(0)]
+		if object != nil && object.Class == "HostXPCDictionary" {
+			r.set(r.profile.Symbols["__xpc_type_dictionary"])
+		} else {
+			r.set(0)
+		}
 	case "CC_SHA512":
 		length := uint64(uint32(r.arg(1)))
 		if length > heapSize {
@@ -1178,6 +1186,19 @@ func (r *Runtime) message(receiver uint64, selector string, super bool) {
 		object.Value = string(data)
 
 		r.set(receiver)
+	case "initWithBytesNoCopy:length:freeWhenDone:":
+		if !r.kindOf(class, "NSData") || r.arg(3) > 1<<20 {
+			panic("unsupported data buffer initialization")
+		}
+
+		data, err := r.engine.MemRead(r.arg(2), r.arg(3))
+		if err != nil {
+			panic(err)
+		}
+
+		object.Value = data
+
+		r.set(receiver)
 	case "timeIntervalSinceDate:":
 		date := object.Value.(time.Time)
 		other := r.objects[r.arg(2)].Value.(time.Time)
@@ -1703,6 +1724,12 @@ func (r *Runtime) message(receiver uint64, selector string, super bool) {
 		}
 
 		r.set(r.New("NSData", data))
+	case "base64EncodedStringWithOptions:":
+		if !r.kindOf(class, "NSData") {
+			panic("base64 encoding on " + class)
+		}
+
+		r.set(r.New("NSString", base64.StdEncoding.EncodeToString(object.Value.([]byte))))
 	case "removeAllObjects":
 		switch object.Value.(type) {
 		case []uint64:
