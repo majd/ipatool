@@ -581,6 +581,7 @@ func expectOwnedAppsHeaders(headers map[string]string, account Account, guid str
 	Expect(headers).To(HaveKeyWithValue("X-Guid", guid))
 	Expect(headers).To(HaveKeyWithValue("Client-DAAP-Version", "3.12"))
 	Expect(headers).To(HaveKeyWithValue("Client-Cloud-Purchase-Daap-Version", "1.1/Configurator-2.0"))
+	Expect(headers).To(HaveKeyWithValue("User-Agent", storeAuthenticationUserAgent))
 }
 
 func ownedAppsDMAPResponse(apps []App) []byte {

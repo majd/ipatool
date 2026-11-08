@@ -288,6 +288,7 @@ func ownedAppsHeaders(acc Account, guid string, now time.Time) map[string]string
 		"Client-Cloud-Purchase-Daap-Version": "1.1/Configurator-2.0",
 		"Client-DAAP-Version":                "3.12",
 		"Date":                               utc.Format(gohttp.TimeFormat),
+		"User-Agent":                         storeAuthenticationUserAgent,
 		"iCloud-DSID":                        acc.DirectoryServicesID,
 		"X-Apple-I-Client-Time":              utc.Format("2006-01-02T15:04:05Z"),
 		"X-Apple-I-Locale":                   "en_US",
