@@ -534,12 +534,15 @@ func (r *Runtime) networkMessage(receiver uint64, class, selector string, meta b
 		u := object.Value.(*url.URL)
 
 		switch selector {
-		case "setQuery:":
+		case "setQuery:", "setPercentEncodedQuery:":
 			u.RawQuery = ""
 			u.ForceQuery = r.arg(2) != 0
 
 			if r.arg(2) != 0 {
-				u.RawQuery = encodeComponentQuery(r.String(r.arg(2)))
+				u.RawQuery = r.String(r.arg(2))
+				if selector == "setQuery:" {
+					u.RawQuery = encodeComponentQuery(u.RawQuery)
+				}
 			}
 
 			r.set(0)
