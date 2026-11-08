@@ -37,6 +37,14 @@ func storefrontPageFixture(items ...string) []byte {
 }
 
 var _ = Describe("App Store storefront data", func() {
+	DescribeTable("resolves storefront response suffixes", func(storefront, country string) {
+		Expect(countryCodeFromStoreFront(storefront)).To(Equal(country))
+	},
+		Entry("comma suffix", "143441,34", "US"),
+		Entry("dash and comma suffixes", "143441-1,34", "US"),
+		Entry("bare storefront", "143443", "DE"),
+	)
+
 	Describe("storefrontVisionApps", func() {
 		It("keeps unique native visionOS apps in storefront order and applies the limit", func() {
 			body := storefrontPageFixture(

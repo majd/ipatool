@@ -59,9 +59,12 @@ func (t *appstore) bag(guid string) (BagOutput, error) {
 		return BagOutput{}, fmt.Errorf("failed to parse authentication endpoint: %w", err)
 	}
 
-	// The bare path can return unusable responses, including a 301 without
-	// Location. Normalize only the validated bag URL, retaining its host and query.
-	authURL.Path = PrivateAppStoreAPIPathAuth + "/"
+	// The legacy bare path can return unusable responses, including a 301
+	// without Location. The native endpoint must retain its distinct path.
+	if strings.HasSuffix(strings.ToLower(authURL.Hostname()), "buy.itunes.apple.com") {
+		authURL.Path = PrivateAppStoreAPIPathAuth + "/"
+	}
+
 	config.AuthEndpoint = authURL.String()
 
 	return BagOutput{AuthEndpoint: config.AuthEndpoint, SAPConfig: config}, nil
@@ -78,11 +81,34 @@ func (t *appstore) fetchURLBag(guid string) (urlBag, error) {
 		return urlBag{}, fmt.Errorf("received unexpected status code: %d", res.StatusCode)
 	}
 
-	return res.Data.URLBag, nil
+	bag := res.Data.URLBag
+	if bag.AuthEndpoint != "" || bag.EntDownloadEndpoint != "" ||
+		bag.RedownloadEndpoint != "" || bag.UpdateEndpoint != "" ||
+		bag.SAPSetupEndpoint != "" || bag.SAPSetupCertEndpoint != "" ||
+		bag.SAPVersion != "" {
+		return res.Data.URLBag, nil
+	}
+
+	return urlBag{
+		AuthEndpoint:         res.Data.AuthEndpoint,
+		EntDownloadEndpoint:  res.Data.EntDownloadEndpoint,
+		RedownloadEndpoint:   res.Data.RedownloadEndpoint,
+		UpdateEndpoint:       res.Data.UpdateEndpoint,
+		SAPSetupEndpoint:     res.Data.SAPSetupEndpoint,
+		SAPSetupCertEndpoint: res.Data.SAPSetupCertEndpoint,
+		SAPVersion:           res.Data.SAPVersion,
+	}, nil
 }
 
 type bagResult struct {
-	URLBag urlBag `plist:"urlBag,omitempty"`
+	URLBag               urlBag `plist:"urlBag,omitempty"`
+	AuthEndpoint         string `plist:"authenticateAccount,omitempty"`
+	EntDownloadEndpoint  string `plist:"volumeStoreDownloadProduct,omitempty"`
+	RedownloadEndpoint   string `plist:"redownloadProduct,omitempty"`
+	UpdateEndpoint       string `plist:"updateProduct,omitempty"`
+	SAPSetupEndpoint     string `plist:"sign-sap-setup,omitempty"`
+	SAPSetupCertEndpoint string `plist:"sign-sap-setup-cert,omitempty"`
+	SAPVersion           string `plist:"sign-sap-version,omitempty"`
 }
 
 type urlBag struct {
@@ -130,6 +156,15 @@ func validateAuthenticationEndpoint(endpoint string) error {
 	}
 
 	host := strings.ToLower(parsed.Hostname())
+	if host == PrivateAppStoreNativeDomain {
+		switch parsed.Path {
+		case PrivateAppStoreNativePath, PrivateAppStoreNativePath + "/", PrivateAppStoreNativePath + "/fast", PrivateAppStoreNativePath + "/fast/":
+			return nil
+		default:
+			return errors.New("unsupported authentication endpoint")
+		}
+	}
+
 	if host != PrivateAppStoreAPIDomain && !strings.HasSuffix(host, "-buy.itunes.apple.com") {
 		return errors.New("unsupported authentication endpoint")
 	}
@@ -143,11 +178,12 @@ func validateAuthenticationEndpoint(endpoint string) error {
 
 func (*appstore) bagRequest(guid string) http.Request {
 	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s?guid=%s", PrivateInitDomain, PrivateInitPath, guid),
+		URL:            fmt.Sprintf("https://%s%s?ix=6&guid=%s", PrivateInitDomain, PrivateInitPath, guid),
 		Method:         http.MethodGET,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
-			"Accept": "application/xml",
+			"Accept":     "application/xml",
+			"User-Agent": storeAuthenticationUserAgent,
 		},
 	}
 }

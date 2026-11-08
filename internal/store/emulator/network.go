@@ -534,6 +534,17 @@ func (r *Runtime) networkMessage(receiver uint64, class, selector string, meta b
 		u := object.Value.(*url.URL)
 
 		switch selector {
+		case "setQuery:":
+			u.RawQuery = ""
+			u.ForceQuery = r.arg(2) != 0
+
+			if r.arg(2) != 0 {
+				u.RawQuery = encodeComponentQuery(r.String(r.arg(2)))
+			}
+
+			r.set(0)
+
+			return true
 		case "query", "percentEncodedQuery":
 			if u.RawQuery == "" && !u.ForceQuery {
 				r.set(0)
@@ -709,6 +720,26 @@ func (r *Runtime) networkMessage(receiver uint64, class, selector string, meta b
 	}
 
 	return false
+}
+
+func encodeComponentQuery(query string) string {
+	const hexadecimal = "0123456789ABCDEF"
+
+	var encoded strings.Builder
+
+	for index := 0; index < len(query); index++ {
+		character := query[index]
+		if character >= 'a' && character <= 'z' || character >= 'A' && character <= 'Z' ||
+			character >= '0' && character <= '9' || strings.IndexByte("-._~!$&'()*+,;=:@/?", character) >= 0 {
+			encoded.WriteByte(character)
+		} else {
+			encoded.WriteByte('%')
+			encoded.WriteByte(hexadecimal[character>>4])
+			encoded.WriteByte(hexadecimal[character&15])
+		}
+	}
+
+	return encoded.String()
 }
 
 func (r *Runtime) validJSONObject(address uint64, top bool, depth int) bool {

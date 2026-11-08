@@ -49,6 +49,7 @@ type Runtime struct {
 
 	taskLocalFrames             map[uint64][]taskLocalBinding
 	transport                   func(*http.Request) (*http.Response, error)
+	xpcSyncHandler              func(string, []byte) ([]byte, error)
 	inflaters                   map[uint64]*inflateStream
 	responseHeaders             map[uint64]http.Header
 	tasks                       map[uint64]*asyncTask

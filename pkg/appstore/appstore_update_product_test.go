@@ -346,7 +346,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 			expected.Data = downloadResult{FailureType: failure, CustomerMessage: "App Store error"}
 			mockDownloadClient.EXPECT().Send(gomock.Any()).Return(expected, nil)
 
-			actual, err := store.sendUpdateProduct(testUpdateEndpoint, account, app, testGUID, testVersionID)
+			actual, err := store.sendUpdateProductContext(context.Background(), testUpdateEndpoint, account, app, testGUID, testVersionID)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(actual).To(Equal(expected))
 		},
@@ -359,7 +359,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 		expected.StatusCode = gohttp.StatusInternalServerError
 		mockDownloadClient.EXPECT().Send(gomock.Any()).Return(expected, nil)
 
-		_, err := store.sendUpdateProduct(testUpdateEndpoint, account, app, testGUID, testVersionID)
+		_, err := store.sendUpdateProductContext(context.Background(), testUpdateEndpoint, account, app, testGUID, testVersionID)
 		Expect(err).To(MatchError("received unexpected update status code: 500"))
 	})
 
@@ -367,7 +367,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 		expected.Data.CustomerMessage = "Unable to process your request"
 		mockDownloadClient.EXPECT().Send(gomock.Any()).Return(expected, nil)
 
-		_, err := store.sendUpdateProduct(testUpdateEndpoint, account, app, testGUID, testVersionID)
+		_, err := store.sendUpdateProductContext(context.Background(), testUpdateEndpoint, account, app, testGUID, testVersionID)
 		Expect(err).To(MatchError("received update error: Unable to process your request"))
 	})
 
@@ -376,7 +376,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 			expected.Data.Items = make([]downloadItemResult, count)
 			mockDownloadClient.EXPECT().Send(gomock.Any()).Return(expected, nil)
 
-			_, err := store.sendUpdateProduct(testUpdateEndpoint, account, app, testGUID, testVersionID)
+			_, err := store.sendUpdateProductContext(context.Background(), testUpdateEndpoint, account, app, testGUID, testVersionID)
 			Expect(err).To(MatchError("update response must contain exactly one item"))
 		},
 		Entry("empty", 0),
@@ -388,7 +388,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 			expected.Data.Items[0].Metadata[field] = value
 			mockDownloadClient.EXPECT().Send(gomock.Any()).Return(expected, nil)
 
-			_, err := store.sendUpdateProduct(testUpdateEndpoint, account, app, testGUID, testVersionID)
+			_, err := store.sendUpdateProductContext(context.Background(), testUpdateEndpoint, account, app, testGUID, testVersionID)
 			Expect(err).To(MatchError(ContainSubstring("update response does not match")))
 		},
 		Entry("wrong app", "itemId", uint64(42)),
@@ -406,7 +406,7 @@ var _ = Describe("AppStore (Update Product)", func() {
 		expected.Data.Items[0].Metadata["softwareVersionExternalIdentifier"] = testVersionID
 		mockDownloadClient.EXPECT().Send(gomock.Any()).Return(expected, nil)
 
-		actual, err := store.sendUpdateProduct(testUpdateEndpoint, account, app, testGUID, testVersionID)
+		actual, err := store.sendUpdateProductContext(context.Background(), testUpdateEndpoint, account, app, testGUID, testVersionID)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(actual).To(Equal(expected))
 	})

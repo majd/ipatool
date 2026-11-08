@@ -2,6 +2,7 @@ package appstore
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	gohttp "net/http"
@@ -68,7 +69,7 @@ func (t *appstore) sendDownloadProduct(ctx context.Context, acc Account, app App
 
 	volumeStore := t.volumeStoreEndpoint(acc)
 
-	res, err := t.downloadClient.Send(t.downloadProductRequest(volumeStore, acc, app, guid, externalVersionID))
+	res, err := t.sendCommerceDownloadRequest(ctx, t.downloadProductRequest(volumeStore, acc, app, guid, externalVersionID), guid)
 	if err != nil {
 		return res, platform, fmt.Errorf("failed to send http request: %w", err)
 	}
@@ -118,11 +119,11 @@ func (t *appstore) sendDownloadProduct(ctx context.Context, acc Account, app App
 		}
 	}
 
-	redownloadRes, err := t.downloadClient.Send(t.downloadProductRequest(redownload, acc, app, guid, externalVersionID))
+	redownloadRes, err := t.sendCommerceDownloadRequest(ctx, t.downloadProductRequest(redownload, acc, app, guid, externalVersionID), guid)
 	if bag.UpdateEndpoint != "" && externalVersionID != "" &&
 		(platform == "" || platform == PlatformIPhone || platform == PlatformIPad || platform == PlatformMacOS || platform == PlatformAppleTV || platform == PlatformWatchOS) &&
 		(isEmptyRedownloadError(err) || (err == nil && isUnavailableDownloadProductResponse(redownloadRes))) {
-		updateRes, updateErr := t.sendUpdateProduct(bag.UpdateEndpoint, acc, app, guid, externalVersionID)
+		updateRes, updateErr := t.sendUpdateProductContext(ctx, bag.UpdateEndpoint, acc, app, guid, externalVersionID)
 
 		if updateErr == nil && platform == "" {
 			platform = PlatformIPhone
@@ -149,7 +150,7 @@ func (t *appstore) sendUnpinnedRedownload(ctx context.Context, endpoint download
 	request := t.downloadProductRequest(endpoint, acc, app, guid, "")
 	request.Context = requestContext
 
-	res, err := t.downloadClient.Send(request)
+	res, err := t.sendCommerceDownloadRequest(requestContext, request, guid)
 	if err != nil {
 		return res, fmt.Errorf("failed to send redownload request: %w", err)
 	}
@@ -172,7 +173,7 @@ func isEmptyRedownloadError(err error) bool {
 		unexpected.StatusCode == gohttp.StatusInternalServerError && unexpected.Snippet == ""
 }
 
-func (t *appstore) sendUpdateProduct(endpoint string, acc Account, app App, guid, externalVersionID string) (http.Result[downloadResult], error) {
+func (t *appstore) sendUpdateProductContext(ctx context.Context, endpoint string, acc Account, app App, guid, externalVersionID string) (http.Result[downloadResult], error) {
 	update, err := newDownloadEndpoint(endpoint, updateProductPath)
 	if err != nil {
 		return http.Result[downloadResult]{}, err
@@ -181,12 +182,37 @@ func (t *appstore) sendUpdateProduct(endpoint string, acc Account, app App, guid
 	// The bag's updateProduct can serve pinned app versions when redownload
 	// returns an empty HTTP 500 or a message-only availability error. Keep
 	// the same session and version selection.
-	res, err := t.downloadClient.Send(t.downloadProductRequest(update, acc, app, guid, externalVersionID))
+	res, err := t.sendCommerceDownloadRequest(ctx, t.downloadProductRequest(update, acc, app, guid, externalVersionID), guid)
 	if err != nil {
 		return res, fmt.Errorf("failed to send update request: %w", err)
 	}
 
 	return res, validateDownloadResponse(res, app, externalVersionID, "update")
+}
+
+func (t *appstore) sendCommerceDownloadRequest(ctx context.Context, request http.Request, guid string) (http.Result[downloadResult], error) {
+	if t.authBackend != nil {
+		hardwareID, err := hex.DecodeString(guid)
+		if err != nil || len(hardwareID) != 6 {
+			return http.Result[downloadResult]{}, errors.New("store download requires a six-byte device GUID")
+		}
+
+		proof, err := t.storeAMDProof(ctx, request.URL, hardwareID)
+		if err != nil {
+			return http.Result[downloadResult]{}, err
+		}
+
+		for key, value := range proof {
+			request.Headers[key] = value
+		}
+	}
+
+	result, err := t.downloadClient.Send(request)
+	if err != nil {
+		return result, fmt.Errorf("send Store commerce request: %w", err)
+	}
+
+	return result, nil
 }
 
 // An empty externalVersionID allows the server to select a version while retaining
@@ -281,10 +307,14 @@ func (*appstore) downloadProductRequest(endpoint downloadProductEndpoint, acc Ac
 		URL:            fmt.Sprintf("%s?guid=%s", endpoint.baseURL, guid),
 		Method:         http.MethodPOST,
 		ResponseFormat: http.ResponseFormatXML,
+		NoRedirects:    true,
 		Headers: map[string]string{
-			"Content-Type": "application/x-apple-plist",
-			"iCloud-DSID":  acc.DirectoryServicesID,
-			"X-Dsid":       acc.DirectoryServicesID,
+			"Content-Type":        "application/x-apple-plist",
+			"User-Agent":          storeAuthenticationUserAgent,
+			"iCloud-DSID":         acc.DirectoryServicesID,
+			"X-Apple-Store-Front": acc.StoreFront,
+			"X-Dsid":              acc.DirectoryServicesID,
+			"X-Token":             acc.PasswordToken,
 		},
 		Payload: &http.XMLPayload{
 			Content: payload,

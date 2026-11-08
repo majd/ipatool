@@ -159,7 +159,7 @@ var _ = Describe("AppStore (Login)", func() {
 			mockBagClient.EXPECT().
 				Send(gomock.Any()).
 				Do(func(req http.Request) {
-					Expect(req.URL).To(Equal("https://init.itunes.apple.com/bag.xml?guid=000000000000"))
+					Expect(req.URL).To(Equal("https://init.itunes.apple.com/bag.xml?ix=6&guid=000000000000"))
 				}).
 				Return(http.Result[bagResult]{
 					StatusCode: 200,

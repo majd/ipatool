@@ -57,6 +57,23 @@ func (e *executor) Send(request apphttp.Request, body []byte) (*http.Response, e
 		ctx = context.Background()
 	}
 
+	if e.operation == "bag-direct" {
+		direct, err := http.NewRequestWithContext(ctx, request.Method, request.URL, bytes.NewReader(body))
+		if err != nil {
+			return nil, fmt.Errorf("create Store request: %w", err)
+		}
+
+		for key, value := range request.Headers {
+			direct.Header.Set(key, value)
+		}
+
+		if direct.Header.Get("User-Agent") == "" {
+			direct.Header.Set("User-Agent", apphttp.DefaultUserAgent)
+		}
+
+		return e.backend.requestTransport(emulator.Request{Operation: "authenticate"})(direct)
+	}
+
 	input := emulator.Request{URL: request.URL, Method: request.Method, Operation: e.operation, Format: string(request.ResponseFormat), Timeout: request.Timeout, Body: body, Headers: make(http.Header), NoRedirects: request.NoRedirects, Raw: request.ResponseFormat == apphttp.ResponseFormatRaw}
 	for key, value := range request.Headers {
 		input.Headers.Set(key, value)
@@ -79,6 +96,10 @@ func (e *executor) Send(request apphttp.Request, body []byte) (*http.Response, e
 func (e *executor) Do(request *http.Request) (*http.Response, error) {
 	if request == nil {
 		return nil, errors.New("store request is nil")
+	}
+
+	if e.operation == "sap" {
+		return e.backend.requestTransport(emulator.Request{Operation: "authenticate"})(request)
 	}
 
 	var body []byte

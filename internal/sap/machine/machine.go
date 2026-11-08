@@ -56,12 +56,13 @@ type Machine struct {
 }
 
 type imageSpec struct {
-	name      string
-	data      []byte
-	base      uint64
-	prelinked map[uint64]string
-	slots     map[uint64]string
-	functions map[uint64]string
+	name       string
+	data       []byte
+	base       uint64
+	prelinked  map[uint64]string
+	slots      map[uint64]string
+	functions  map[uint64]string
+	kernelBase uint64
 }
 
 type runtimeOptions struct {
@@ -221,6 +222,12 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 
 		if err != nil {
 			return nil, nil, fmt.Errorf("relocate SAP guest image: %w", err)
+		}
+
+		if spec.kernelBase != 0 {
+			if err := image.RelocateKernelCachePointers(spec.base, spec.kernelBase, resolver); err != nil {
+				return nil, nil, fmt.Errorf("relocate %s kernel-cache pointers: %w", spec.name, err)
+			}
 		}
 
 		if err := image.Load(engine); err != nil {
