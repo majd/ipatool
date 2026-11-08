@@ -26,6 +26,29 @@ func (r *Runtime) symbol(name string) {
 	}
 
 	switch name {
+	case "AMSError":
+		// AMSAccountAuthenticationPlugin uses this factory when Apple returns a
+		// server dialog and native presentation is disabled. Preserve the error
+		// as an NSError so the framework can finish the request and the caller can
+		// inspect the original response instead of aborting the guest.
+		info := map[string]uint64{}
+		if description := r.arg(1); description != 0 {
+			info["NSLocalizedDescription"] = description
+		}
+
+		if reason := r.arg(2); reason != 0 {
+			info["NSLocalizedFailureReason"] = reason
+		}
+
+		if underlying := r.arg(3); underlying != 0 {
+			info["NSUnderlyingError"] = underlying
+		}
+
+		r.set(r.New("NSError", map[string]uint64{
+			"domain":   r.New("NSString", "AMSErrorDomain"),
+			"code":     r.New("NSNumber", int64(r.arg(0))),
+			"userInfo": r.New("NSDictionary", info),
+		}))
 	case "xpc_get_type":
 		object := r.objects[r.arg(0)]
 		if object != nil && object.Class == "HostXPCDictionary" {
@@ -744,6 +767,29 @@ func (r *Runtime) message(receiver uint64, selector string, super bool) {
 		r.set(0)
 
 		return
+	}
+	// Store tasks use keep-alives to request host process assertions. The guest
+	// runs synchronously inside the CLI, so retaining a scoped token is enough.
+	if class == "AMSKeepAlive" {
+		switch selector {
+		case "keepAliveWithName:style:", "rbs_keepAliveWithName:style:":
+			if meta {
+				value := r.New("AMSKeepAlive", nil)
+				r.objects[value].Properties["name"] = r.arg(2)
+				r.objects[value].Properties["style"] = r.arg(3)
+				r.set(value)
+
+				return
+			}
+		case "invalidate", "rbs_invalidate":
+			r.set(0)
+
+			return
+		case "name", "style":
+			r.set(object.Properties[selector])
+
+			return
+		}
 	}
 
 	if entry := r.lookup(class, selector, meta); !super && entry != 0 {
@@ -1961,6 +2007,12 @@ func (r *Runtime) formatAt(format string, sp uint64) string {
 			} else {
 				obj := r.objects[value]
 				if obj == nil {
+					if class := r.classNames[value]; class != "" {
+						result.WriteString(class)
+
+						break
+					}
+
 					panic(fmt.Sprintf("unknown format object %#x", value))
 				}
 

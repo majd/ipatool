@@ -137,6 +137,20 @@ var _ = Describe("AppStore (Login)", func() {
 		)
 	})
 
+	DescribeTable("does not expose untrusted dialog actions", func(action loginDialogActionResult) {
+		result := loginResult{Dialog: loginDialogResult{Message: "Account action required", OKButtonString: "Continue", OKButtonAction: action}}
+		err := authenticationDialogError(result)
+
+		Expect(err).To(MatchError("Account action required"))
+	},
+		Entry("non-Apple URL", loginDialogActionResult{Kind: "OpenURL", URL: "https://example.com/reset"}),
+		Entry("insecure URL", loginDialogActionResult{Kind: "OpenURL", URL: "http://iforgot.apple.com/reset"}),
+		Entry("embedded credentials", loginDialogActionResult{Kind: "OpenURL", URL: "https://user@iforgot.apple.com/reset"}),
+		Entry("nonstandard port", loginDialogActionResult{Kind: "OpenURL", URL: "https://iforgot.apple.com:8443/reset"}),
+		Entry("fragment", loginDialogActionResult{Kind: "OpenURL", URL: "https://iforgot.apple.com/reset#token"}),
+		Entry("non-navigation action", loginDialogActionResult{Kind: "Buy", URL: "https://iforgot.apple.com/reset"}),
+	)
+
 	When("fails to read Machine's MAC address", func() {
 		BeforeEach(func() {
 			mockMachine.EXPECT().
@@ -296,6 +310,36 @@ var _ = Describe("AppStore (Login)", func() {
 				})
 				Expect(err).To(HaveOccurred())
 				Expect(err.Error()).To(ContainSubstring("account is disabled"))
+			})
+		})
+
+		When("store API returns an account recovery dialog", func() {
+			BeforeEach(func() {
+				mockClient.EXPECT().
+					Send(gomock.Any()).
+					Return(http.Result[loginResult]{
+						StatusCode: 200,
+						Data: loginResult{
+							CustomerMessage: CustomerMessageAccountDisabled,
+							Dialog: loginDialogResult{
+								Message:        "This Apple Account has been locked for security reasons.",
+								Explanation:    "Reset your password to continue.",
+								OKButtonString: "Reset",
+								OKButtonAction: loginDialogActionResult{
+									Kind: "OpenURL",
+									URL:  "https://iforgot.apple.com/cgi-bin/iforgot.cgi",
+								},
+							},
+						},
+					}, nil)
+			})
+
+			It("surfaces the dialog and trusted recovery URL", func() {
+				_, err := as.Login(LoginInput{Password: testPassword})
+
+				Expect(err).To(MatchError(ContainSubstring("This Apple Account has been locked for security reasons.")))
+				Expect(err).To(MatchError(ContainSubstring("Reset your password to continue.")))
+				Expect(err).To(MatchError(ContainSubstring("Reset: https://iforgot.apple.com/cgi-bin/iforgot.cgi")))
 			})
 		})
 
