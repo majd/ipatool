@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strings"
 
@@ -91,6 +92,53 @@ var _ = Describe("Generated profile response branches", func() {
 		Entry("authentication failure", "authenticate", http.MethodPost, "application/x-apple-plist", `<plist version="1.0"><dict><key>failureType</key><string>2034</string><key>customerMessage</key><string>fixture-value</string></dict></plist>`, http.StatusOK, false),
 		Entry("authentication server dialog", "authenticate", http.MethodPost, "application/x-apple-plist", `<plist version="1.0"><dict><key>customerMessage</key><string>fixture-value</string><key>dialog</key><dict><key>message</key><string>Account locked</string><key>explanation</key><string>Reset the account to continue.</string><key>okButtonString</key><string>Reset</string><key>okButtonAction</key><dict><key>kind</key><string>OpenURL</string><key>url</key><string>https://iforgot.apple.com/cgi-bin/iforgot.cgi</string></dict></dict></dict></plist>`, http.StatusOK, false),
 		Entry("purchase failure", "purchase", http.MethodPost, "application/x-apple-plist", `<plist version="1.0"><dict><key>failureType</key><string>9610</string><key>customerMessage</key><string>fixture-value</string></dict></plist>`, http.StatusOK, false),
+	)
+})
+
+var _ = Describe("URL component query setters", func() {
+	DescribeTable("preserves query values through the runtime bridge", func(selector string, value any, encoded, decoded string) {
+		ctx := context.Background()
+		bundle, err := assets.Load(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		prepared, err := profile.Load(ctx)
+		Expect(err).NotTo(HaveOccurred())
+		guest, err := open(ctx, bundle.AppleMediaServices, prepared, true)
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(guest.Close)
+		u, err := url.Parse("https://example.com/path?old=value#fragment")
+		Expect(err).NotTo(HaveOccurred())
+		components := guest.New("NSURLComponents", u)
+		_, err = guest.Invoke(components, "setQuery:", guest.New("NSString", "old=value"))
+		Expect(err).NotTo(HaveOccurred())
+		_, err = guest.Invoke(components, selector, guest.importValue(value))
+		Expect(err).NotTo(HaveOccurred())
+		encodedQuery, err := guest.Invoke(components, "percentEncodedQuery")
+		Expect(err).NotTo(HaveOccurred())
+		query, err := guest.Invoke(components, "query")
+		Expect(err).NotTo(HaveOccurred())
+		expectedURL := "https://example.com/path"
+		if value == nil {
+			Expect(encodedQuery).To(BeZero())
+			Expect(query).To(BeZero())
+		} else {
+			Expect(encodedQuery).NotTo(BeZero())
+			Expect(query).NotTo(BeZero())
+			Expect(guest.String(encodedQuery)).To(Equal(encoded))
+			Expect(guest.String(query)).To(Equal(decoded))
+			expectedURL += "?" + encoded
+		}
+
+		result, err := guest.Invoke(components, "URL")
+		Expect(err).NotTo(HaveOccurred())
+		Expect(guest.String(result)).To(Equal(expectedURL + "#fragment"))
+	},
+		Entry("clears an encoded query", "setPercentEncodedQuery:", nil, "", ""),
+		Entry("keeps an empty encoded query delimiter", "setPercentEncodedQuery:", "", "", ""),
+		Entry("preserves percent escapes and literal plus signs", "setPercentEncodedQuery:", "q=a%20b%2Bc+%26%3D%25%23&symbol=%e2%9c%93", "q=a%20b%2Bc+%26%3D%25%23&symbol=%e2%9c%93", "q=a b+c+&=%#&symbol=✓"),
+		Entry("preserves query delimiters", "setPercentEncodedQuery:", "q=/?@!$&'()*+,;=:", "q=/?@!$&'()*+,;=:", "q=/?@!$&'()*+,;=:"),
+		Entry("clears a decoded query", "setQuery:", nil, "", ""),
+		Entry("keeps an empty decoded query delimiter", "setQuery:", "", "", ""),
+		Entry("encodes decoded query values", "setQuery:", "q=a b+%&symbol=✓", "q=a%20b+%25&symbol=%E2%9C%93", "q=a b+%&symbol=✓"),
 	)
 })
 
