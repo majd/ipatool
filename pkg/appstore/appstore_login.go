@@ -159,10 +159,24 @@ type loginAccountResult struct {
 	Address loginAddressResult `plist:"address,omitempty"`
 }
 
+type loginDialogActionResult struct {
+	Kind string `plist:"kind,omitempty"`
+	URL  string `plist:"url,omitempty"`
+}
+
+type loginDialogResult struct {
+	Message            string                  `plist:"message,omitempty"`
+	Explanation        string                  `plist:"explanation,omitempty"`
+	OKButtonString     string                  `plist:"okButtonString,omitempty"`
+	OKButtonAction     loginDialogActionResult `plist:"okButtonAction,omitempty"`
+	CancelButtonString string                  `plist:"cancelButtonString,omitempty"`
+}
+
 type loginResult struct {
 	FailureType         string             `plist:"failureType,omitempty"`
 	CustomerMessage     string             `plist:"customerMessage,omitempty"`
 	Account             loginAccountResult `plist:"accountInfo,omitempty"`
+	Dialog              loginDialogResult  `plist:"dialog,omitempty"`
 	DirectoryServicesID string             `plist:"dsPersonId,omitempty"`
 	PasswordToken       string             `plist:"passwordToken,omitempty"`
 }
@@ -383,6 +397,8 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 
 	if action := authenticationMachineAction(res.Headers); action != nil {
 		err = action
+	} else if dialogErr := authenticationDialogError(res.Data); dialogErr != nil {
+		err = NewErrorWithMetadata(dialogErr, res)
 	} else if res.StatusCode >= gohttp.StatusMultipleChoices && res.StatusCode < gohttp.StatusBadRequest {
 		if redirect, err = res.GetHeader("location"); err != nil {
 			err = fmt.Errorf("failed to retrieve redirect location: %w", err)
@@ -420,6 +436,70 @@ func (t *appstore) parseLoginResponse(res *http.Result[loginResult], attempt int
 	}
 
 	return retry, redirect, err
+}
+
+func authenticationDialogError(result loginResult) error {
+	dialog := result.Dialog
+	if strings.TrimSpace(dialog.Message) == "" && strings.TrimSpace(dialog.Explanation) == "" &&
+		strings.TrimSpace(dialog.OKButtonString) == "" && strings.TrimSpace(dialog.CancelButtonString) == "" &&
+		strings.TrimSpace(dialog.OKButtonAction.Kind) == "" && strings.TrimSpace(dialog.OKButtonAction.URL) == "" {
+		return nil
+	}
+
+	message := strings.TrimSpace(dialog.Message)
+	explanation := strings.TrimSpace(dialog.Explanation)
+
+	if message == "" {
+		message = strings.TrimSpace(result.CustomerMessage)
+	}
+
+	actionURL := trustedAuthenticationDialogURL(dialog.OKButtonAction)
+	if message == "" && explanation == "" && actionURL == "" {
+		return nil
+	}
+
+	parts := make([]string, 0, 2)
+	if message != "" {
+		parts = append(parts, message)
+	}
+
+	if explanation != "" && explanation != message {
+		parts = append(parts, explanation)
+	}
+
+	detail := strings.Join(parts, ": ")
+	if detail == "" {
+		detail = "Apple requires action before sign-in can continue"
+	}
+
+	if actionURL != "" {
+		label := strings.TrimSpace(dialog.OKButtonString)
+		if label == "" {
+			label = "Continue"
+		}
+
+		detail += fmt.Sprintf(" (%s: %s)", label, actionURL)
+	}
+
+	return errors.New(detail)
+}
+
+func trustedAuthenticationDialogURL(action loginDialogActionResult) string {
+	if !strings.EqualFold(strings.TrimSpace(action.Kind), "OpenURL") {
+		return ""
+	}
+
+	value, err := url.Parse(strings.TrimSpace(action.URL))
+	if err != nil || value.Scheme != "https" || value.User != nil || value.Fragment != "" || value.Port() != "" && value.Port() != "443" {
+		return ""
+	}
+
+	host := strings.ToLower(value.Hostname())
+	if host != "apple.com" && !strings.HasSuffix(host, ".apple.com") {
+		return ""
+	}
+
+	return value.String()
 }
 
 func authenticationMachineAction(headers map[string]string) *authenticationMachineActionError {

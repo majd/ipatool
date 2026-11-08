@@ -89,6 +89,7 @@ var _ = Describe("Generated profile response branches", func() {
 		Entry("version lookup GET", "lookup", http.MethodGet, "application/json", `{"results":{"fixture-value":{"offers":[]}}}`, http.StatusOK, false),
 		Entry("streamed package range", "download", http.MethodGet, "application/octet-stream", "fixture-value\x00\xff", http.StatusPartialContent, true),
 		Entry("authentication failure", "authenticate", http.MethodPost, "application/x-apple-plist", `<plist version="1.0"><dict><key>failureType</key><string>2034</string><key>customerMessage</key><string>fixture-value</string></dict></plist>`, http.StatusOK, false),
+		Entry("authentication server dialog", "authenticate", http.MethodPost, "application/x-apple-plist", `<plist version="1.0"><dict><key>customerMessage</key><string>fixture-value</string><key>dialog</key><dict><key>message</key><string>Account locked</string><key>explanation</key><string>Reset the account to continue.</string><key>okButtonString</key><string>Reset</string><key>okButtonAction</key><dict><key>kind</key><string>OpenURL</string><key>url</key><string>https://iforgot.apple.com/cgi-bin/iforgot.cgi</string></dict></dict></dict></plist>`, http.StatusOK, false),
 		Entry("purchase failure", "purchase", http.MethodPost, "application/x-apple-plist", `<plist version="1.0"><dict><key>failureType</key><string>9610</string><key>customerMessage</key><string>fixture-value</string></dict></plist>`, http.StatusOK, false),
 	)
 })
