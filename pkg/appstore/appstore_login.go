@@ -66,6 +66,12 @@ func (t *appstore) legacyLogin(input LoginInput) (LoginOutput, error) {
 		return LoginOutput{}, err
 	}
 
+	if countryCode := phoneNumberStorefrontCountryCode(input.Email); countryCode != "" {
+		if _, err = t.discoverStorefrontID(countryCode); err != nil {
+			return LoginOutput{}, fmt.Errorf("failed to discover storefronts: %w", err)
+		}
+	}
+
 	macAddr, err := t.machine.MacAddress()
 	if err != nil {
 		return LoginOutput{}, fmt.Errorf("failed to get mac address: %w", err)
@@ -529,7 +535,7 @@ func (t *appstore) loginRequest(email, password, authCode, guid, endpoint string
 			},
 		},
 	}
-	if storefront := phoneNumberStorefront(email); storefront != "" {
+	if storefront := t.storefrontID(phoneNumberStorefrontCountryCode(email)); storefront != "" {
 		request.Headers["X-Apple-Store-Front"] = storefront
 	}
 

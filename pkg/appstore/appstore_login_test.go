@@ -42,11 +42,12 @@ var _ = Describe("AppStore (Login)", func() {
 		mockMachine = machine.NewMockMachine(ctrl)
 		signer = &stubActionSigner{}
 		as = &appstore{
-			keychain:       mockKeychain,
-			loginClient:    mockClient,
-			bagClient:      mockBagClient,
-			machine:        mockMachine,
-			authRetrySleep: func(time.Duration) {},
+			keychain:               mockKeychain,
+			loginClient:            mockClient,
+			bagClient:              mockBagClient,
+			machine:                mockMachine,
+			authRetrySleep:         func(time.Duration) {},
+			storefrontCountryCodes: testStorefrontCountryCodes(),
 			actionSignerFactory: func(config SAPConfig, machineID []byte) (ActionSigner, error) {
 				Expect(config).To(Equal(validSAPConfig()))
 				Expect(machineID).To(Equal([]byte{0, 0, 0, 0, 0, 0}))

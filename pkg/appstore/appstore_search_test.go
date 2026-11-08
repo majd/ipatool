@@ -24,8 +24,9 @@ var _ = Describe("AppStore (Search)", func() {
 		mockClient = http.NewMockClient[searchResult](ctrl)
 		mockStorefrontClient = http.NewMockClient[[]byte](ctrl)
 		as = &appstore{
-			searchClient:     mockClient,
-			storefrontClient: mockStorefrontClient,
+			searchClient:           mockClient,
+			storefrontClient:       mockStorefrontClient,
+			storefrontCountryCodes: testStorefrontCountryCodes(),
 		}
 	})
 

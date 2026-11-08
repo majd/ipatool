@@ -24,7 +24,7 @@ var _ = Describe("Platform version catalog fallback", func() {
 
 	BeforeEach(func() {
 		client = http.NewMockClient[platformVersionLookupResult](gomock.NewController(GinkgoT()))
-		store = &appstore{platformClient: client}
+		store = &appstore{platformClient: client, storefrontCountryCodes: testStorefrontCountryCodes()}
 	})
 
 	expectLookup := func(catalog string, status int, data platformVersionLookupResult, sendErr error) *gomock.Call {

@@ -44,6 +44,7 @@ var _ = Describe("Redownloading delisted iOS apps", func() {
 		store = &appstore{
 			platformClient: catalogs, downloadClient: downloads, bagClient: bags,
 			httpClient: assets, machine: device, os: operatingsystem.New(),
+			storefrontCountryCodes: testStorefrontCountryCodes(),
 		}
 		input = DownloadInput{
 			Context: context.Background(),

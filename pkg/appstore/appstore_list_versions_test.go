@@ -28,10 +28,11 @@ var _ = Describe("AppStore (ListVersions)", func() {
 		mockPlatformClient = http.NewMockClient[platformVersionLookupResult](ctrl)
 		mockMachine = machine.NewMockMachine(ctrl)
 		as = &appstore{
-			bagClient:      mockBagClient,
-			downloadClient: mockDownloadClient,
-			platformClient: mockPlatformClient,
-			machine:        mockMachine,
+			bagClient:              mockBagClient,
+			downloadClient:         mockDownloadClient,
+			platformClient:         mockPlatformClient,
+			machine:                mockMachine,
+			storefrontCountryCodes: testStorefrontCountryCodes(),
 		}
 	})
 

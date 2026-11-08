@@ -26,7 +26,7 @@ type SearchOutput struct {
 }
 
 func (t *appstore) Search(input SearchInput) (SearchOutput, error) {
-	countryCode, err := countryCodeFromStoreFront(input.Account.StoreFront)
+	countryCode, err := t.countryCodeFromStoreFront(input.Account.StoreFront)
 	if err != nil {
 		return SearchOutput{}, fmt.Errorf("country code is invalid: %w", err)
 	}

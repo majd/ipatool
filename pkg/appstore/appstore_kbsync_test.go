@@ -42,6 +42,7 @@ var _ = Describe("AppStore (preferred kbsync download)", func() {
 		generated = 0
 		store = &appstore{
 			downloadClient: downloads, bagClient: bags, platformClient: platforms,
+			storefrontCountryCodes: testStorefrontCountryCodes(),
 			kbsyncGenerator: func(ctx context.Context, hardwareID []byte, dsid uint64) ([]byte, error) {
 				Expect(ctx.Err()).NotTo(HaveOccurred())
 				deadline, ok := ctx.Deadline()

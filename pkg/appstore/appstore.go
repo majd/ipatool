@@ -43,28 +43,30 @@ type AppStore interface {
 }
 
 type appstore struct {
-	keychain              keychain.Keychain
-	loginClient           http.Client[loginResult]
-	searchClient          http.Client[searchResult]
-	purchaseClient        http.Client[purchaseResult]
-	downloadClient        http.Client[downloadResult]
-	kbsyncGenerator       kbsyncGenerator
-	kbsyncCache           kbsyncCache
-	platformClient        http.Client[platformVersionLookupResult]
-	storefrontClient      http.Client[[]byte]
-	bagClient             http.Client[bagResult]
-	ownedAppsClient       http.Client[[]byte]
-	httpClient            http.Client[interface{}]
-	macDecrypterFactory   macPackageDecrypterFactory
-	actionSignerFactory   ActionSignerFactory
-	authRetrySleep        func(time.Duration)
-	machine               machine.Machine
-	os                    operatingsystem.OperatingSystem
-	authBackend           *store.Backend
-	authHTTP              *gohttp.Client
-	authStateMu           sync.Mutex
-	anisetteState         []byte
-	authenticationHeaders gohttp.Header
+	keychain               keychain.Keychain
+	loginClient            http.Client[loginResult]
+	searchClient           http.Client[searchResult]
+	purchaseClient         http.Client[purchaseResult]
+	downloadClient         http.Client[downloadResult]
+	kbsyncGenerator        kbsyncGenerator
+	kbsyncCache            kbsyncCache
+	platformClient         http.Client[platformVersionLookupResult]
+	storefrontClient       http.Client[[]byte]
+	storefrontsMu          sync.Mutex
+	storefrontCountryCodes map[string]string
+	bagClient              http.Client[bagResult]
+	ownedAppsClient        http.Client[[]byte]
+	httpClient             http.Client[interface{}]
+	macDecrypterFactory    macPackageDecrypterFactory
+	actionSignerFactory    ActionSignerFactory
+	authRetrySleep         func(time.Duration)
+	machine                machine.Machine
+	os                     operatingsystem.OperatingSystem
+	authBackend            *store.Backend
+	authHTTP               *gohttp.Client
+	authStateMu            sync.Mutex
+	anisetteState          []byte
+	authenticationHeaders  gohttp.Header
 }
 
 type Args struct {

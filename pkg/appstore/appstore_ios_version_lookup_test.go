@@ -31,7 +31,7 @@ var _ = Describe("iOS catalog version fallback", func() {
 
 	BeforeEach(func() {
 		client = http.NewMockClient[platformVersionLookupResult](gomock.NewController(GinkgoT()))
-		store = &appstore{platformClient: client}
+		store = &appstore{platformClient: client, storefrontCountryCodes: testStorefrontCountryCodes()}
 	})
 
 	DescribeTable("resolves Arcade versions after exhausting the MDM catalogs", func(platform Platform, noOffers bool, quotedVersion bool) {
@@ -115,7 +115,7 @@ var _ = Describe("ListVersions for apps missing from the MDM catalogs", func() {
 		downloads := http.NewMockClient[downloadResult](ctrl)
 		bags := http.NewMockClient[bagResult](ctrl)
 		device := machine.NewMockMachine(ctrl)
-		store := &appstore{platformClient: catalog, downloadClient: downloads, bagClient: bags, machine: device}
+		store := &appstore{platformClient: catalog, downloadClient: downloads, bagClient: bags, machine: device, storefrontCountryCodes: testStorefrontCountryCodes()}
 		device.EXPECT().MacAddress().Return("00:11:22:33:44:55", nil)
 		result := downloadResult{FailureType: FailureTypeLicenseNotFound}
 		if licensed {
