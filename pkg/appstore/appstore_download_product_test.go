@@ -42,9 +42,10 @@ var _ = Describe("AppStore (Download Product)", func() {
 		mockDownloadClient = http.NewMockClient[downloadResult](ctrl)
 		mockPlatformClient = http.NewMockClient[platformVersionLookupResult](ctrl)
 		store = &appstore{
-			bagClient:      mockBagClient,
-			downloadClient: mockDownloadClient,
-			platformClient: mockPlatformClient,
+			bagClient:              mockBagClient,
+			downloadClient:         mockDownloadClient,
+			platformClient:         mockPlatformClient,
+			storefrontCountryCodes: testStorefrontCountryCodes(),
 		}
 		account = Account{
 			DirectoryServicesID: "test-dsid",

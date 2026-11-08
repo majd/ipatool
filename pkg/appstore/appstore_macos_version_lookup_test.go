@@ -44,7 +44,7 @@ var _ = Describe("Mac purchase version selection", func() {
 		defer ctrl.Finish()
 		downloads := http.NewMockClient[downloadResult](ctrl)
 		pages := http.NewMockClient[[]byte](ctrl)
-		store := &appstore{downloadClient: downloads, storefrontClient: pages}
+		store := &appstore{downloadClient: downloads, storefrontClient: pages, storefrontCountryCodes: testStorefrontCountryCodes()}
 		expected := http.Result[downloadResult]{StatusCode: gohttp.StatusOK, Data: downloadResult{Items: []downloadItemResult{{URL: "https://example.test/mac.pkg"}}}}
 		gomock.InOrder(
 			pages.EXPECT().Send(gomock.Any()).Do(func(req http.Request) {
@@ -74,7 +74,7 @@ var _ = Describe("Mac purchase version selection", func() {
 		downloads := http.NewMockClient[downloadResult](ctrl)
 		pages := http.NewMockClient[[]byte](ctrl)
 		bags := http.NewMockClient[bagResult](ctrl)
-		store := &appstore{downloadClient: downloads, storefrontClient: pages, bagClient: bags}
+		store := &appstore{downloadClient: downloads, storefrontClient: pages, bagClient: bags, storefrontCountryCodes: testStorefrontCountryCodes()}
 		bag := validBagResult()
 		bag.URLBag.RedownloadEndpoint = testRedownloadEndpoint
 		expected := http.Result[downloadResult]{StatusCode: gohttp.StatusOK, Data: downloadResult{Items: []downloadItemResult{{URL: "https://example.test/mac.pkg"}}}}
@@ -102,7 +102,7 @@ var _ = Describe("Mac purchase version selection", func() {
 		ctrl := gomock.NewController(GinkgoT())
 		defer ctrl.Finish()
 		pages := http.NewMockClient[[]byte](ctrl)
-		store := &appstore{storefrontClient: pages, downloadClient: http.NewMockClient[downloadResult](ctrl)}
+		store := &appstore{storefrontClient: pages, downloadClient: http.NewMockClient[downloadResult](ctrl), storefrontCountryCodes: testStorefrontCountryCodes()}
 		pages.EXPECT().Send(gomock.Any()).Return(http.Result[[]byte]{StatusCode: status, Data: body}, requestErr)
 		_, _, err := store.sendDownloadProduct(context.Background(), Account{StoreFront: "143443-2,34"}, app, "001122334455", "", PlatformMacOS)
 		Expect(err).To(HaveOccurred())

@@ -67,7 +67,7 @@ func (t *appstore) lookupLatestExternalVersionID(acc Account, app App, platform 
 		return "", errors.New("app ID is required for platform version lookup")
 	}
 
-	countryCode, err := countryCodeFromStoreFront(acc.StoreFront)
+	countryCode, err := t.countryCodeFromStoreFront(acc.StoreFront)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve the country code: %w", err)
 	}

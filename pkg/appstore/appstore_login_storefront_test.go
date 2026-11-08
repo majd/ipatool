@@ -8,7 +8,7 @@ import (
 
 var _ = Describe("Phone account login routing", func() {
 	DescribeTable("sets a storefront hint without rewriting the Apple ID", func(appleID, storefront string) {
-		request := (&appstore{}).loginRequest(appleID, "password", "", "guid", testAuthEndpoint, 1, &stubActionSigner{})
+		request := (&appstore{storefrontCountryCodes: testStorefrontCountryCodes()}).loginRequest(appleID, "password", "", "guid", testAuthEndpoint, 1, &stubActionSigner{})
 
 		Expect(request.Payload.(*http.XMLPayload).Content).To(HaveKeyWithValue("appleId", appleID))
 		if storefront == "" {

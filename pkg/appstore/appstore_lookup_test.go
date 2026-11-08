@@ -21,7 +21,8 @@ var _ = Describe("AppStore (Lookup)", func() {
 		ctrl = gomock.NewController(GinkgoT())
 		mockClient = http.NewMockClient[searchResult](ctrl)
 		as = &appstore{
-			searchClient: mockClient,
+			searchClient:           mockClient,
+			storefrontCountryCodes: testStorefrontCountryCodes(),
 		}
 	})
 

@@ -2,9 +2,10 @@ package appstore
 
 import "strings"
 
-// phoneNumberStorefront supplies a routing hint for phone-based Apple Accounts
-// in mainland China and India. It does not change the Apple ID sent to Apple.
-func phoneNumberStorefront(appleID string) string {
+// phoneNumberStorefrontCountryCode identifies the storefront routing hint for
+// phone-based Apple Accounts in mainland China and India. It does not change
+// the Apple ID sent to Apple.
+func phoneNumberStorefrontCountryCode(appleID string) string {
 	number := strings.ReplaceAll(strings.TrimSpace(appleID), " ", "")
 	number = strings.ReplaceAll(number, "-", "")
 
@@ -30,7 +31,7 @@ func phoneNumberStorefront(appleID string) string {
 	// match a supported country code and cannot fall back to a local format.
 	switch {
 	case len(number) == 13 && strings.HasPrefix(number, "861"):
-		return storeFronts["CN"]
+		return "CN"
 	case len(number) == 12 && strings.HasPrefix(number, "91"):
 		number = number[2:]
 	case international:
@@ -38,7 +39,7 @@ func phoneNumberStorefront(appleID string) string {
 	}
 
 	if len(number) == 11 && number[0] == '1' {
-		return storeFronts["CN"]
+		return "CN"
 	}
 
 	// India also permits a trunk prefix when writing a national number.
@@ -47,7 +48,7 @@ func phoneNumberStorefront(appleID string) string {
 	}
 
 	if len(number) == 10 && number[0] >= '6' && number[0] <= '9' {
-		return storeFronts["IN"]
+		return "IN"
 	}
 
 	return ""

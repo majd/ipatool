@@ -14,7 +14,7 @@ import (
 )
 
 func (t *appstore) lookupLatestMacOSExternalVersionID(acc Account, app App) (string, error) {
-	countryCode, err := countryCodeFromStoreFront(acc.StoreFront)
+	countryCode, err := t.countryCodeFromStoreFront(acc.StoreFront)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve the country code: %w", err)
 	}

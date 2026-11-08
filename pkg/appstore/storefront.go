@@ -1,156 +1,299 @@
 package appstore
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	gohttp "net/http"
+	"strconv"
 	"strings"
+
+	"github.com/majd/ipatool/v2/pkg/http"
+	"howett.net/plist"
 )
 
-func countryCodeFromStoreFront(storeFront string) (string, error) {
-	identifier, _, _ := strings.Cut(strings.TrimSpace(storeFront), ",")
-	identifier, _, _ = strings.Cut(identifier, "-")
+const (
+	availableStorefrontsURL = "https://itunes.apple.com/WebObjects/MZStore.woa/wa/availableStoreFronts"
+	storefrontGenreURL      = "https://apps.apple.com/genre/id36"
+	maxStorefrontIDRange    = 1000
+)
 
-	for key, val := range storeFronts {
-		if identifier == val {
-			return key, nil
+type availableStorefrontsResult struct {
+	Storefronts []availableStorefront `plist:"storefronts"`
+}
+
+type availableStorefront struct {
+	CountryCode string `plist:"country-code"`
+	ID          int64  `plist:"id"`
+}
+
+type storefrontGenrePage struct {
+	StorePlatformData map[string]struct {
+		Meta struct {
+			Storefront struct {
+				CountryCode string `json:"cc"`
+				ID          string `json:"id"`
+			} `json:"storefront"`
+		} `json:"meta"`
+	} `json:"storePlatformData"`
+}
+
+func (t *appstore) countryCodeFromStoreFront(storeFront string) (string, error) {
+	if err := t.discoverAvailableStorefronts(); err != nil {
+		return "", err
+	}
+
+	identifier := storefrontIdentifier(storeFront)
+	if countryCode := t.cachedStorefrontCountryCode(identifier); countryCode != "" {
+		return countryCode, nil
+	}
+
+	countryCode, found, err := t.discoverStorefrontCountryCode(identifier)
+	if err != nil {
+		return "", err
+	}
+
+	if found {
+		return countryCode, nil
+	}
+
+	return "", storefrontMappingError(storeFront)
+}
+
+func (t *appstore) storefrontID(countryCode string) string {
+	t.storefrontsMu.Lock()
+	defer t.storefrontsMu.Unlock()
+
+	for identifier, code := range t.storefrontCountryCodes {
+		if code == countryCode {
+			return identifier
 		}
 	}
 
-	return "", fmt.Errorf("country code mapping for store front (%s) was not found", storeFront)
+	return ""
 }
 
-var storeFronts = map[string]string{
-	"AE": "143481",
-	"AG": "143540",
-	"AI": "143538",
-	"AL": "143575",
-	"AM": "143524",
-	"AO": "143564",
-	"AR": "143505",
-	"AT": "143445",
-	"AU": "143460",
-	"AZ": "143568",
-	"BB": "143541",
-	"BD": "143490",
-	"BE": "143446",
-	"BG": "143526",
-	"BH": "143559",
-	"BM": "143542",
-	"BN": "143560",
-	"BO": "143556",
-	"BR": "143503",
-	"BS": "143539",
-	"BW": "143525",
-	"BY": "143565",
-	"BZ": "143555",
-	"CA": "143455",
-	"CH": "143459",
-	"CI": "143527",
-	"CL": "143483",
-	"CN": "143465",
-	"CO": "143501",
-	"CR": "143495",
-	"CY": "143557",
-	"CZ": "143489",
-	"DE": "143443",
-	"DK": "143458",
-	"DM": "143545",
-	"DO": "143508",
-	"DZ": "143563",
-	"EC": "143509",
-	"EE": "143518",
-	"EG": "143516",
-	"ES": "143454",
-	"FI": "143447",
-	"FR": "143442",
-	"GB": "143444",
-	"GD": "143546",
-	"GE": "143615",
-	"GH": "143573",
-	"GR": "143448",
-	"GT": "143504",
-	"GY": "143553",
-	"HK": "143463",
-	"HN": "143510",
-	"HR": "143494",
-	"HU": "143482",
-	"ID": "143476",
-	"IE": "143449",
-	"IL": "143491",
-	"IN": "143467",
-	"IS": "143558",
-	"IT": "143450",
-	"IQ": "143617",
-	"JM": "143511",
-	"JO": "143528",
-	"JP": "143462",
-	"KE": "143529",
-	"KN": "143548",
-	"KR": "143466",
-	"KW": "143493",
-	"KY": "143544",
-	"KZ": "143517",
-	"LB": "143497",
-	"LC": "143549",
-	"LI": "143522",
-	"LK": "143486",
-	"LT": "143520",
-	"LU": "143451",
-	"LV": "143519",
-	"MD": "143523",
-	"MG": "143531",
-	"MK": "143530",
-	"ML": "143532",
-	"MN": "143592",
-	"MO": "143515",
-	"MS": "143547",
-	"MT": "143521",
-	"MU": "143533",
-	"MV": "143488",
-	"MX": "143468",
-	"MY": "143473",
-	"NE": "143534",
-	"NG": "143561",
-	"NI": "143512",
-	"NL": "143452",
-	"NO": "143457",
-	"NP": "143484",
-	"NZ": "143461",
-	"OM": "143562",
-	"PA": "143485",
-	"PE": "143507",
-	"PH": "143474",
-	"PK": "143477",
-	"PL": "143478",
-	"PT": "143453",
-	"PY": "143513",
-	"QA": "143498",
-	"RO": "143487",
-	"RS": "143500",
-	"RU": "143469",
-	"SA": "143479",
-	"SE": "143456",
-	"SG": "143464",
-	"SI": "143499",
-	"SK": "143496",
-	"SN": "143535",
-	"SR": "143554",
-	"SV": "143506",
-	"TC": "143552",
-	"TH": "143475",
-	"TN": "143536",
-	"TR": "143480",
-	"TT": "143551",
-	"TW": "143470",
-	"TZ": "143572",
-	"UA": "143492",
-	"UG": "143537",
-	"US": "143441",
-	"UY": "143514",
-	"UZ": "143566",
-	"VC": "143550",
-	"VE": "143502",
-	"VG": "143543",
-	"VN": "143471",
-	"YE": "143571",
-	"ZA": "143472",
+func (t *appstore) discoverStorefrontID(countryCode string) (string, error) {
+	if err := t.discoverAvailableStorefronts(); err != nil {
+		return "", err
+	}
+
+	countryCode = strings.ToUpper(strings.TrimSpace(countryCode))
+	if identifier := t.storefrontID(countryCode); identifier != "" {
+		return identifier, nil
+	}
+
+	identifiers, err := t.missingStorefrontIdentifiers()
+	if err != nil {
+		return "", err
+	}
+
+	for _, identifier := range identifiers {
+		resolvedCountryCode, found, resolveErr := t.discoverStorefrontCountryCode(identifier)
+		if resolveErr != nil {
+			return "", resolveErr
+		}
+
+		if found && resolvedCountryCode == countryCode {
+			return identifier, nil
+		}
+	}
+
+	return "", fmt.Errorf("store front mapping for country code (%s) was not found", countryCode)
+}
+
+func (t *appstore) cachedStorefrontCountryCode(identifier string) string {
+	t.storefrontsMu.Lock()
+	defer t.storefrontsMu.Unlock()
+
+	return t.storefrontCountryCodes[identifier]
+}
+
+func (t *appstore) missingStorefrontIdentifiers() ([]string, error) {
+	t.storefrontsMu.Lock()
+	defer t.storefrontsMu.Unlock()
+
+	minimum, maximum := int64(0), int64(0)
+	known := make(map[int64]struct{}, len(t.storefrontCountryCodes))
+
+	for identifier := range t.storefrontCountryCodes {
+		value, err := strconv.ParseInt(identifier, 10, 64)
+		if err != nil || value <= 0 {
+			continue
+		}
+
+		known[value] = struct{}{}
+
+		if minimum == 0 || value < minimum {
+			minimum = value
+		}
+
+		if value > maximum {
+			maximum = value
+		}
+	}
+
+	if minimum == 0 || maximum-minimum > maxStorefrontIDRange {
+		return nil, errors.New("available storefront identifier range is invalid")
+	}
+
+	identifiers := make([]string, 0, maximum-minimum+1-int64(len(known)))
+
+	for identifier := minimum; identifier <= maximum; identifier++ {
+		if _, ok := known[identifier]; !ok {
+			identifiers = append(identifiers, strconv.FormatInt(identifier, 10))
+		}
+	}
+
+	return identifiers, nil
+}
+
+func (t *appstore) discoverStorefrontCountryCode(identifier string) (string, bool, error) {
+	if _, err := strconv.ParseInt(identifier, 10, 64); err != nil {
+		return "", false, nil
+	}
+
+	if t.storefrontClient == nil {
+		return "", false, errors.New("storefront client is not configured")
+	}
+
+	res, err := t.storefrontClient.Send(http.Request{
+		URL:            storefrontGenreURL,
+		Method:         http.MethodGET,
+		ResponseFormat: http.ResponseFormatRaw,
+		NoRedirects:    true,
+		Headers: map[string]string{
+			"X-Apple-Store-Front": identifier + "-2,29",
+		},
+	})
+	if err != nil {
+		return "", false, fmt.Errorf("storefront country code request failed: %w", err)
+	}
+
+	if (res.StatusCode >= gohttp.StatusMultipleChoices && res.StatusCode < gohttp.StatusBadRequest) || res.StatusCode == gohttp.StatusNotFound {
+		return "", false, nil
+	}
+
+	if res.StatusCode != gohttp.StatusOK {
+		return "", false, NewErrorWithMetadata(errors.New("storefront country code request failed"), res)
+	}
+
+	var page storefrontGenrePage
+
+	if err = json.Unmarshal(res.Data, &page); err != nil {
+		return "", false, fmt.Errorf("failed to decode storefront country code: %w", err)
+	}
+
+	var (
+		countryCode     string
+		foundIdentifier bool
+	)
+
+	for _, data := range page.StorePlatformData {
+		storefront := data.Meta.Storefront
+		if storefront.ID == identifier {
+			foundIdentifier = true
+			countryCode = strings.ToUpper(strings.TrimSpace(storefront.CountryCode))
+
+			break
+		}
+	}
+
+	if !foundIdentifier {
+		return "", false, nil
+	}
+
+	if len(countryCode) != 2 {
+		return "", false, errors.New("storefront country code response contains no country code")
+	}
+
+	for _, character := range countryCode {
+		if character < 'A' || character > 'Z' {
+			return "", false, errors.New("storefront country code response contains an invalid country code")
+		}
+	}
+
+	t.storefrontsMu.Lock()
+	defer t.storefrontsMu.Unlock()
+
+	for knownIdentifier, knownCountryCode := range t.storefrontCountryCodes {
+		if knownCountryCode == countryCode && knownIdentifier != identifier {
+			return "", false, nil
+		}
+	}
+
+	t.storefrontCountryCodes[identifier] = countryCode
+
+	return countryCode, true, nil
+}
+
+func (t *appstore) discoverAvailableStorefronts() error {
+	t.storefrontsMu.Lock()
+	defer t.storefrontsMu.Unlock()
+
+	if t.storefrontCountryCodes != nil {
+		return nil
+	}
+
+	if t.storefrontClient == nil {
+		return errors.New("storefront client is not configured")
+	}
+
+	res, err := t.storefrontClient.Send(http.Request{
+		URL:            availableStorefrontsURL,
+		Method:         http.MethodGET,
+		ResponseFormat: http.ResponseFormatRaw,
+	})
+	if err != nil {
+		return fmt.Errorf("available storefronts request failed: %w", err)
+	}
+
+	if res.StatusCode != gohttp.StatusOK {
+		return NewErrorWithMetadata(errors.New("available storefronts request failed"), res)
+	}
+
+	var result availableStorefrontsResult
+	if _, err = plist.Unmarshal(res.Data, &result); err != nil {
+		return fmt.Errorf("failed to decode available storefronts: %w", err)
+	}
+
+	countryCodes := make(map[string]string, len(result.Storefronts))
+
+	for _, storefront := range result.Storefronts {
+		countryCode := strings.ToUpper(strings.TrimSpace(storefront.CountryCode))
+		if storefront.ID <= 0 || countryCode == "" {
+			continue
+		}
+
+		countryCodes[strconv.FormatInt(storefront.ID, 10)] = countryCode
+	}
+
+	if len(countryCodes) == 0 {
+		return errors.New("available storefronts response contains no storefronts")
+	}
+
+	t.storefrontCountryCodes = countryCodes
+
+	return nil
+}
+
+func countryCodeFromStoreFront(storeFront string, countryCodes map[string]string) (string, error) {
+	identifier := storefrontIdentifier(storeFront)
+
+	if countryCode, ok := countryCodes[identifier]; ok {
+		return countryCode, nil
+	}
+
+	return "", storefrontMappingError(storeFront)
+}
+
+func storefrontIdentifier(storeFront string) string {
+	identifier, _, _ := strings.Cut(strings.TrimSpace(storeFront), ",")
+	identifier, _, _ = strings.Cut(identifier, "-")
+
+	return identifier
+}
+
+func storefrontMappingError(storeFront string) error {
+	return fmt.Errorf("country code mapping for store front (%s) was not found", storeFront)
 }
