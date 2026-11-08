@@ -109,6 +109,7 @@ var _ = Describe("AppStore (Purchase)", func() {
 				Do(func(req http.Request) {
 					expectedURL := "https://p" + testPod + "-" + PrivateAppStoreAPIDomain + PrivateAppStoreAPIPathPurchase
 					Expect(req.URL).To(Equal(expectedURL))
+					Expect(req.Headers).To(HaveKeyWithValue("User-Agent", storeAuthenticationUserAgent))
 					Expect(req.Payload).To(BeAssignableToTypeOf(&http.XMLPayload{}))
 					payload := req.Payload.(*http.XMLPayload)
 					Expect(payload.Content["guid"]).To(Equal(testGUID))

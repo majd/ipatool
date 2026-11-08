@@ -116,6 +116,7 @@ func (t *appstore) purchaseRequest(acc Account, app App, storeFront, guid string
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{
 			"Content-Type":        "application/x-apple-plist",
+			"User-Agent":          storeAuthenticationUserAgent,
 			"iCloud-DSID":         acc.DirectoryServicesID,
 			"X-Dsid":              acc.DirectoryServicesID,
 			"X-Apple-Store-Front": storeFront,
