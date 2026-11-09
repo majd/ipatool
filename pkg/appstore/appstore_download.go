@@ -238,19 +238,47 @@ type downloadResult struct {
 	Items           []downloadItemResult `plist:"songList,omitempty"`
 }
 
+func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *progressbar.ProgressBar) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	err := t.downloadFileAttempt(ctx, src, dst, progress, true, "")
+
+	var parallelErr *parallelDownloadError
+	if !errors.As(err, &parallelErr) || ctx.Err() != nil {
+		return err
+	}
+
+	if fallbackErr := t.downloadFileAttempt(ctx, src, dst, progress, false, parallelErr.validator); fallbackErr != nil {
+		return errors.Join(err, fmt.Errorf("single-connection fallback failed: %w", fallbackErr))
+	}
+
+	return nil
+}
+
 //nolint:nonamedreturns // Deferred close errors must propagate to callers.
-func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *progressbar.ProgressBar) (err error) {
+func (t *appstore) downloadFileAttempt(ctx context.Context, src, dst string, progress *progressbar.ProgressBar, parallel bool, validator string) (err error) {
 	req, err := t.httpClient.NewRequest("GET", src, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 
-	if ctx == nil {
-		ctx = context.Background()
+	// Staged ranges are expendable; only the contiguous destination is resumed.
+	if err := os.RemoveAll(downloadPartsPath(dst)); err != nil {
+		return fmt.Errorf("failed to remove stale download parts: %w", err)
 	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	if req != nil {
 		req = req.WithContext(ctx)
+		req.Header.Set("Accept-Encoding", "identity")
+
+		if validator != "" {
+			req.Header.Set("If-Range", validator)
+		}
 	}
 
 	file, err := t.os.OpenFile(dst, os.O_CREATE|os.O_RDWR, 0644)
@@ -308,6 +336,17 @@ func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *
 		}
 
 		writer = io.MultiWriter(file, progress)
+	}
+
+	// Combining responses requires a strong validator to keep all ranges on
+	// the same representation. Servers without one retain the single stream.
+	if parallel && res.StatusCode == gohttp.StatusPartialContent &&
+		remaining == total-offset && remaining >= parallelDownloadThreshold && downloadValidator(res) != "" {
+		if err := t.downloadFileParallel(ctx, cancel, src, dst, file, writer, res, offset, total, progress); err != nil {
+			return &parallelDownloadError{err: err, validator: downloadValidator(res)}
+		}
+
+		return nil
 	}
 
 	var body io.Reader = res.Body
