@@ -10,7 +10,10 @@ import (
 	"strings"
 )
 
-const remoteReadAttempts = 3
+const (
+	remoteReadAttempts    = 3
+	restoreImageUserAgent = "Mozilla/5.0"
+)
 
 type remoteFile struct {
 	ctx    context.Context
@@ -26,6 +29,7 @@ func openRemoteFile(ctx context.Context, client *http.Client) (*remoteFile, erro
 		return nil, fmt.Errorf("create remote image request: %w", err)
 	}
 
+	request.Header.Set("User-Agent", restoreImageUserAgent)
 	request.Header.Set("Range", "bytes=0-0")
 	response, err := client.Do(request)
 
@@ -110,6 +114,7 @@ func (r *remoteFile) ReadAt(data []byte, offset int64) (int, error) {
 			return total, fmt.Errorf("create remote range request: %w", err)
 		}
 
+		request.Header.Set("User-Agent", restoreImageUserAgent)
 		request.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
 		response, err := r.client.Do(request)
 		if err != nil {
