@@ -1084,7 +1084,7 @@ var _ = Describe("AppStore (Download)", func() {
 				Stat(testFile.Name()).
 				Return(info, nil)
 			mockHTTPClient.EXPECT().
-				Do(request.WithContext(context.Background())).
+				Do(gomock.AssignableToTypeOf(request)).
 				DoAndReturn(func(request *gohttp.Request) (*gohttp.Response, error) {
 					Expect(request.Header.Get("range")).To(Equal("bytes=8-"))
 
