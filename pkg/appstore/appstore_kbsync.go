@@ -133,19 +133,25 @@ func (t *appstore) sendEntDownloadRequest(ctx context.Context, endpoint download
 		}
 	}
 
-	request.Payload = &http.XMLPayload{Content: map[string]interface{}{
-		"creditDisplay":     "",
-		"guid":              guid,
-		"kbsync":            blob,
-		"salableAdamId":     strconv.FormatInt(app.ID, 10),
-		"serialNumber":      base64.StdEncoding.EncodeToString(serial),
-		"externalVersionId": versionID,
-	}}
+	payload := map[string]interface{}{
+		"creditDisplay": "",
+		"guid":          guid,
+		"kbsync":        blob,
+		"salableAdamId": strconv.FormatInt(app.ID, 10),
+		"serialNumber":  base64.StdEncoding.EncodeToString(serial),
+	}
+	if versionID != "" {
+		payload["externalVersionId"] = versionID
+	}
+
+	request.Payload = &http.XMLPayload{Content: payload}
 
 	res, err := t.downloadClient.Send(request)
 	if err != nil {
 		return res, fmt.Errorf("send ent/download request: %w", err)
 	}
+
+	res.Data = normalizeDownloadFailure(res.Data)
 
 	if res.Data.FailureType != "" {
 		return res, NewErrorWithMetadata(fmt.Errorf("received ent/download error: %s", res.Data.FailureType), res)
