@@ -107,9 +107,9 @@ func (t *appstore) sendDownloadProduct(ctx context.Context, acc Account, app App
 
 		externalVersionID, err = t.lookupLatestExternalVersionID(acc, app, platform)
 		if errors.Is(err, errIOSCatalogAppNotFound) {
-			// A delisted app can still be available to this account. Try once
-			// without a version; Download validates the returned package's platform.
-			res, err := t.sendUnpinnedRedownload(ctx, redownload, acc, app, guid)
+			// A delisted app can still be available to this account. Neither
+			// recovery endpoint needs a catalog version to select its entitled build.
+			res, err := t.sendDelistedDownload(ctx, redownload, bag.EntDownloadEndpoint, acc, app, guid)
 
 			return res, platform, err
 		}
@@ -139,6 +139,40 @@ func (t *appstore) sendDownloadProduct(ctx context.Context, acc Account, app App
 	return redownloadRes, platform, nil
 }
 
+func (t *appstore) sendDelistedDownload(ctx context.Context, redownload downloadProductEndpoint, entEndpoint string, acc Account, app App, guid string) (http.Result[downloadResult], error) {
+	res, err := t.sendUnpinnedRedownload(ctx, redownload, acc, app, guid)
+	if err == nil && res.Data.FailureType != FailureTypeLicenseNotFound {
+		return res, nil
+	}
+
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return res, errors.Join(err, ctxErr)
+	}
+
+	if t.kbsyncGenerator == nil || entEndpoint == "" {
+		return res, err
+	}
+
+	endpoint, endpointErr := newDownloadEndpoint(entEndpoint, entDownloadPath)
+	if endpointErr != nil {
+		return res, errors.Join(err, endpointErr)
+	}
+
+	// Bypass catalog discovery: it already confirmed that there is no offer.
+	// Download still checks the returned package's platform before publishing it.
+	entRes, entErr := t.sendEntDownload(ctx, endpoint, acc, app, guid, "")
+	if entErr == nil || entRes.Data.FailureType == FailureTypePasswordTokenExpired ||
+		entRes.Data.FailureType == FailureTypeLicenseNotFound {
+		return entRes, nil
+	}
+
+	if res.Data.FailureType == FailureTypeLicenseNotFound {
+		return res, nil
+	}
+
+	return entRes, fmt.Errorf("app %d has no offer in the account's App Store catalog and the kbsync fallback failed: %w", app.ID, errors.Join(err, entErr))
+}
+
 func (t *appstore) sendUnpinnedRedownload(ctx context.Context, endpoint downloadProductEndpoint, acc Account, app App, guid string) (http.Result[downloadResult], error) {
 	requestContext, cancel := context.WithTimeout(ctx, http.DefaultAuthenticationTimeout)
 	defer cancel()
@@ -155,6 +189,8 @@ func (t *appstore) sendUnpinnedRedownload(ctx context.Context, endpoint download
 		return res, fmt.Errorf("failed to send redownload request: %w", err)
 	}
 
+	res.Data = normalizeDownloadFailure(res.Data)
+
 	if err := validateDownloadResponse(res, app, "", "redownload"); err != nil {
 		return res, err
 	}
@@ -164,6 +200,42 @@ func (t *appstore) sendUnpinnedRedownload(ctx context.Context, endpoint download
 	}
 
 	return res, nil
+}
+
+func normalizeDownloadFailure(data downloadResult) downloadResult {
+	if len(data.Items) == 0 && data.FailureType == "" && data.Metrics["messageCode"] != nil {
+		data.FailureType = strings.TrimSpace(fmt.Sprint(data.Metrics["messageCode"]))
+	}
+
+	if data.FailureType == FailureTypeSignInRequired || data.FailureType == FailureTypeDeviceVerificationFailed {
+		data.FailureType = FailureTypePasswordTokenExpired
+	}
+
+	if len(data.Items) > 0 {
+		return data
+	}
+
+	message := strings.Join(strings.Fields(data.CustomerMessage), " ")
+	if strings.EqualFold(message, "sign in to the itunes store") || strings.EqualFold(message, "sign-in required") {
+		data.FailureType = FailureTypePasswordTokenExpired
+	}
+
+	if data.FailureType == FailureTypePasswordTokenExpired {
+		return data
+	}
+
+	const unavailable = "Redownload Unavailable with This Apple Account"
+
+	dialogMessage, _ := data.Dialog["message"].(string)
+	dialogExplanation, _ := data.Dialog["explanation"].(string)
+
+	if message == unavailable ||
+		(strings.Join(strings.Fields(dialogMessage), " ") == unavailable &&
+			strings.Join(strings.Fields(dialogExplanation), " ") == "This redownload is not available for this Apple Account either because it was bought by a different user or the item was refunded or cancelled.") {
+		data.FailureType = FailureTypeLicenseNotFound
+	}
+
+	return data
 }
 
 func isEmptyRedownloadError(err error) bool {
