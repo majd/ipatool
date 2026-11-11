@@ -1,6 +1,7 @@
 package assets
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -8,18 +9,26 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
 	remoteReadAttempts    = 3
 	restoreImageUserAgent = "Mozilla/5.0"
+	remoteSmallReadSize   = 32 << 10
+	remoteReadAheadSize   = 256 << 10
 )
 
 type remoteFile struct {
-	ctx    context.Context
-	client *http.Client
-	url    string
-	size   int64
+	ctx         context.Context
+	client      *http.Client
+	url         string
+	size        int64
+	mu          sync.Mutex
+	cache       []byte
+	cacheOffset int64
+	previous    bool
+	lastEnd     int64
 }
 
 //nolint:wsl // Request construction and validation are clearer in protocol order.
@@ -49,6 +58,14 @@ func openRemoteFile(ctx context.Context, client *http.Client) (*remoteFile, erro
 	}
 	if start != 0 || end != 0 {
 		return nil, fmt.Errorf("open remote image: server returned unexpected byte range %d-%d", start, end)
+	}
+
+	probe, err := io.ReadAll(io.LimitReader(response.Body, 2))
+	if err != nil {
+		return nil, fmt.Errorf("read remote image probe: %w", err)
+	}
+	if len(probe) != 1 {
+		return nil, errors.New("remote image probe has an invalid length")
 	}
 
 	return &remoteFile{ctx: ctx, client: client, url: macOSRestoreURL, size: size}, nil
@@ -101,6 +118,60 @@ func (r *remoteFile) ReadAt(data []byte, offset int64) (int, error) {
 		wanted = int(remaining)
 	}
 
+	if err := r.ctx.Err(); err != nil {
+		return 0, fmt.Errorf("read remote image: %w", err)
+	}
+	r.mu.Lock()
+	if offset >= r.cacheOffset && offset+int64(wanted) <= r.cacheOffset+int64(len(r.cache)) {
+		copy(data[:wanted], r.cache[offset-r.cacheOffset:offset-r.cacheOffset+int64(wanted)])
+		r.previous, r.lastEnd = true, offset+int64(wanted)
+		r.mu.Unlock()
+		if wanted != len(data) {
+			return wanted, io.EOF
+		}
+
+		return wanted, nil
+	}
+	// Sparse metadata reads stay exact; only a sequential small-read stream
+	// earns read-ahead. This avoids fetching large unused image regions.
+	ahead := r.previous && offset == r.lastEnd && wanted <= remoteSmallReadSize
+	r.previous, r.lastEnd = true, offset+int64(wanted)
+	r.mu.Unlock()
+	fetchSize := wanted
+	if ahead {
+		fetchSize = int(min(int64(remoteReadAheadSize), r.size-offset))
+	}
+	buffer := data[:wanted]
+	if fetchSize > wanted {
+		buffer = make([]byte, fetchSize)
+	}
+	count, err := r.readRange(buffer, offset)
+	if count == fetchSize && err == nil && fetchSize <= remoteReadAheadSize {
+		cached := buffer
+		if fetchSize == wanted {
+			cached = bytes.Clone(buffer)
+		}
+		r.mu.Lock()
+		r.cacheOffset, r.cache = offset, cached
+		r.mu.Unlock()
+	}
+	if fetchSize > wanted {
+		copy(data[:wanted], buffer[:min(count, wanted)])
+	}
+	if count < wanted {
+		return count, err
+	}
+	if wanted != len(data) {
+		return wanted, io.EOF
+	}
+
+	return wanted, nil
+}
+
+// Read and validate one wire range, resuming interrupted bodies as needed.
+func (r *remoteFile) readRange(data []byte, offset int64) (int, error) {
+	wanted := len(data)
+
 	total := 0
 
 	var lastErr error
@@ -116,6 +187,7 @@ func (r *remoteFile) ReadAt(data []byte, offset int64) (int, error) {
 
 		request.Header.Set("User-Agent", restoreImageUserAgent)
 		request.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, end))
+
 		response, err := r.client.Do(request)
 		if err != nil {
 			lastErr = err
@@ -128,10 +200,12 @@ func (r *remoteFile) ReadAt(data []byte, offset int64) (int, error) {
 
 			return total, fmt.Errorf("read remote image range: server returned %s", response.Status)
 		}
+
 		actualStart, actualEnd, actualSize, err := parseContentRange(response.Header.Get("Content-Range"))
 
 		if err != nil || actualStart != start || actualEnd != end || actualSize != r.size {
 			response.Body.Close()
+
 			if err != nil {
 				return total, fmt.Errorf("read remote image range: %w", err)
 			}
@@ -158,10 +232,6 @@ func (r *remoteFile) ReadAt(data []byte, offset int64) (int, error) {
 		}
 
 		return total, fmt.Errorf("read remote image at offset %d: %w", offset+int64(total), lastErr)
-	}
-
-	if wanted != len(data) {
-		return total, io.EOF
 	}
 
 	return total, nil
