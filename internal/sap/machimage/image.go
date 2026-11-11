@@ -2,9 +2,11 @@ package machimage
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"sort"
 
@@ -33,16 +35,19 @@ type segment struct {
 }
 
 type Image struct {
-	name       string
-	data       []byte
-	file       *macho.File
-	base       uint64
-	segments   []segment
-	binds      []types.Bind
-	rebases    []types.Rebase
-	chained    *fixupchains.DyldChainedFixups
-	relocated  bool
-	loadedBase uint64
+	name         string
+	data         []byte
+	modified     map[uint64][]byte
+	instructions map[uint64][]instructionPatch
+	file         *macho.File
+	base         uint64
+	segments     []segment
+	binds        []types.Bind
+	rebases      []types.Rebase
+	chained      *fixupchains.DyldChainedFixups
+	fixups       []chainedRelocation
+	relocated    bool
+	loadedBase   uint64
 }
 
 func (i *Image) Base() uint64 {
@@ -56,7 +61,41 @@ func Open(name string, input []byte) (*Image, error) {
 		return nil, fmt.Errorf("open %s: %w", name, err)
 	}
 
-	file, err := macho.NewFile(bytes.NewReader(data))
+	return openImage(name, data, nil)
+}
+
+func openImage(name string, data []byte, modified map[uint64][]byte) (*Image, error) {
+	image := &Image{name: name, data: data, modified: modified}
+
+	var reader io.ReaderAt = bytes.NewReader(data)
+
+	if modified != nil {
+		reader = imageInput{image}
+	}
+
+	var key [sha256.Size]byte
+
+	var preparation imagePreparation
+
+	var cached bool
+
+	if modified != nil {
+		key = sha256.Sum256(data)
+		preparation, cached = imagePreparations.get(key)
+	}
+
+	var file *macho.File
+
+	var err error
+	if cached {
+		file, err = macho.NewFile(reader, macho.FileConfig{LoadExcluding: []types.LoadCmd{types.LC_SYMTAB, types.LC_DYSYMTAB, types.LC_CODE_SIGNATURE}})
+		if err == nil {
+			file.Symtab, file.Dysymtab = preparation.symtab, preparation.dysymtab
+		}
+	} else {
+		file, err = macho.NewFile(reader)
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("open %s Mach-O: %w", name, err)
 	}
@@ -65,12 +104,9 @@ func Open(name string, input []byte) (*Image, error) {
 		return nil, fmt.Errorf("open %s: expected arm64 Mach-O, found %s", name, file.CPU)
 	}
 
-	image := &Image{
-		name: name,
-		data: data,
-		file: file,
-		base: file.GetBaseAddress(),
-	}
+	image.file = file
+	image.base = file.GetBaseAddress()
+
 	for _, item := range file.Segments() {
 		image.segments = append(image.segments, segment{
 			name:     item.Name,
@@ -84,6 +120,14 @@ func Open(name string, input []byte) (*Image, error) {
 	if err := image.validateSegments(); err != nil {
 		return nil, err
 	}
+
+	if cached {
+		image.instructions, image.fixups = preparation.instructions, preparation.fixups
+		image.binds, image.rebases = preparation.binds, preparation.rebases
+
+		return image, nil
+	}
+
 	if err := image.removePointerAuthentication(); err != nil {
 		return nil, err
 	}
@@ -109,26 +153,50 @@ func Open(name string, input []byte) (*Image, error) {
 		}
 	}
 
+	if modified != nil {
+		if image.chained != nil {
+			image.fixups, err = image.decodeChainedRelocations()
+			if err != nil {
+				return nil, err
+			}
+
+			image.chained = nil
+		}
+
+		imagePreparations.put(key, imagePreparation{instructions: image.instructions, fixups: image.fixups, binds: image.binds, rebases: image.rebases, symtab: file.Symtab, dysymtab: file.Dysymtab})
+	}
+
 	return image, nil
 }
 
-//nolint:wsl // Instruction decoding is clearer when related operations stay together.
 func (i *Image) removePointerAuthentication() error {
+	var ranges [][2]uint64
+
 	for _, section := range i.file.Sections {
 		if !section.Flags.IsPureInstructions() && !section.Flags.IsSomeInstructions() {
 			continue
 		}
+
 		start := uint64(section.Offset)
+
 		end, overflow := add(start, section.Size)
 		if overflow || end > uint64(len(i.data)) {
 			return fmt.Errorf("instruction section %s exceeds %s", section.Name, i.name)
 		}
-		for offset := start; offset+4 <= end; offset += 4 {
+
+		ranges = append(ranges, [2]uint64{start, end})
+	}
+
+	for _, region := range ranges {
+		for offset := region[0]; offset+4 <= region[1]; offset += 4 {
 			instruction := binary.LittleEndian.Uint32(i.data[offset:])
 			replacement := WithoutPointerAuthentication(instruction)
-			if replacement != instruction {
-				binary.LittleEndian.PutUint32(i.data[offset:], replacement)
+
+			if replacement == instruction {
+				continue
 			}
+
+			i.writeInstruction(offset, replacement)
 		}
 	}
 
@@ -177,26 +245,53 @@ func WithoutPointerAuthentication(instruction uint32) uint32 {
 	return replacement
 }
 
-func arm64Slice(input []byte) ([]byte, error) {
-	fat, err := macho.NewFatFile(bytes.NewReader(input))
-	if err != nil {
-		return bytes.Clone(input), nil
+// ARM64Slice selects the arm64e image without parsing the other architectures.
+// The returned view aliases input and must not be modified by the caller.
+func ARM64Slice(input []byte) ([]byte, error) {
+	if len(input) < 4 || binary.BigEndian.Uint32(input) != types.MagicFat.Int() {
+		return input, nil
 	}
 
-	for _, architecture := range fat.Arches {
-		if architecture.CPU != types.CPUArm64 || architecture.SubCPU&types.CpuSubtypeMask != types.CPUSubtypeArm64E {
+	const headerSize, architectureSize = 8, 20
+	if len(input) < headerSize {
+		return nil, errors.New("truncated universal binary header")
+	}
+
+	count := uint64(binary.BigEndian.Uint32(input[4:]))
+	if count == 0 || count > uint64(len(input)-headerSize)/architectureSize {
+		return nil, errors.New("invalid universal binary architecture count")
+	}
+
+	for index := uint64(0); index < count; index++ {
+		header := input[headerSize+index*architectureSize:]
+		cpu := types.CPU(binary.BigEndian.Uint32(header))
+		subtype := types.CPUSubtype(binary.BigEndian.Uint32(header[4:]))
+
+		if cpu != types.CPUArm64 || subtype&types.CpuSubtypeMask != types.CPUSubtypeArm64E {
 			continue
 		}
 
-		end, overflow := add(uint64(architecture.Offset), uint64(architecture.Size))
-		if overflow || end > uint64(len(input)) {
-			return nil, errors.New("arm64e slice exceeds input size")
+		offset := uint64(binary.BigEndian.Uint32(header[8:]))
+		size := uint64(binary.BigEndian.Uint32(header[12:]))
+		end, overflow := add(offset, size)
+
+		if size == 0 || offset < headerSize+count*architectureSize || overflow || end > uint64(len(input)) {
+			return nil, errors.New("arm64e slice exceeds input size or overlaps universal binary header")
 		}
 
-		return bytes.Clone(input[architecture.Offset:end]), nil
+		return input[offset:end], nil
 	}
 
 	return nil, errors.New("universal binary has no arm64e slice")
+}
+
+func arm64Slice(input []byte) ([]byte, error) {
+	data, err := ARM64Slice(input)
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes.Clone(data), nil
 }
 
 func (i *Image) Export(name string, loadBase uint64) (uint64, error) {
@@ -313,7 +408,7 @@ func (i *Image) RelocateKernelCachePointers(loadBase, kernelBase uint64, resolve
 
 		end := item.fileOff + item.fileSize
 		for offset := start; offset <= end-pointerSize; offset += kernelFixupStride {
-			raw := binary.LittleEndian.Uint64(i.data[offset : offset+pointerSize])
+			raw := i.pointerAt(offset)
 
 			pointer := fixupchains.DyldChainedPtr64KernelCacheRebase{Pointer: raw}
 			if pointer.CacheLevel() != 0 || pointer.Target() == 0 {
@@ -362,19 +457,20 @@ func (i *Image) containsAddress(address uint64) bool {
 }
 
 //nolint:wsl // Chained-fixup decoding is clearer when related operations stay together.
-func (i *Image) relocateChained(loadBase uint64, resolve func(string) (uint64, error)) error {
+func (i *Image) decodeChainedRelocations() ([]chainedRelocation, error) {
 	if i.chained == nil {
-		return nil
+		return nil, nil
 	}
 
+	var relocations []chainedRelocation
 	for _, start := range i.chained.Starts {
 		for _, fixup := range start.Fixups {
 			offset := fixup.Offset()
 			if offset > uint64(len(i.data)) || pointerSize > uint64(len(i.data))-offset {
-				return fmt.Errorf("chained fixup at %#x exceeds %s", offset, i.name)
+				return nil, fmt.Errorf("chained fixup at %#x exceeds %s", offset, i.name)
 			}
 
-			var address uint64
+			relocation := chainedRelocation{offset: offset}
 
 			switch {
 			case fixup.IsRebase():
@@ -391,7 +487,7 @@ func (i *Image) relocateChained(loadBase uint64, resolve func(string) (uint64, e
 					if i.chained.PointerFormat == fixupchains.DYLD_CHAINED_PTR_ARM64E {
 						absolute := rebase.UnpackTarget() & 0x00ffffffffffffff
 						if absolute < i.base {
-							return fmt.Errorf("chained rebase at %#x precedes the base of %s", offset, i.name)
+							return nil, fmt.Errorf("chained rebase at %#x precedes the base of %s", offset, i.name)
 						}
 						target = absolute - i.base
 					}
@@ -402,28 +498,19 @@ func (i *Image) relocateChained(loadBase uint64, resolve func(string) (uint64, e
 
 					target, err = i.chained.Rebase(offset, i.base)
 					if err != nil {
-						return fmt.Errorf("decode chained rebase at %#x in %s: %w", offset, i.name, err)
+						return nil, fmt.Errorf("decode chained rebase at %#x in %s: %w", offset, i.name, err)
 					}
 				}
 
-				var overflow bool
-
-				address, overflow = add(loadBase, target)
-				if overflow {
-					return fmt.Errorf("chained rebase at %#x with target %#x, image base %#x, load base %#x, format %s, and type %T overflows in %s", offset, target, i.base, loadBase, i.chained.PointerFormat, fixup, i.name)
-				}
+				relocation.target = target
 			case fixup.IsBind():
 				binding, ok := fixup.(fixupchains.Bind)
 				if !ok {
-					return fmt.Errorf("invalid chained bind at %#x in %s", offset, i.name)
+					return nil, fmt.Errorf("invalid chained bind at %#x in %s", offset, i.name)
 				}
 
-				var err error
-
-				address, err = resolve(binding.Name())
-				if err != nil {
-					return fmt.Errorf("resolve %s for %s: %w", binding.Name(), i.name, err)
-				}
+				relocation.isBind = true
+				relocation.symbol = binding.Name()
 
 				addend := int64(binding.Addend())
 				switch arm64e := fixup.(type) {
@@ -436,17 +523,54 @@ func (i *Image) relocateChained(loadBase uint64, resolve func(string) (uint64, e
 					addend += int64(i.chained.Imports[ordinal].Addend())
 				}
 
-				address, err = addSigned(address, addend)
-				if err != nil {
-					return fmt.Errorf("apply chained addend for %s in %s: %w", binding.Name(), i.name, err)
-				}
+				relocation.addend = addend
 			default:
-				return fmt.Errorf("unknown chained fixup at %#x in %s", offset, i.name)
+				return nil, fmt.Errorf("unknown chained fixup at %#x in %s", offset, i.name)
 			}
 
-			if err := i.putPointer(offset, address); err != nil {
-				return err
+			relocations = append(relocations, relocation)
+		}
+	}
+
+	return relocations, nil
+}
+
+func (i *Image) relocateChained(loadBase uint64, resolve func(string) (uint64, error)) error {
+	relocations := i.fixups
+
+	if i.chained != nil {
+		var err error
+
+		relocations, err = i.decodeChainedRelocations()
+		if err != nil {
+			return err
+		}
+	}
+
+	for _, relocation := range relocations {
+		var address uint64
+
+		if relocation.isBind {
+			value, err := resolve(relocation.symbol)
+			if err != nil {
+				return fmt.Errorf("resolve %s for %s: %w", relocation.symbol, i.name, err)
 			}
+
+			address, err = addSigned(value, relocation.addend)
+			if err != nil {
+				return fmt.Errorf("apply chained addend for %s in %s: %w", relocation.symbol, i.name, err)
+			}
+		} else {
+			var overflow bool
+
+			address, overflow = add(loadBase, relocation.target)
+			if overflow {
+				return fmt.Errorf("chained rebase at %#x with target %#x overflows in %s", relocation.offset, relocation.target, i.name)
+			}
+		}
+
+		if err := i.putPointer(relocation.offset, address); err != nil {
+			return err
 		}
 	}
 
@@ -473,6 +597,13 @@ func (i *Image) PreparePrelinked(external map[uint64]string, resolve func(string
 		patched[address] = value
 	}
 
+	if len(patched) == 0 {
+		i.relocated = true
+		i.loadedBase = i.base
+
+		return nil
+	}
+
 	for _, item := range i.segments {
 		if item.name == "__TEXT" || item.name == "__LINKEDIT" || item.fileSize < pointerSize {
 			continue
@@ -485,7 +616,7 @@ func (i *Image) PreparePrelinked(external map[uint64]string, resolve func(string
 
 		end := item.fileOff + item.fileSize
 		for offset := start; offset <= end-pointerSize; offset += pointerSize {
-			current := binary.LittleEndian.Uint64(i.data[offset : offset+pointerSize])
+			current := i.pointerAt(offset)
 
 			value, ok := patched[current]
 			if !ok {
@@ -571,6 +702,11 @@ func (i *Image) Load(memory Memory) error {
 		}
 	}
 
+	var buffer []byte
+	if len(i.modified) > 0 || len(i.instructions) > 0 {
+		buffer = make([]byte, min(128<<10, len(i.data)))
+	}
+
 	for _, item := range i.segments {
 		if item.name == "__PAGEZERO" || item.fileSize == 0 {
 			continue
@@ -586,7 +722,7 @@ func (i *Image) Load(memory Memory) error {
 			return fmt.Errorf("segment %s address overflows in %s", item.name, i.name)
 		}
 
-		if err := memory.MemWrite(address, i.data[item.fileOff:end]); err != nil {
+		if err := i.writeSegment(memory, address, item.fileOff, end, buffer); err != nil {
 			return fmt.Errorf("write segment %s from %s: %w", item.name, i.name, err)
 		}
 	}
@@ -650,7 +786,10 @@ func (i *Image) putPointer(offset, value uint64) error {
 		return fmt.Errorf("fixup at %#x exceeds %s", offset, i.name)
 	}
 
-	binary.LittleEndian.PutUint64(i.data[offset:end], value)
+	var data [8]byte
+
+	binary.LittleEndian.PutUint64(data[:], value)
+	i.writeAt(offset, data[:])
 
 	return nil
 }

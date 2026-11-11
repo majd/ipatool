@@ -2,7 +2,6 @@
 package emulator
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/binary"
@@ -13,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/blacktop/go-macho"
 	"github.com/majd/ipatool/v2/internal/sap/machimage"
 	"github.com/majd/ipatool/v2/internal/sap/unicorn"
 	storeprofile "github.com/majd/ipatool/v2/internal/store/profile"
@@ -151,8 +149,10 @@ func open(ctx context.Context, imageData []byte, prepared storeprofile.Data, str
 		}
 	}
 
+	images := make([]*machimage.Image, 0, len(imageInputs))
+
 	for name, data := range imageInputs {
-		image, e := machimage.Open(name, data)
+		image, e := machimage.OpenShared(name, data)
 		if e != nil {
 			return nil, fmt.Errorf("prepare store runtime: %w", e)
 		}
@@ -164,6 +164,8 @@ func open(ctx context.Context, imageData []byte, prepared storeprofile.Data, str
 		if e = image.Load(r); e != nil {
 			return nil, fmt.Errorf("prepare store runtime: %w", e)
 		}
+
+		images = append(images, image)
 	}
 
 	pageData := prepared.Pages
@@ -210,14 +212,8 @@ func open(ctx context.Context, imageData []byte, prepared storeprofile.Data, str
 		}
 	}
 
-	for _, page := range profile.Pages {
-		if page.Offset+4096 > uint64(len(pageData)) {
-			return nil, errors.New("profile page exceeds data")
-		}
-
-		if err = r.MemWrite(page.Address, pageData[page.Offset:page.Offset+4096]); err != nil {
-			return nil, fmt.Errorf("prepare store runtime: %w", err)
-		}
+	if err = writeProfilePages(r, profile.Pages, pageData); err != nil {
+		return nil, fmt.Errorf("prepare store runtime: %w", err)
 	}
 
 	for _, call := range profile.Calls {
@@ -233,39 +229,26 @@ func open(ctx context.Context, imageData []byte, prepared storeprofile.Data, str
 		}
 	}
 	// Non-fragile ivar offsets are fixed by the Objective-C loader on macOS.
-	for _, imageBytes := range imageInputs {
-		file, err := macho.NewFile(bytes.NewReader(imageBytes))
-		if err != nil {
-			return nil, fmt.Errorf("prepare store runtime: %w", err)
-		}
+	for _, image := range images {
+		r.codeRanges = append(r.codeRanges, image.InstructionRanges()...)
 
-		defer file.Close()
-
-		for _, section := range file.Sections {
-			if section.Flags.IsPureInstructions() || section.Flags.IsSomeInstructions() {
-				r.codeRanges = append(r.codeRanges, [2]uint64{section.Addr, section.Addr + section.Size})
+		for _, sym := range image.Symbols() {
+			if !strings.HasPrefix(sym.Name, "_OBJC_IVAR_$_") {
+				continue
 			}
-		}
 
-		if file.Symtab != nil {
-			for _, sym := range file.Symtab.Syms {
-				if !strings.HasPrefix(sym.Name, "_OBJC_IVAR_$_") {
-					continue
-				}
+			parts := strings.SplitN(strings.TrimPrefix(sym.Name, "_OBJC_IVAR_$_"), ".", 2)
+			if len(parts) != 2 {
+				continue
+			}
 
-				parts := strings.SplitN(strings.TrimPrefix(sym.Name, "_OBJC_IVAR_$_"), ".", 2)
-				if len(parts) != 2 {
-					continue
-				}
+			if c := r.classes[parts[0]]; c != nil {
+				if offset, ok := c.Ivars[parts[1]]; ok {
+					data := make([]byte, 4)
+					binary.LittleEndian.PutUint32(data, uint32(offset))
 
-				if c := r.classes[parts[0]]; c != nil {
-					if offset, ok := c.Ivars[parts[1]]; ok {
-						data := make([]byte, 4)
-						binary.LittleEndian.PutUint32(data, uint32(offset))
-
-						if err = r.MemWrite(sym.Value, data); err != nil {
-							return nil, fmt.Errorf("prepare store runtime: %w", err)
-						}
+					if err = r.MemWrite(sym.Value, data); err != nil {
+						return nil, fmt.Errorf("prepare store runtime: %w", err)
 					}
 				}
 			}
