@@ -22,6 +22,7 @@ import (
 	"github.com/majd/go-apfs/pkg/disk"
 	"github.com/majd/go-apfs/pkg/disk/dmg"
 	"github.com/majd/go-apfs/types"
+	"github.com/majd/ipatool/v2/internal/sap/machimage"
 )
 
 const (
@@ -74,7 +75,7 @@ func extractAPFSFiles(ctx context.Context, source io.ReaderAt, size int64, paths
 		if err := ctx.Err(); err != nil {
 			return fmt.Errorf("extract Apple filesystem files: %w", err)
 		}
-		if err := extractor.extractFile(ctx, path, destination); err != nil {
+		if err := extractor.extractImageFile(ctx, path, destination, filepath.Ext(path) != ".icxs"); err != nil {
 			return fmt.Errorf("extract %s from Apple filesystem: %w", path, err)
 		}
 	}
@@ -129,7 +130,7 @@ func newAPFSExtractor(source io.ReaderAt, size int64) (*apfsExtractor, func() er
 	return extractor, closeExtractor, nil
 }
 
-func (e *apfsExtractor) extractFile(ctx context.Context, path, destination string) (err error) {
+func (e *apfsExtractor) extractImageFile(ctx context.Context, path, destination string, thin bool) (err error) {
 	file, err := e.openFile(ctx, path)
 	if err != nil {
 		return err
@@ -150,8 +151,15 @@ func (e *apfsExtractor) extractFile(ctx context.Context, path, destination strin
 		}
 	}()
 
-	reader := &contextReader{ctx: ctx, reader: io.NewSectionReader(file, 0, file.size)}
-	if _, err := io.CopyN(output, reader, file.size); err != nil {
+	offset, size := int64(0), file.size
+	if thin {
+		offset, size, err = machimage.ARM64Range(file, file.size)
+		if err != nil {
+			return fmt.Errorf("select runtime image architecture: %w", err)
+		}
+	}
+	reader := &contextReader{ctx: ctx, reader: io.NewSectionReader(file, offset, size)}
+	if _, err := io.CopyN(output, reader, size); err != nil {
 		return fmt.Errorf("copy file data: %w", err)
 	}
 

@@ -82,7 +82,10 @@ func resolveRemoteImage(ctx context.Context) (Bundle, error) {
 		files[spec.name] = data
 	}
 
-	bundle := bundleFrom(files)
+	bundle, err := compactBundle(bundleFrom(files))
+	if err != nil {
+		return Bundle{}, err
+	}
 	if err := validate(bundle); err != nil {
 		return Bundle{}, err
 	}
