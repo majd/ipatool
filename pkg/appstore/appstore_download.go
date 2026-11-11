@@ -233,9 +233,11 @@ type downloadItemResult struct {
 }
 
 type downloadResult struct {
-	FailureType     string               `plist:"failureType,omitempty"`
-	CustomerMessage string               `plist:"customerMessage,omitempty"`
-	Items           []downloadItemResult `plist:"songList,omitempty"`
+	FailureType     string                 `plist:"failureType,omitempty"`
+	CustomerMessage string                 `plist:"customerMessage,omitempty"`
+	Dialog          map[string]interface{} `plist:"dialog,omitempty"`
+	Metrics         map[string]interface{} `plist:"metrics,omitempty"`
+	Items           []downloadItemResult   `plist:"songList,omitempty"`
 }
 
 func (t *appstore) downloadFile(ctx context.Context, src, dst string, progress *progressbar.ProgressBar) error {
