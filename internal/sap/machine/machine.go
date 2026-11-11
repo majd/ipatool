@@ -112,7 +112,7 @@ func openRuntime(ctx context.Context, bundle assets.Bundle, options runtimeOptio
 	images := make(map[string]*machimage.Image, len(imageSpecs))
 
 	for _, spec := range imageSpecs {
-		image, err := machimage.Open(spec.name, spec.data)
+		image, err := machimage.OpenShared(spec.name, spec.data)
 		if err != nil {
 			return nil, nil, fmt.Errorf("open %s image: %w", spec.name, err)
 		}
