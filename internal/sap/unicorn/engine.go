@@ -154,7 +154,20 @@ func (e *Engine) register(handle uintptr) {
 	purego.RegisterLibFunc(&e.api.open, handle, "uc_open")
 	purego.RegisterLibFunc(&e.api.close, handle, "uc_close")
 	purego.RegisterLibFunc(&e.api.query, handle, "uc_query")
-	purego.RegisterLibFunc(&e.api.ctl, handle, "uc_ctl")
+	// Darwin ARM64 passes C variadic arguments on the stack. Fill the six
+	// remaining integer registers so purego places uc_ctl's value there.
+	if (runtime.GOOS == "darwin" || runtime.GOOS == "ios") && runtime.GOARCH == "arm64" {
+		var control func(uintptr, uint32, uintptr, uintptr, uintptr, uintptr, uintptr, uintptr, uint32) int32
+
+		purego.RegisterLibFunc(&control, handle, "uc_ctl")
+
+		e.api.ctl = func(engine uintptr, command, value uint32) int32 {
+			return control(engine, command, 0, 0, 0, 0, 0, 0, value)
+		}
+	} else {
+		purego.RegisterLibFunc(&e.api.ctl, handle, "uc_ctl")
+	}
+
 	purego.RegisterLibFunc(&e.api.strerror, handle, "uc_strerror")
 	purego.RegisterLibFunc(&e.api.memMap, handle, "uc_mem_map")
 	purego.RegisterLibFunc(&e.api.memUnmap, handle, "uc_mem_unmap")
