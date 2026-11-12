@@ -86,35 +86,47 @@ func remoteFileSize(client apphttp.Client[interface{}], url string) (int64, erro
 		return 0, fmt.Errorf("expected partial content response, got status %d", res.StatusCode)
 	}
 
-	size, err := parseContentRangeSize(res.Header.Get("Content-Range"))
+	start, end, size, err := parseContentRange(res.Header.Get("Content-Range"))
 	if err != nil {
 		return 0, err
+	}
+
+	if start != 0 || end != 0 {
+		return 0, fmt.Errorf("unexpected content range for size probe: bytes %d-%d/%d", start, end, size)
 	}
 
 	return size, nil
 }
 
-func parseContentRangeSize(header string) (int64, error) {
+func parseContentRange(header string) (int64, int64, int64, error) {
 	if header == "" {
-		return 0, errors.New("content range is empty")
+		return 0, 0, 0, errors.New("content range is empty")
 	}
 
-	slash := strings.LastIndex(header, "/")
-	if slash == -1 || slash == len(header)-1 {
-		return 0, fmt.Errorf("invalid content range: %s", header)
+	unitAndRange, sizeText, ok := strings.Cut(header, "/")
+	if !ok {
+		return 0, 0, 0, fmt.Errorf("invalid content range: %s", header)
 	}
 
-	sizeText := header[slash+1:]
-	if sizeText == "*" {
-		return 0, fmt.Errorf("invalid content range size: %s", sizeText)
+	rangeText, ok := strings.CutPrefix(unitAndRange, "bytes ")
+	if !ok {
+		return 0, 0, 0, fmt.Errorf("invalid content range: %s", header)
 	}
 
-	size, err := strconv.ParseInt(sizeText, 10, 64)
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse content range size: %w", err)
+	startText, endText, ok := strings.Cut(rangeText, "-")
+	if !ok {
+		return 0, 0, 0, fmt.Errorf("invalid content range: %s", header)
 	}
 
-	return size, nil
+	start, startErr := strconv.ParseInt(startText, 10, 64)
+	end, endErr := strconv.ParseInt(endText, 10, 64)
+	size, sizeErr := strconv.ParseInt(sizeText, 10, 64)
+
+	if startErr != nil || endErr != nil || sizeErr != nil || start < 0 || end < start || end >= size {
+		return 0, 0, 0, fmt.Errorf("invalid content range: %s", header)
+	}
+
+	return start, end, size, nil
 }
 
 func (r *httpRangeReaderAt) ReadAt(p []byte, off int64) (int, error) {
@@ -130,32 +142,36 @@ func (r *httpRangeReaderAt) ReadAt(p []byte, off int64) (int, error) {
 		return 0, io.EOF
 	}
 
-	end := off + int64(len(p))
-	if end > r.size {
-		end = r.size
-	}
+	readLength := min(int64(len(p)), r.size-off)
+	end := off + readLength
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	windowStart, window := r.windowStart, r.window
+
+	var readErr error
+
 	if off < r.windowStart || end > r.windowStart+int64(len(r.window)) {
-		fetchEnd := off + max(int64(len(p)), rangeReaderReadAhead)
-		if fetchEnd > r.size {
-			fetchEnd = r.size
-		}
+		fetchEnd := off + min(max(int64(len(p)), rangeReaderReadAhead), r.size-off)
 
-		data, err := r.fetch(off, fetchEnd-1)
-		if err != nil {
-			return 0, err
-		}
+		window, readErr = r.fetch(off, fetchEnd-1)
+		windowStart = off
 
-		r.windowStart = off
-		r.window = data
+		// Only complete responses become cache entries. A valid partial prefix
+		// can still satisfy this read without replacing the previous window.
+		if readErr == nil {
+			r.windowStart = windowStart
+			r.window = window
+		}
 	}
 
-	n := copy(p[:end-off], r.window[off-r.windowStart:])
+	n := copy(p[:readLength], window[off-windowStart:])
+	if int64(n) < readLength {
+		return n, readErr
+	}
 
-	if off+int64(len(p)) > r.size {
+	if n < len(p) {
 		return n, io.EOF
 	}
 
@@ -185,11 +201,20 @@ func (r *httpRangeReaderAt) fetch(start, stop int64) ([]byte, error) {
 		return nil, fmt.Errorf("expected partial content response, got status %d", res.StatusCode)
 	}
 
+	actualStart, actualStop, actualSize, err := parseContentRange(res.Header.Get("Content-Range"))
+	if err != nil {
+		return nil, err
+	}
+
+	if actualStart != start || actualStop != stop || actualSize != r.size {
+		return nil, fmt.Errorf("unexpected content range: bytes %d-%d/%d, expected bytes %d-%d/%d", actualStart, actualStop, actualSize, start, stop, r.size)
+	}
+
 	data := make([]byte, stop-start+1)
 
-	_, err = io.ReadFull(res.Body, data)
+	n, err := io.ReadFull(res.Body, data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
+		return data[:n], fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	return data, nil
