@@ -845,6 +845,10 @@ func (r *Runtime) performHTTP(task uint64) {
 		r.lastResponse = &copied
 	}
 
+	if err := tracePurchaseResponse(request, response, data); err != nil {
+		panic(err)
+	}
+
 	headers := map[string]uint64{}
 	for k, v := range response.Header {
 		headers[k] = r.New("NSString", strings.Join(v, ", "))
