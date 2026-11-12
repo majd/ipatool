@@ -13,6 +13,7 @@ import (
 )
 
 const (
+	queryPageSize    = 2
 	queryTimeout     = 4
 	controlCPUModel  = uint32(7 | 1<<26 | 1<<30)
 	arm64CPUModelMax = uint32(3)
@@ -140,6 +141,19 @@ func newEngine(ctx context.Context, loadLibrary func(context.Context) (library, 
 		_ = library.close()
 
 		return nil, err
+	}
+
+	// uc_open and CPU model selection leave initialization lazy. Force it here
+	// so later memory/register operations cannot reset the shared timeout clock.
+	if err := engineClock.initialize(ctx, func() error {
+		var pageSize uint64
+
+		return engine.err(engine.api.query(engine.handle, queryPageSize, &pageSize))
+	}); err != nil {
+		_ = engine.api.close(engine.handle)
+		_ = library.close()
+
+		return nil, fmt.Errorf("initialize arm64 emulator: %w", err)
 	}
 
 	runtime.SetFinalizer(engine, func(engine *Engine) {
@@ -319,6 +333,9 @@ func (e *Engine) Start(begin, end uint64) error {
 		return err
 	}
 
+	doneEmulation := engineClock.beginEmulation()
+	defer doneEmulation()
+
 	return e.executionError(e.err(e.api.emuStart(handle, begin, end, 0, 0)))
 }
 
@@ -342,6 +359,9 @@ func (e *Engine) StartBounded(begin, end uint64, timeout time.Duration, instruct
 	if err := e.executionError(nil); err != nil {
 		return err
 	}
+
+	doneEmulation := engineClock.beginEmulation()
+	defer doneEmulation()
 
 	if err := e.executionError(e.err(e.api.emuStart(handle, begin, end, microseconds, instructionLimit))); err != nil {
 		return err
