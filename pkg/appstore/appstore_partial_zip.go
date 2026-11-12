@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	apphttp "github.com/majd/ipatool/v2/pkg/http"
@@ -31,10 +32,19 @@ type versionMetadata struct {
 	ReleaseDate    time.Time
 }
 
+// rangeReaderReadAhead is the minimum size of a remote read. archive/zip parses the central
+// directory through a 4 KiB bufio.Reader, and every request made through the Store client
+// runs in the emulator, so each miss reads ahead and later reads are served from memory.
+const rangeReaderReadAhead int64 = 1 << 20
+
 type httpRangeReaderAt struct {
 	client apphttp.Client[interface{}]
 	url    string
 	size   int64
+
+	mu          sync.Mutex
+	windowStart int64
+	window      []byte
 }
 
 func newHTTPRangeReaderAt(client apphttp.Client[interface{}], url string) (*httpRangeReaderAt, int64, error) {
@@ -120,24 +130,51 @@ func (r *httpRangeReaderAt) ReadAt(p []byte, off int64) (int, error) {
 		return 0, io.EOF
 	}
 
-	requestEnd := off + int64(len(p)) - 1
-	rangeEnd := requestEnd
-
-	if rangeEnd >= r.size {
-		rangeEnd = r.size - 1
+	end := off + int64(len(p))
+	if end > r.size {
+		end = r.size
 	}
 
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if off < r.windowStart || end > r.windowStart+int64(len(r.window)) {
+		fetchEnd := off + max(int64(len(p)), rangeReaderReadAhead)
+		if fetchEnd > r.size {
+			fetchEnd = r.size
+		}
+
+		data, err := r.fetch(off, fetchEnd-1)
+		if err != nil {
+			return 0, err
+		}
+
+		r.windowStart = off
+		r.window = data
+	}
+
+	n := copy(p[:end-off], r.window[off-r.windowStart:])
+
+	if off+int64(len(p)) > r.size {
+		return n, io.EOF
+	}
+
+	return n, nil
+}
+
+// fetch downloads bytes start...stop (inclusive) with a single range request.
+func (r *httpRangeReaderAt) fetch(start, stop int64) ([]byte, error) {
 	req, err := r.client.NewRequest("GET", r.url, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Accept-Encoding", "identity")
-	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", off, rangeEnd))
+	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", start, stop))
 
 	res, err := r.client.Do(req)
 	if err != nil {
-		return 0, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
 	}
 
 	if res != nil && res.Body != nil {
@@ -145,25 +182,17 @@ func (r *httpRangeReaderAt) ReadAt(p []byte, off int64) (int, error) {
 	}
 
 	if res.StatusCode != http.StatusPartialContent {
-		return 0, fmt.Errorf("expected partial content response, got status %d", res.StatusCode)
+		return nil, fmt.Errorf("expected partial content response, got status %d", res.StatusCode)
 	}
 
-	readLength := int(rangeEnd-off) + 1
+	data := make([]byte, stop-start+1)
 
-	n, err := io.ReadFull(res.Body, p[:readLength])
-	if err == io.ErrUnexpectedEOF || err == io.EOF {
-		return n, io.EOF
-	}
-
+	_, err = io.ReadFull(res.Body, data)
 	if err != nil {
-		return n, fmt.Errorf("failed to read response body: %w", err)
+		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	if requestEnd >= r.size {
-		return n, io.EOF
-	}
-
-	return n, nil
+	return data, nil
 }
 
 func (t *appstore) readVersionMetadataFromIPA(url string) (versionMetadata, error) {
