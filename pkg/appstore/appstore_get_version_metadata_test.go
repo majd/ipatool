@@ -165,6 +165,26 @@ var _ = Describe("HTTPRangeReaderAt", func() {
 		Expect(string(buf[:n])).To(Equal("ef"))
 		Expect(rangeLog).To(ContainElement("bytes=4-5"))
 	})
+
+	It("serves small sequential reads from one read-ahead request", func() {
+		data := bytes.Repeat([]byte("0123456789abcdef"), 4096)
+		rangeLog := []string{}
+		server, _, _ := testIPAServerWithRangeLog(data, &rangeLog)
+		defer server.Close()
+
+		reader, _, err := newHTTPRangeReaderAt(newDownloadTestClient(), server.URL)
+		Expect(err).NotTo(HaveOccurred())
+
+		buf := make([]byte, 4096)
+		for off := int64(1024); off+int64(len(buf)) <= int64(len(data)); off += int64(len(buf)) {
+			n, err := reader.ReadAt(buf, off)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(buf[:n]).To(Equal(data[off : off+int64(n)]))
+		}
+
+		// The first entry is the size probe made when the reader is opened.
+		Expect(rangeLog).To(Equal([]string{"bytes=0-0", fmt.Sprintf("bytes=1024-%d", len(data)-1)}))
+	})
 })
 
 var _ = Describe("AppStore (GetVersionMetadata)", func() {
