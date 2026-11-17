@@ -71,7 +71,7 @@ func (e *executor) Send(request apphttp.Request, body []byte) (*http.Response, e
 			direct.Header.Set("User-Agent", apphttp.DefaultUserAgent)
 		}
 
-		return e.backend.requestTransport(emulator.Request{Operation: "authenticate"})(direct)
+		return e.backend.requestTransport(emulator.Request{Operation: "authenticate", Timeout: request.Timeout})(direct)
 	}
 
 	input := emulator.Request{URL: request.URL, Method: request.Method, Operation: e.operation, Format: string(request.ResponseFormat), Timeout: request.Timeout, Body: body, Headers: make(http.Header), NoRedirects: request.NoRedirects, Raw: request.ResponseFormat == apphttp.ResponseFormatRaw}

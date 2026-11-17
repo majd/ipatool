@@ -191,8 +191,13 @@ func validateAuthenticationEndpoint(endpoint string) error {
 }
 
 func (*appstore) bagRequest(guid string) http.Request {
+	endpoint := fmt.Sprintf("https://%s%s?ix=6", PrivateInitDomain, PrivateInitPath)
+	if guid != "" {
+		endpoint += "&guid=" + url.QueryEscape(guid)
+	}
+
 	return http.Request{
-		URL:            fmt.Sprintf("https://%s%s?ix=6&guid=%s", PrivateInitDomain, PrivateInitPath, guid),
+		URL:            endpoint,
 		Method:         http.MethodGET,
 		ResponseFormat: http.ResponseFormatXML,
 		Headers: map[string]string{

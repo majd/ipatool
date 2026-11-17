@@ -53,8 +53,10 @@ type appstore struct {
 	kbsyncCache            kbsyncCache
 	platformClient         http.Client[platformVersionLookupResult]
 	storefrontClient       http.Client[[]byte]
+	storefrontBagClient    http.Client[storefrontBagResult]
 	storefrontsMu          sync.Mutex
 	storefrontCountryCodes map[string]string
+	storefrontListLoaded   bool
 	bagClient              http.Client[bagResult]
 	ownedAppsClient        http.Client[[]byte]
 	httpClient             http.Client[interface{}]
@@ -107,6 +109,7 @@ func NewAppStore(args Args) AppStore {
 		kbsyncGenerator:     defaultKBSyncGenerator,
 		platformClient:      http.NewClient[platformVersionLookupResult](clientArgs),
 		storefrontClient:    http.NewClient[[]byte](clientArgs),
+		storefrontBagClient: http.NewClient[storefrontBagResult](http.Args{CookieJar: args.CookieJar, Timeout: http.DefaultAuthenticationTimeout, Executor: backend.Client("bag-direct")}),
 		bagClient:           http.NewClient[bagResult](http.Args{CookieJar: args.CookieJar, Timeout: http.DefaultAuthenticationTimeout, Executor: backend.Client("bag-direct")}),
 		ownedAppsClient:     http.NewClient[[]byte](clientArgs),
 		httpClient:          http.NewClient[interface{}](http.Args{CookieJar: args.CookieJar, Executor: backend.Client("transfer")}),
