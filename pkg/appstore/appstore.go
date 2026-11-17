@@ -47,6 +47,7 @@ type appstore struct {
 	loginClient            http.Client[loginResult]
 	searchClient           http.Client[searchResult]
 	purchaseClient         http.Client[purchaseResult]
+	termsClient            http.Client[termsResult]
 	downloadClient         http.Client[downloadResult]
 	kbsyncGenerator        kbsyncGenerator
 	kbsyncCache            kbsyncCache
@@ -101,6 +102,7 @@ func NewAppStore(args Args) AppStore {
 		loginClient:         http.NewClient[loginResult](http.Args{CookieJar: args.CookieJar, Authentication: true, Executor: backend.Client("authenticate")}),
 		searchClient:        http.NewClient[searchResult](clientArgs),
 		purchaseClient:      http.NewClient[purchaseResult](http.Args{CookieJar: args.CookieJar, Executor: backend.Client("purchase")}),
+		termsClient:         http.NewClient[termsResult](http.Args{CookieJar: args.CookieJar, Timeout: http.DefaultAuthenticationTimeout, Executor: backend.Client("request")}),
 		downloadClient:      http.NewClient[downloadResult](clientArgs),
 		kbsyncGenerator:     defaultKBSyncGenerator,
 		platformClient:      http.NewClient[platformVersionLookupResult](clientArgs),
