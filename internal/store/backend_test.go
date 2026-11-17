@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/majd/ipatool/v2/internal/store/emulator"
+	apphttp "github.com/majd/ipatool/v2/pkg/http"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -96,6 +97,16 @@ var _ = Describe("Store connection reuse", func() {
 		_, err = backend.requestTransport(emulator.Request{Timeout: 20 * time.Millisecond})(req)
 		Expect(err).To(MatchError(ContainSubstring("deadline exceeded")))
 		Expect(get("request", "/").StatusCode).To(Equal(http.StatusOK))
+	})
+	It("honors the public bag request timeout", func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_, err := backend.Client("bag-direct").Send(apphttp.Request{
+			URL: server.URL + "/slow", Method: http.MethodGet,
+			Context: ctx, Timeout: 20 * time.Millisecond,
+		}, nil)
+		Expect(err).To(MatchError(ContainSubstring("deadline exceeded")))
+		Expect(ctx.Err()).NotTo(HaveOccurred())
 	})
 	It("cancels an active stream without closing an unrelated pooled connection", func() {
 		api := get("request", "/")
