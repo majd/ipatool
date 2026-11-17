@@ -141,7 +141,7 @@ var _ = Describe("Download command", func() {
 		cmd.SetContext(context.WithValue(context.Background(), interactiveKey, false))
 
 		Expect(cmd.Execute()).To(Succeed())
-		Expect(store.accountInfoCalls).To(Equal(1))
+		Expect(store.accountInfoCalls).To(Equal(2))
 		Expect(store.purchaseInputs).To(HaveLen(1))
 		Expect(store.purchaseInputs[0].Platform).To(Equal(platform))
 		Expect(store.purchaseInputs[0].App).To(Equal(appstore.App{ID: 42}))
@@ -167,7 +167,7 @@ var _ = Describe("Download command", func() {
 		cmd.SetContext(context.WithValue(context.Background(), interactiveKey, false))
 
 		Expect(cmd.Execute()).To(Succeed())
-		Expect(store.accountInfoCalls).To(Equal(1))
+		Expect(store.accountInfoCalls).To(Equal(2))
 		Expect(store.loginInputs).To(HaveLen(1))
 		Expect(store.purchaseInputs).To(HaveLen(2))
 		Expect(store.purchaseInputs[0].Platform).To(Equal(appstore.PlatformMacOS))
@@ -198,7 +198,7 @@ var _ = Describe("Download command", func() {
 		cmd.SetContext(context.WithValue(context.Background(), interactiveKey, false))
 
 		Expect(cmd.Execute()).To(Succeed())
-		Expect(store.accountInfoCalls).To(Equal(1))
+		Expect(store.accountInfoCalls).To(Equal(1 + purchaseCount))
 		Expect(store.loginInputs).To(Equal([]appstore.LoginInput{{Email: account.Email, Password: account.Password}}))
 		Expect(store.lookupInputs).To(HaveLen(len(downloadErrors)))
 		Expect(store.lookupInputs[0].Account).To(Equal(account))
@@ -222,6 +222,38 @@ var _ = Describe("Download command", func() {
 		Entry("refreshes an expired token", []error{appstore.ErrPasswordTokenExpired, nil}, 0),
 		Entry("retains the refreshed token for a subsequent purchase", []error{appstore.ErrPasswordTokenExpired, appstore.ErrLicenseRequired, nil}, 1),
 	)
+
+	DescribeTable("downloads using the storefront persisted during purchase", func(refresh bool) {
+		original := appstore.Account{Email: "user@example.com", Password: "password", PasswordToken: "old-token", StoreFront: "143441-1,34"}
+		corrected := original
+		corrected.StoreFront = "143462-1,34"
+		store := &fakeDownloadAppStore{
+			account: original, downloadErrors: []error{appstore.ErrLicenseRequired, nil},
+			purchaseStorefront: corrected.StoreFront,
+		}
+		if refresh {
+			corrected.PasswordToken = "new-token"
+			store.loginAccount = corrected
+			store.purchaseErrors = []error{appstore.ErrPasswordTokenExpired, nil}
+		}
+		previousDependencies := dependencies
+		DeferCleanup(func() { dependencies = previousDependencies })
+		dependencies.Logger = log.NewLogger(log.Args{})
+		command := downloadCmdWithAppStore(func() appstore.AppStore { return store })
+		command.SetArgs([]string{"--app-id", "42", "--purchase"})
+		command.SetContext(context.WithValue(context.Background(), interactiveKey, false))
+		Expect(command.Execute()).To(Succeed())
+		Expect(store.downloadInputs).To(HaveLen(2))
+		Expect(store.downloadInputs[0].Account).To(Equal(original))
+		Expect(store.downloadInputs[1].Account).To(Equal(corrected))
+		if refresh {
+			Expect(store.loginInputs).To(HaveLen(1))
+			Expect(store.purchaseInputs).To(HaveLen(2))
+			Expect(store.purchaseInputs[1].Account).To(Equal(corrected))
+		} else {
+			Expect(store.loginInputs).To(BeEmpty())
+		}
+	}, Entry("immediate success", false), Entry("token refresh after correction", true))
 
 	It("returns an account read error before attempting a download", func() {
 		store := &fakeDownloadAppStore{accountInfoError: errors.New("account unavailable")}
@@ -251,22 +283,24 @@ func (f *fakeSinfReplicator) ReplicateSinf(input appstore.ReplicateSinfInput) er
 }
 
 type fakeDownloadAppStore struct {
-	account          appstore.Account
-	accountInfoCalls int
-	accountInfoError error
-	downloadErrors   []error
-	downloadInputs   []appstore.DownloadInput
-	loginAccount     appstore.Account
-	loginInputs      []appstore.LoginInput
-	lookupInputs     []appstore.LookupInput
-	lookupOutput     appstore.LookupOutput
-	lookupError      error
-	purchaseErrors   []error
-	purchaseInputs   []appstore.PurchaseInput
+	account            appstore.Account
+	accountInfoCalls   int
+	accountInfoError   error
+	downloadErrors     []error
+	downloadInputs     []appstore.DownloadInput
+	loginAccount       appstore.Account
+	loginInputs        []appstore.LoginInput
+	lookupInputs       []appstore.LookupInput
+	lookupOutput       appstore.LookupOutput
+	lookupError        error
+	purchaseErrors     []error
+	purchaseInputs     []appstore.PurchaseInput
+	purchaseStorefront string
 }
 
 func (f *fakeDownloadAppStore) Login(input appstore.LoginInput) (appstore.LoginOutput, error) {
 	f.loginInputs = append(f.loginInputs, input)
+	f.account = f.loginAccount
 
 	return appstore.LoginOutput{Account: f.loginAccount}, nil
 }
@@ -295,6 +329,10 @@ func (*fakeDownloadAppStore) OwnedApps(input appstore.OwnedAppsInput) (appstore.
 
 func (f *fakeDownloadAppStore) Purchase(input appstore.PurchaseInput) error {
 	f.purchaseInputs = append(f.purchaseInputs, input)
+	if f.purchaseStorefront != "" {
+		f.account.StoreFront = f.purchaseStorefront
+	}
+
 	index := len(f.purchaseInputs) - 1
 
 	if index < len(f.purchaseErrors) && f.purchaseErrors[index] != nil {

@@ -385,6 +385,73 @@ var _ = Describe("MCP server", func() {
 		}
 	}, Entry("explicit opt in", true), Entry("no opt in", false))
 
+	DescribeTable("uses a purchase-corrected storefront for MCP downloads", func(refresh bool) {
+		account.DirectoryServicesID = "123456"
+		account.StoreFront = "143441-1,34"
+		var downloads []appstore.Account
+		purchases := 0
+		expectedPurchases := 1
+		if refresh {
+			expectedPurchases = 2
+		}
+		store.download = func(input appstore.DownloadInput) (appstore.DownloadOutput, error) {
+			downloads = append(downloads, input.Account)
+			if purchases < expectedPurchases {
+				return appstore.DownloadOutput{}, appstore.ErrLicenseRequired
+			}
+
+			return appstore.DownloadOutput{DestinationPath: "/tmp/example.pkg"}, nil
+		}
+		store.purchase = func(input appstore.PurchaseInput) error {
+			purchases++
+			account.StoreFront = "143462-1,34"
+			if refresh && purchases == 1 {
+				return appstore.ErrPasswordTokenExpired
+			}
+
+			return nil
+		}
+		store.login = func(appstore.LoginInput) (appstore.LoginOutput, error) {
+			account.PasswordToken = "new-token"
+
+			return appstore.LoginOutput{Account: account}, nil
+		}
+		result := call("download_app", map[string]any{"app_id": 123, "platform": "macos", "purchase": true})
+		Expect(result.IsError).To(BeFalse())
+		Expect(purchases).To(Equal(expectedPurchases))
+		Expect(result.StructuredContent).To(HaveKeyWithValue("purchased", true))
+		Expect(downloads[0].StoreFront).To(Equal("143441-1,34"))
+		Expect(downloads[len(downloads)-1].StoreFront).To(Equal("143462-1,34"))
+		if refresh {
+			Expect(downloads[len(downloads)-1].PasswordToken).To(Equal("new-token"))
+		}
+	}, Entry("immediate success", false), Entry("after token refresh", true))
+
+	DescribeTable("propagates errors after purchasing during an MCP download", func(accountReadFails bool) {
+		failure := errors.New("fixture post-purchase failure")
+		downloads := 0
+		store.download = func(appstore.DownloadInput) (appstore.DownloadOutput, error) {
+			downloads++
+			if downloads == 1 {
+				return appstore.DownloadOutput{}, appstore.ErrLicenseRequired
+			}
+
+			return appstore.DownloadOutput{}, failure
+		}
+		store.purchase = func(appstore.PurchaseInput) error {
+			if accountReadFails {
+				store.accountInfo = func() (appstore.AccountInfoOutput, error) {
+					return appstore.AccountInfoOutput{}, failure
+				}
+			}
+
+			return nil
+		}
+		result := call("download_app", map[string]any{"app_id": 123, "platform": "macos", "purchase": true})
+		Expect(result.IsError).To(BeTrue())
+		Expect(result.Content[0].(*mcp.TextContent).Text).To(ContainSubstring(failure.Error()))
+	}, Entry("reloading the saved account", true), Entry("retrying the download", false))
+
 	It("refreshes an expired session using saved credentials", func() {
 		var login appstore.LoginInput
 		var accounts []appstore.Account

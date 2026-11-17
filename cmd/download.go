@@ -95,6 +95,14 @@ func downloadCmdWithAppStore(appStore func() appstore.AppStore) *cobra.Command {
 					if err != nil && !errors.Is(err, appstore.ErrLicenseAlreadyExists) {
 						return err
 					}
+
+					// Purchasing may persist a server-corrected storefront.
+					info, err := store.AccountInfo()
+					if err != nil {
+						return err
+					}
+
+					acc = info.Account
 					purchaseRequired = false
 					purchased = true
 					dependencies.Logger.Verbose().
