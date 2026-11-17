@@ -44,6 +44,7 @@ type Runtime struct {
 	lastResponse                             *http.Response
 	transportError                           error
 	streamResponse, noRedirects, authRequest bool
+	termsActionAdapterInstalled              bool
 
 	taskLocalFrames             map[uint64][]taskLocalBinding
 	transport                   func(*http.Request) (*http.Response, error)

@@ -101,6 +101,10 @@ func (r *Runtime) Execute(input Request) (response *http.Response, err error) {
 		}
 	}
 
+	if input.Operation == "purchase" {
+		r.installTermsActionAdapter()
+	}
+
 	parameters := input.Parameters
 
 	if input.Operation == "authenticate" {
