@@ -234,15 +234,6 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string, signe
 		request = t.loginRequest(email, password, authCode, guid, request.URL, attempt, signer)
 	}
 
-	sf, err := res.GetHeader(HTTPHeaderStoreFront)
-	if errors.Is(err, http.ErrHeaderNotFound) {
-		sf, err = res.GetHeader(HTTPHeaderRequestStoreFront)
-	}
-
-	if err != nil {
-		return Account{}, NewErrorWithMetadata(fmt.Errorf("failed to get storefront header: %w", err), res)
-	}
-
 	pod, err := res.GetHeader(HTTPHeaderPod)
 	if err != nil && !errors.Is(err, http.ErrHeaderNotFound) {
 		return Account{}, NewErrorWithMetadata(fmt.Errorf("failed to get pod header: %w", err), res)
@@ -257,6 +248,11 @@ func (t *appstore) login(email, password, authCode, guid, endpoint string, signe
 
 	if directoryServicesID == "" {
 		return Account{}, NewErrorWithMetadata(errors.New("apple returned no directory services identifier"), res)
+	}
+
+	sf, err := t.loginStorefront(res, directoryServicesID)
+	if err != nil {
+		return Account{}, NewErrorWithMetadata(err, res)
 	}
 
 	accountEmail := res.Data.Account.Email

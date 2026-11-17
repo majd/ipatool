@@ -217,6 +217,12 @@ func (t *mcpTools) download(ctx context.Context, input mcpDownloadInput) (mcpDow
 				return mcpDownloadOutput{}, err
 			}
 
+			info, accountErr := t.store.AccountInfo()
+			if accountErr != nil {
+				return mcpDownloadOutput{}, accountErr
+			}
+
+			downloadInput.Account = info.Account
 			purchased = true
 			out, err = t.store.Download(downloadInput)
 		}

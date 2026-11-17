@@ -34,10 +34,10 @@ func (t *appstore) Purchase(input PurchaseInput) error {
 		return errors.New("purchasing paid apps is not supported")
 	}
 
-	err = t.purchaseWithParams(input.Account, input.App, guid, PricingParameterAppStore)
+	err = t.purchaseWithParams(&input.Account, input.App, guid, PricingParameterAppStore)
 	if err != nil {
 		if input.Platform != PlatformMacOS && err == ErrTemporarilyUnavailable {
-			err = t.purchaseWithParams(input.Account, input.App, guid, PricingParameterAppleArcade)
+			err = t.purchaseWithParams(&input.Account, input.App, guid, PricingParameterAppleArcade)
 			if err != nil {
 				return fmt.Errorf("failed to purchase item with param '%s': %w", PricingParameterAppleArcade, err)
 			}
@@ -56,14 +56,36 @@ type purchaseResult struct {
 	CustomerMessage string `plist:"customerMessage,omitempty"`
 	JingleDocType   string `plist:"jingleDocType,omitempty"`
 	Status          int    `plist:"status,omitempty"`
+	Metrics         struct {
+		DialogID string `plist:"dialogId,omitempty"`
+	} `plist:"metrics,omitempty" json:"-"`
+	Dialog loginDialogResult `plist:"dialog,omitempty" json:"-"`
 }
 
-func (t *appstore) purchaseWithParams(acc Account, app App, guid string, pricingParameters string) error {
-	req := t.purchaseRequest(acc, app, acc.StoreFront, guid, pricingParameters)
+func (t *appstore) purchaseWithParams(acc *Account, app App, guid string, pricingParameters string) error {
+	req := t.purchaseRequest(*acc, app, acc.StoreFront, guid, pricingParameters)
 	res, err := t.purchaseClient.Send(req)
 
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
+	}
+
+	if res.StatusCode == gohttp.StatusOK {
+		if storefront := purchaseStorefrontCorrection(res.Data, acc.StoreFront); storefront != "" {
+			if err := t.saveAccountStorefront(acc.DirectoryServicesID, storefront); err != nil {
+				return fmt.Errorf("failed to correct account storefront: %w", err)
+			}
+
+			// Persist before retrying: an expired token causes the caller to log
+			// in again, and that login must retain Apple's corrected storefront.
+			acc.StoreFront = storefront
+			req = t.purchaseRequest(*acc, app, storefront, guid, pricingParameters)
+
+			res, err = t.purchaseClient.Send(req)
+			if err != nil {
+				return fmt.Errorf("request failed: %w", err)
+			}
+		}
 	}
 
 	if res.Data.FailureType == FailureTypeTemporarilyUnavailable {
